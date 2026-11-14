@@ -10,6 +10,7 @@ import {
   type PermissionScope,
 } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { userProfiles } from "$lib/server/db/userProfileSchema";
 import {
   permissions,
   rolePermissions,
@@ -115,8 +116,10 @@ async function requireManageableTarget(
       activatedAt: users.activatedAt,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+      avatarKey: userProfiles.avatarKey,
     })
     .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .where(eq(users.id, targetUserId))
     .limit(1);
 
@@ -142,8 +145,10 @@ export async function listManagedUsers(actorRoles: string[]) {
         status: users.status,
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
+        avatarKey: userProfiles.avatarKey,
       })
-      .from(users),
+      .from(users)
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id)),
     db
       .select({ userId: userRoles.userId, code: roles.code, name: roles.name })
       .from(userRoles)
@@ -162,6 +167,8 @@ export async function listManagedUsers(actorRoles: string[]) {
       const assignedRoles = rolesByUser.get(user.id) ?? [];
       return {
         ...user,
+        hasAvatar: Boolean(user.avatarKey),
+        avatarKey: undefined,
         roles: assignedRoles.map((role) => role.code),
         roleNames: assignedRoles.map((role) => role.name),
       };
