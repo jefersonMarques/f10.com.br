@@ -7,6 +7,7 @@
   } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import {
     ArrowUpRight,
     Image as ImageIcon,
@@ -68,6 +69,8 @@
     body: string;
     createdAt: string;
     attachments?: ChatAttachment[];
+    reactions?: Array<{ code: "like" | "heart" | "check" | "eyes"; count: number }>;
+    myReaction?: "like" | "heart" | "check" | "eyes" | null;
   };
 
   type GuestMessage = {
@@ -621,6 +624,26 @@
     pendingImages = pendingImages.filter((item) => item.id !== id);
   }
 
+  async function reactChatMessage(
+    messageId: string,
+    code: "like" | "heart" | "check" | "eyes",
+  ): Promise<void> {
+    if (!session) return;
+    const response = await fetch(`/api/support/chat/${encodeURIComponent(session.sessionId)}/reactions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messageId, reaction: code }),
+    });
+    if (!response.ok) {
+      attachmentError = "Não foi possível registrar a reação.";
+      return;
+    }
+    await refreshMessages(false);
+  }
+
   async function sendHumanMessage(): Promise<void> {
     if (!session || sending) return;
     const body = reply.trim();
@@ -710,7 +733,7 @@
         <div class="space-y-3">
           {#each messages as message}
             <div class={`flex ${message.authorType === "customer" ? "justify-end" : "justify-start"}`}>
-              <div class={`max-w-[86%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-6 ${message.authorType === "customer" ? "rounded-br-md bg-[#000A57] text-white" : message.authorType === "system" ? "border border-[#E7E9EF] bg-[#F0F2F6] text-[#6C7382]" : "rounded-bl-md border border-[#E4E7EE] bg-[var(--app-surface)] text-[var(--app-text)]"}`}>
+              <div class={`group relative max-w-[86%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-6 ${message.authorType === "customer" ? "rounded-br-md bg-[#000A57] text-white" : message.authorType === "system" ? "border border-[#E7E9EF] bg-[#F0F2F6] text-[#6C7382]" : "rounded-bl-md border border-[#E4E7EE] bg-[var(--app-surface)] text-[var(--app-text)]"}`}>
                 {#if message.authorType === "user" && message.authorUserName}<p class="mb-1 text-[12px] font-semibold text-[#6E7690]">{message.authorUserName}{message.authorOnline ? " · online" : ""}</p>{/if}
                 {#if message.body}
                   {#if message.authorType === "customer"}
@@ -725,6 +748,10 @@
                   </div>
                 {/if}
                 <p class={`mt-1 text-[10px] ${message.authorType === "customer" ? "text-white/60" : "text-[#9AA0AC]"}`}>{formatTime(message.createdAt)}</p>
+                {#if message.authorType !== "system"}
+                  <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
+                    onReact={(code) => reactChatMessage(message.id, code)}/>
+                {/if}
               </div>
             </div>
           {/each}
