@@ -31,7 +31,8 @@
     mounted = true;
     chatOpen = hasRestorableSupportChat(window.sessionStorage) ||
       readRestorableSupportGuestMessages(window.sessionStorage, SUPPORT_CHAT_GUEST_KEY).length > 0 ||
-      readRestorableSupportGuestMessages(window.sessionStorage, SUPPORT_ASSISTANT_GUEST_KEY).length > 0;
+      readRestorableSupportGuestMessages(window.sessionStorage, SUPPORT_ASSISTANT_GUEST_KEY).length > 0 ||
+      ($page.data as { openChat?: boolean }).openChat === true;
     const handleOpenHelpAssistant = (): void => openChat();
     window.addEventListener("f10:open-help-assistant", handleOpenHelpAssistant);
 
