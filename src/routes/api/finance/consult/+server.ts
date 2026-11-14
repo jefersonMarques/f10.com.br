@@ -8,9 +8,11 @@ import { getSessionUser, SESSION_COOKIE_NAME } from "$lib/server/auth/session";
 import { getPermissionScope, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { isAuthorizedF10Context } from "$lib/server/customerPortal/customerF10AuthRepository";
 import { consumeSupportPublicRateLimit } from "$lib/server/support/supportPublicRateLimit";
 import {
-  authorizeFinancePayer,
+  authorizeFinancePayerForScope,
+  type FinanceScope,
   consultFinanceInstallments,
   consultFinancePix,
 } from "$lib/server/finance/financePaymentService";
@@ -25,14 +27,11 @@ type FinanceAction = "contracts" | "installments" | "pix";
 type FinanceAccess = {
   actorId: string;
   scope: "customer" | "operator";
+  financeScope: FinanceScope;
 };
 
 function errorResponse(code: string, status: number) {
   return json({ error: code }, { status, headers: HEADERS });
-}
-
-function isFinanceAction(value: unknown): value is FinanceAction {
-  return value === "contracts" || value === "installments" || value === "pix";
 }
 
 async function authorizeFinanceAccess(
@@ -45,11 +44,24 @@ async function authorizeFinanceAccess(
     if (
       !customer ||
       customer.selectedUnitId === null ||
-      customer.selectedGroupId === null
+      customer.selectedGroupId === null ||
+      !isAuthorizedF10Context(
+        customer,
+        customer.selectedGroupId,
+        customer.selectedUnitId,
+      )
     ) {
       return null;
     }
-    return { actorId: customer.sessionId, scope: "customer" };
+    return {
+      actorId: customer.sessionId,
+      scope: "customer",
+      financeScope: {
+        kind: "customer",
+        groupId: customer.selectedGroupId,
+        unitId: customer.selectedUnitId,
+      },
+    };
   }
 
   if (scope !== "operator" || !UUID_PATTERN.test(ticketId)) return null;
@@ -78,7 +90,11 @@ async function authorizeFinanceAccess(
     return null;
   }
 
-  return { actorId: operator.user.id, scope: "operator" };
+  return {
+    actorId: operator.user.id,
+    scope: "operator",
+    financeScope: { kind: "operator", ticketId },
+  };
 }
 
 async function recordFinanceConsultation(
@@ -109,22 +125,52 @@ async function recordFinanceConsultation(
   });
 }
 
-export const GET: RequestHandler = async ({ url, cookies }) => {
+function financeError(cause: unknown) {
+  const code = cause instanceof Error ? cause.message : "FINANCE_UNAVAILABLE";
+  if (code === "FINANCE_PAYER_NOT_VALIDATED") return errorResponse(code, 401);
+  if (code === "FINANCE_CONTRACT_NOT_AUTHORIZED") return errorResponse(code, 403);
+  if (code === "FINANCE_PIX_UNAVAILABLE" ||
+      code === "FINANCE_COMPANY_UNRESOLVED" ||
+      code === "FINANCE_COMPANY_AMBIGUOUS" ||
+      code === "FINANCE_COMPANY_NOT_LINKED") {
+    return errorResponse(code, 409);
+  }
+  return errorResponse("FINANCE_UNAVAILABLE", 503);
+}
+
+async function enforceFinanceRateLimit(
+  access: FinanceAccess,
+  address: string,
+): Promise<boolean> {
+  return consumeSupportPublicRateLimit(
+    "finance-payment",
+    `${access.scope}:${access.actorId}:${address}`,
+    { maxRequests: 24, windowMs: 15 * 60_000, blockMs: 15 * 60_000 },
+  );
+}
+
+export const GET: RequestHandler = async ({ url, cookies, getClientAddress }) => {
   if (!(await isFinanceReadOnlyEnabled())) {
     return json({ enabled: false }, { headers: HEADERS });
   }
 
   try {
+    const ticketId = url.searchParams.get("ticketId") ?? "";
     const access = await authorizeFinanceAccess(
       url.searchParams.get("scope") ?? "",
-      url.searchParams.get("ticketId") ?? "",
+      ticketId,
       cookies,
     );
     if (!access) return errorResponse("FINANCE_NOT_AUTHORIZED", 403);
+    if (!(await enforceFinanceRateLimit(access, getClientAddress()))) {
+      return errorResponse("FINANCE_RATE_LIMITED", 429);
+    }
 
-    return json({ enabled: true }, { headers: HEADERS });
-  } catch {
-    return errorResponse("FINANCE_UNAVAILABLE", 503);
+    const payer = await authorizeFinancePayerForScope(access.financeScope);
+    await recordFinanceConsultation(access, "contracts", ticketId, null);
+    return json({ enabled: true, contracts: payer.contracts }, { headers: HEADERS });
+  } catch (cause) {
+    return financeError(cause);
   }
 };
 
@@ -158,21 +204,17 @@ export const POST: RequestHandler = async ({
     return errorResponse("INVALID_REQUEST", 400);
   }
 
-  const { scope, ticketId, document, birth, action } = body;
+  const { scope, ticketId, action } = body;
   const contractId = body.contractId;
   const receivableId = body.receivableId;
 
   if (
     (scope !== "customer" && scope !== "operator") ||
     (typeof ticketId !== "string" && ticketId !== undefined) ||
-    typeof document !== "string" || document.length > 30 ||
-    typeof birth !== "string" || birth.length > 10 ||
-    !isFinanceAction(action) ||
-    (action !== "contracts" && (
-      typeof contractId !== "number" ||
-      !Number.isSafeInteger(contractId) ||
-      contractId <= 0
-    )) ||
+    (action !== "installments" && action !== "pix") ||
+    typeof contractId !== "number" ||
+    !Number.isSafeInteger(contractId) ||
+    contractId <= 0 ||
     (action === "pix" && (
       typeof receivableId !== "number" ||
       !Number.isSafeInteger(receivableId) ||
@@ -187,15 +229,11 @@ export const POST: RequestHandler = async ({
     const access = await authorizeFinanceAccess(scope, normalizedTicketId, cookies);
     if (!access) return errorResponse("FINANCE_NOT_AUTHORIZED", 403);
 
-    const allowed = await consumeSupportPublicRateLimit(
-      "finance-payment",
-      `${scope}:${access.actorId}:${getClientAddress()}`,
-      { maxRequests: 12, windowMs: 15 * 60_000, blockMs: 15 * 60_000 },
-    );
+    const allowed = await enforceFinanceRateLimit(access, getClientAddress());
     if (!allowed) return errorResponse("FINANCE_RATE_LIMITED", 429);
 
-    const payer = await authorizeFinancePayer(document, birth);
-    if (action !== "contracts" && !payer.contracts.some((item) => item.id === contractId)) {
+    const payer = await authorizeFinancePayerForScope(access.financeScope);
+    if (!payer.contracts.some((item) => item.id === contractId)) {
       return errorResponse("FINANCE_CONTRACT_NOT_AUTHORIZED", 403);
     }
 
@@ -203,12 +241,9 @@ export const POST: RequestHandler = async ({
       access,
       action,
       normalizedTicketId,
-      action === "contracts" ? null : contractId as number,
+      contractId as number,
     );
 
-    if (action === "contracts") {
-      return json({ contracts: payer.contracts }, { headers: HEADERS });
-    }
     if (action === "installments") {
       const result = await consultFinanceInstallments(payer, contractId as number);
       return json(result, { headers: HEADERS });
@@ -220,13 +255,6 @@ export const POST: RequestHandler = async ({
     );
     return json(result, { headers: HEADERS });
   } catch (cause) {
-    const code = cause instanceof Error ? cause.message : "FINANCE_UNAVAILABLE";
-    if (code === "FINANCE_DOCUMENT_INVALID" || code === "FINANCE_BIRTH_INVALID") {
-      return errorResponse(code, 400);
-    }
-    if (code === "FINANCE_PAYER_NOT_VALIDATED") return errorResponse(code, 401);
-    if (code === "FINANCE_CONTRACT_NOT_AUTHORIZED") return errorResponse(code, 403);
-    if (code === "FINANCE_PIX_UNAVAILABLE") return errorResponse(code, 409);
-    return errorResponse("FINANCE_UNAVAILABLE", 503);
+    return financeError(cause);
   }
 };

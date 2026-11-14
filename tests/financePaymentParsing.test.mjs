@@ -6,6 +6,7 @@ import {
   normalizePaymentInstallments,
   positivePaymentId,
   parseF10FinanceContracts,
+  parseF10CompanyCandidates,
 } from "../src/lib/server/finance/financePaymentParsing.ts";
 
 test("finance identifiers accept only positive safe integers", () => {
@@ -94,4 +95,21 @@ test("empty authorized F10 contracts are distinct from unvalidated payers", () =
 test("CPF requires payer birth validation, CNPJ does not", () => {
   assert.throws(() => normalizePayerDocument("12345678901", ""), /FINANCE_BIRTH_INVALID/);
   assert.equal(normalizePayerDocument("12345678000190", ""), "12345678000190");
+});
+
+test("automatic company lookup rejects missing and ambiguous payer mappings", () => {
+  const resolved = parseF10CompanyCandidates([
+    { contractId: "12", holderId: "200" },
+    { contractId: "13", holderId: "200" },
+  ]);
+  assert.equal(resolved.holderId, 200);
+  assert.deepEqual([...resolved.contractIds], [12, 13]);
+  assert.throws(() => parseF10CompanyCandidates([]), /FINANCE_COMPANY_NOT_LINKED/);
+  assert.throws(() => parseF10CompanyCandidates([
+    { contractId: "12", holderId: "200" },
+    { contractId: "13", holderId: "201" },
+  ]), /FINANCE_COMPANY_AMBIGUOUS/);
+  assert.throws(() => parseF10CompanyCandidates([
+    { contractId: "12", holderId: null },
+  ]), /FINANCE_COMPANY_UNRESOLVED/);
 });

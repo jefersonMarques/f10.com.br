@@ -58,6 +58,7 @@ async function requestPaymentApi(
 
 export async function validateF10PaymentPayer(input: {
   unitId: number;
+  personId: number;
   document: string;
   birth: string;
 }): Promise<string> {
@@ -65,6 +66,7 @@ export async function validateF10PaymentPayer(input: {
     method: "POST",
     body: {
       unidade_id: input.unitId,
+      pessoa_id: input.personId,
       cpf: input.document,
       birth: input.birth,
     },
