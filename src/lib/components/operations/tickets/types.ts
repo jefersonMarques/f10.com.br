@@ -38,6 +38,7 @@ export type TicketItem = {
   queueName: string;
   assignedUserId: string | null;
   assignedUserName: string | null;
+  assignedUserHasAvatar?: boolean;
   labels: TicketLabel[];
   workflowState: TicketWorkflowState;
 };
