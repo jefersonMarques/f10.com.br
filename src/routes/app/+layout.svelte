@@ -63,6 +63,7 @@
   let lastHeartbeatAt = 0;
   const permissionCodes = new Set(data.permissions.map((permission) => permission.code));
   const canRespondToChat = permissionCodes.has("chat.respond");
+  const canTrackPresence = canRespondToChat || permissionCodes.has("tickets.reply");
   const canViewCustomers = permissionCodes.has("customers.view");
   const canTrackHelpVideoProcessing =
     permissionCodes.has("help.view") || permissionCodes.has("help.edit");
@@ -149,7 +150,7 @@
   }
 
   async function refreshPresence(): Promise<void> {
-    if (!canRespondToChat) return;
+    if (!canTrackPresence) return;
     try {
       const response = await fetch("/api/app/presence", { cache: "no-store" });
       if (response.ok) presence = await response.json() as typeof presence;
@@ -176,7 +177,7 @@
   }
 
   async function heartbeatPresence(): Promise<void> {
-    if (!canRespondToChat || !presence || presence.manualStatus === "offline") return;
+    if (!canTrackPresence || !presence || presence.manualStatus === "offline") return;
     const now = Date.now();
     if (now - lastHeartbeatAt < 60_000) return;
     lastHeartbeatAt = now;
@@ -216,7 +217,7 @@
     window.addEventListener("f10:notifications:changed", syncNotifications);
     syncNotifications();
 
-    if (canRespondToChat) {
+    if (canTrackPresence) {
       presenceTimer = setInterval(() => void refreshPresence(), 60_000);
       const handleActivity = () => void heartbeatPresence();
       window.addEventListener("pointerdown", handleActivity, { passive: true });
@@ -283,7 +284,7 @@
 
         <HelpVideoProcessingPulse enabled={canTrackHelpVideoProcessing} />
 
-        {#if canRespondToChat && presence}
+        {#if canTrackPresence && presence}
           <div bind:this={presenceMenu} class="relative hidden sm:block">
             <button type="button" on:click={() => { presenceOpen = !presenceOpen; profileOpen = false; notificationOpen = false; }} class="application-text-caption flex h-10 items-center gap-2 rounded-xl bg-[var(--app-surface-muted)] px-3 font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-muted)]" aria-expanded={presenceOpen}>
               <span class={`h-2.5 w-2.5 rounded-full ${presenceDotClass(presence.effectiveStatus)}`}></span>
