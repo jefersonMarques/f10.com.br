@@ -14,6 +14,7 @@ import {
   isNull,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { listMessageReactionSummaries, EMPTY_REACTION_SUMMARY } from "$lib/server/support/supportMessageReactionRepository";
 import {
   supportPublicLimits,
   webChatMessageAttachments,
@@ -384,7 +385,7 @@ export async function listPublicChatMessages(
         )
         .orderBy(asc(webChatMessages.createdAt));
 
-  const [attachmentRows, onlineRows] = await Promise.all([
+  const [attachmentRows, onlineRows, reactionSummaries] = await Promise.all([
     session.ticketId
       ? listSupportMessageAttachments(messages.map((message) => message.id))
       : listSupportChatMessageAttachments(messages.map((message) => message.id)),
@@ -409,6 +410,12 @@ export async function listPublicChatMessages(
           ),
         );
     })(),
+    listMessageReactionSummaries(
+      session.ticketId ? "ticket" : "chat",
+      messages.map((message) => message.id),
+      "customer",
+      session.customerContactId ?? "",
+    ),
   ]);
 
   const attachmentsByMessage = new Map<string, typeof attachmentRows>();
@@ -421,6 +428,7 @@ export async function listPublicChatMessages(
 
   return messages.map((message) => ({
     ...message,
+    ...(reactionSummaries.get(message.id) ?? EMPTY_REACTION_SUMMARY),
     authorOnline: message.authorUserId ? onlineUserIds.has(message.authorUserId) : false,
     avatarUrl: message.authorUserId
       ? `/api/support/agents/${encodeURIComponent(message.authorUserId)}/avatar`

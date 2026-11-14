@@ -153,6 +153,25 @@ export async function createTicketFromChat(
       );
     }
 
+
+    if (messages.length > 0) {
+      const messageIds = messages.map((message) => message.id);
+      await tx.execute(sql`
+        INSERT INTO support_message_reactions
+          (source_kind, message_id, actor_kind, actor_key, reaction, created_at)
+        SELECT 'ticket', message_id, actor_kind, actor_key, reaction, created_at
+        FROM support_message_reactions
+        WHERE source_kind = 'chat'
+          AND message_id IN (${sql.join(messageIds.map((id) => sql`${id}::uuid`), sql`, `)})
+        ON CONFLICT DO NOTHING
+      `);
+      await tx.execute(sql`
+        DELETE FROM support_message_reactions
+        WHERE source_kind = 'chat'
+          AND message_id IN (${sql.join(messageIds.map((id) => sql`${id}::uuid`), sql`, `)})
+      `);
+    }
+
     const attachments = await tx
       .select({
         id: webChatMessageAttachments.id,

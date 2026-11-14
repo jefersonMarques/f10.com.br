@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { listMessageReactionSummaries, EMPTY_REACTION_SUMMARY } from "$lib/server/support/supportMessageReactionRepository";
 import { customerTicketOwnershipCondition } from "$lib/server/customerPortal/ticketOwnership";
 import { calculateNextResponseDueAt } from "$lib/server/support/ticketSlaService";
 import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
@@ -322,7 +323,10 @@ export async function getCustomerPortalTicket(
       .orderBy(asc(ticketEvents.createdAt)),
   ]);
 
-  const attachmentRows = await listSupportMessageAttachments(messages.map((message) => message.id));
+  const [attachmentRows, reactionSummaries] = await Promise.all([
+    listSupportMessageAttachments(messages.map((message) => message.id)),
+    listMessageReactionSummaries("ticket", messages.map((message) => message.id), "customer", contactId),
+  ]);
   const attachmentsByMessage = new Map<string, typeof attachmentRows>();
   for (const attachment of attachmentRows) {
     const current = attachmentsByMessage.get(attachment.messageId) ?? [];
@@ -334,6 +338,7 @@ export async function getCustomerPortalTicket(
     ticket,
     messages: messages.map((message) => ({
       ...message,
+      ...(reactionSummaries.get(message.id) ?? EMPTY_REACTION_SUMMARY),
       attachments: (attachmentsByMessage.get(message.id) ?? []).map((attachment) => ({
         ...attachment,
         href: `/cliente/chamados/${ticket.id}/anexos/${attachment.id}`,

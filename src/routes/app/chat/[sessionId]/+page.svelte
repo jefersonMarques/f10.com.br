@@ -29,6 +29,7 @@
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import ChatInbox from "$lib/components/support/ChatInbox.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -375,6 +376,33 @@
     }
   }
 
+  async function reactMessage(message: ChatMessage, code: "like" | "heart" | "check" | "eyes"): Promise<void> {
+    const response = await fetch("/api/app/messages/reactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceKind: message.storageSource ?? "chat",
+        sourceSessionId: message.sourceSessionId ?? chat.sessionId,
+        messageId: message.id,
+        reaction: code,
+      }),
+    });
+    if (!response.ok) {
+      errorMessage = "Não foi possível registrar a reação.";
+      return;
+    }
+    const snapshot = await fetch(`/api/app/chat/${chat.sessionId}/messages?limit=40`, {
+      cache: "no-store",
+    });
+    if (!snapshot.ok) return;
+    const result = await snapshot.json() as { messages: ChatMessage[] };
+    const latest = new Map(result.messages.map((entry) => [entry.id, entry]));
+    messages = messages.map((entry) => {
+      const fresh = latest.get(entry.id);
+      return fresh ? { ...entry, reactions: fresh.reactions, myReaction: fresh.myReaction } : entry;
+    });
+  }
+
   async function sendMessage(): Promise<void> {
     const body = messageBody.trim();
     if ((!body && replyFiles.length === 0) || sending || !canWrite) return;
@@ -556,14 +584,16 @@
 
                 {#if message.visibility === "internal"}
                   <div class="flex justify-center py-1">
-                    <article class="w-full max-w-[88%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-4 py-3 text-[var(--app-text)] shadow-sm">
+                    <article class="group relative w-full max-w-[88%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-4 py-3 text-[var(--app-text)] shadow-sm">
                       <div class="mb-2 flex items-center justify-between gap-3"><span class="text-[12px] font-semibold text-[var(--app-warning-text)]">Nota interna · {messageAuthor(message)}</span><span class="text-[11px] text-[var(--app-text-muted)]">{formatTime(message.createdAt)}</span></div>
                       <SupportChatMarkdown text={message.body} size="md" className="mt-2 text-[var(--app-text)]"/>
+                      <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
+                        onReact={(code) => reactMessage(message, code)}/>
                     </article>
                   </div>
                 {:else}
                   <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-                    <article class={`max-w-[88%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#000A57] text-white"}`}>
+                    <article class={`group relative max-w-[88%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#000A57] text-white"}`}>
                       {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-[var(--app-info-text)]"><Bot size={13} />{message.authorUserName ?? "Sistema F10"}</div>{/if}
 
                       {#if message.attachments && message.attachments.length > 0}
@@ -583,6 +613,10 @@
 
                       {#if message.body}<SupportChatMarkdown text={message.body} isCustomer={message.authorType === "user"} size="md" />{/if}
                       <div class={`mt-2 flex items-center gap-1.5 text-[11px] ${message.authorType === "customer" ? "text-[#989EAB]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/65"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
+                      {#if message.authorType !== "system"}
+                        <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
+                          onReact={(code) => reactMessage(message, code)}/>
+                      {/if}
                     </article>
                   </div>
                 {/if}

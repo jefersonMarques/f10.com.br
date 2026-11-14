@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { listMessageReactionSummaries, EMPTY_REACTION_SUMMARY } from "$lib/server/support/supportMessageReactionRepository";
 import { selectConversationSession } from "$lib/support/chatInboxClassification";
 import { webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
@@ -460,11 +461,26 @@ export async function listInternalChatConversationMessages(
     anchorSessionId,
   );
   const page = await listRawConversationMessages(sessions, options);
+  const messages = await hydrateMessageAttachments(page.messages);
+  const [chatReactions, ticketReactions] = await Promise.all([
+    listMessageReactionSummaries(
+      "chat", messages.filter((message) => message.storageSource === "chat").map((message) => message.id),
+      "agent", actorUserId,
+    ),
+    listMessageReactionSummaries(
+      "ticket", messages.filter((message) => message.storageSource === "ticket").map((message) => message.id),
+      "agent", actorUserId,
+    ),
+  ]);
 
   return {
     chat,
     conversationKey,
-    messages: await hydrateMessageAttachments(page.messages),
+    messages: messages.map((message) => ({
+      ...message,
+      ...((message.storageSource === "chat" ? chatReactions : ticketReactions).get(message.id)
+        ?? EMPTY_REACTION_SUMMARY),
+    })),
     hasOlder: page.hasOlder,
   };
 }
