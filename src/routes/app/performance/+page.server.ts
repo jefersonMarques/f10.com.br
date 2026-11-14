@@ -18,7 +18,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const permissions = new Map(
     layout.permissions.map((permission) => [permission.code, permission.scope]),
   );
-  if (!hasPermission(permissions, "reports.view")) {
+  if (!hasPermission(permissions, "performance.view")) {
     throw error(403, "Acesso não autorizado.");
   }
 
