@@ -5,6 +5,7 @@
     ChevronDown,
     LifeBuoy,
     Layers3,
+    Download,
     LoaderCircle,
     Search,
     Sparkles,
@@ -202,6 +203,24 @@
         {/if}
       </section>
     {:else}
+    <section aria-label="Download do F10" class="mt-8">
+      <a href="/download"
+        class="group flex flex-wrap items-center justify-between gap-4 rounded-[22px] border border-[#DDE2EE] bg-white px-5 py-4 shadow-[0_8px_24px_rgba(1,13,40,0.035)] transition hover:border-[#BBC5DB] hover:shadow-md sm:px-6">
+        <span class="flex min-w-0 items-center gap-3">
+          <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
+            <Download size={21} aria-hidden="true"/>
+          </span>
+          <span class="min-w-0">
+            <strong class="block text-[15px] font-semibold text-[#010D28]">Download do F10</strong>
+            <span class="mt-0.5 block text-[12px] leading-5 text-[#687285]">Baixe o instalador oficial do F10.</span>
+          </span>
+        </span>
+        <span class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white transition group-hover:bg-[#141F77]">
+          Baixar <ArrowRight size={16}/>
+        </span>
+      </a>
+    </section>
+
     {#if data.collections.length > 0}
       <section class="mt-10">
         <div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Seleções F10</p><h2 class="mt-1 text-[24px] font-semibold tracking-[-0.035em] text-[#010D28]">Coleções</h2></div>
