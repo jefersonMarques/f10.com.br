@@ -36,6 +36,24 @@ export const supportAgentPresence = pgTable(
   ],
 );
 
+export const supportPresenceIntervals = pgTable(
+  "support_presence_intervals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    status: text("status").$type<"online" | "busy">().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    closeReason: text("close_reason").$type<"manual" | "away" | "status">(),
+  },
+  (table) => [
+    index("support_presence_intervals_range_idx").on(
+      table.userId, table.startedAt, table.endedAt,
+    ),
+  ],
+);
+
 export const supportChatRoutingMembers = pgTable(
   "support_chat_routing_members",
   {
