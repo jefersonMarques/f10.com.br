@@ -262,7 +262,7 @@
     guestMessages = [
       createGuestMessage(
         "assistant",
-        "Olá! Sou o Assistente F10. Como posso ajudar?",
+        "Olá! Como posso ajudar?",
       ),
     ];
   }
@@ -272,6 +272,10 @@
     reply = window.sessionStorage.getItem(DRAFT_KEY) ?? "";
 
     guestMessages = readRestorableSupportGuestMessages(window.sessionStorage, GUEST_KEY);
+    if (guestMessages[0]?.role === "assistant" &&
+      guestMessages[0].body === "Olá! Sou o Assistente F10. Posso tentar resolver sua dúvida agora. Você também pode pedir para falar com alguém da equipe a qualquer momento.") {
+      guestMessages = [{ ...guestMessages[0], body: "Olá! Como posso ajudar?" }, ...guestMessages.slice(1)];
+    }
     if (guestMessages.length === 0) {
       const priorMessages = readRestorableSupportGuestMessages(
         window.sessionStorage,
@@ -1011,32 +1015,6 @@
     }
   }
 
-  function startAnotherChat(): void {
-    void publishLiveDraft("");
-    clearStoredSession();
-    revokeImages(pendingImages);
-    pendingImages = [];
-    reply = "";
-    guestReply = "";
-    errorMessage = "";
-    attachmentError = "";
-    selectedEntryOptionId = "";
-    selectedEntryOptionLabel = "";
-    handoffRequested = false;
-    updateUnresolvedCount(0);
-    guestMessages = [];
-    ensureGuestGreeting();
-    persistDraft("");
-
-    if (entryDepartment === "finance") {
-      handoffRequested = true;
-      authStep = !authState.authenticated
-        ? "login"
-        : authState.requiresUnitSelection ? "unit" : "ready";
-      if (authStep === "ready") void startHumanChat();
-    }
-  }
-
   function formatTime(value: string): string {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
@@ -1097,14 +1075,6 @@
         </div>
       </div>
       <div class="flex items-center gap-1.5">
-        {#if !session && entryDepartment === "support"}
-          <button type="button" on:click={() => void requestHumanSupport()}
-            class="inline-flex min-h-9 shrink-0 items-center rounded-full border border-[#DDE1E9] bg-white px-2.5 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F5F6FA] sm:px-3"
-            aria-label="Falar com a equipe F10">
-            <span class="sm:hidden">Equipe</span>
-            <span class="hidden sm:inline">Falar com a equipe</span>
-          </button>
-        {/if}
         <button type="button" on:click={onClose} class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#F2F3F7] text-[#5F6676] transition hover:bg-[#E7E9EF] hover:text-[#000A57]" aria-label="Fechar chat">
           <X size={18} aria-hidden="true" />
         </button>
@@ -1212,20 +1182,24 @@
             {/if}
           {/each}
 
-          {#if entryDepartment === "support" && guestMessages.length <= 3 && !handoffRequested}
-            <div class="ml-10 space-y-2 pt-1">
-              <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9A9FAA]">Opções rápidas</p>
-              {#if entryOptionsLoading}
-                <div class="py-2 text-[#8A909E]"><LoaderCircle class="animate-spin" size={16}/></div>
-              {:else}
-                <div class="flex flex-wrap gap-2">
+          {#if entryDepartment === "support" && !handoffRequested}
+            <div class="ml-10 flex flex-wrap gap-2 pt-1">
+              {#if guestMessages.length <= 3}
+                {#if entryOptionsLoading}
+                  <LoaderCircle class="animate-spin text-[#8A909E]" size={16}/>
+                {:else}
                   {#each entryOptions.filter((option) => !isFinancialChatOption(option)) as option}
-                    <button type="button" on:click={() => void selectEntryOption(option)} class="rounded-xl border border-[#DDE1E9] bg-white px-3 py-2 text-left text-[11px] font-semibold text-[#3D4556] shadow-sm transition hover:border-[#BFC5D2] hover:text-[#000A57]">
+                    <button type="button" on:click={() => void selectEntryOption(option)}
+                      class="min-h-9 rounded-xl border border-[#DDE1E9] bg-white px-3 text-[12px] font-semibold text-[#3D4556] transition hover:border-[#BFC5D2] hover:text-[#000A57]">
                       {option.label}
                     </button>
                   {/each}
-                </div>
+                {/if}
               {/if}
+              <button type="button" on:click={() => void requestHumanSupport()}
+                class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#E8BD9D] bg-[#FFF6EC] px-3 text-[12px] font-semibold text-[#A64B08] transition hover:bg-[#FFEBD9]">
+                <UserRound size={15} aria-hidden="true"/> Falar com a equipe
+              </button>
             </div>
           {/if}
 
@@ -1299,7 +1273,6 @@
           <textarea bind:value={reply} maxlength="4000" rows="1" placeholder="Escreva sua mensagem..." class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[14px] leading-6 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" on:input={handleCustomerDraftInput} on:keydown={handleReplyKeydown} on:paste={handleReplyPaste}></textarea>
           <button type="submit" disabled={sending || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>
-        <div class="mt-2 flex flex-wrap items-center justify-between gap-2"><span class="text-[11px] text-[#777E8D]">Texto visível à equipe · Enter envia · Shift+Enter quebra linha</span><button type="button" on:click={startAnotherChat} class="text-[11px] font-semibold text-[#6D7485] hover:text-[#000A57]">Novo atendimento</button></div>
       </form>
     {:else if entryDepartment === "support" && !handoffRequested}
       <form class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-3" on:submit|preventDefault={sendGuestMessage}>
@@ -1307,10 +1280,6 @@
         <div class="flex items-end gap-2">
           <textarea bind:value={guestReply} maxlength="2000" rows="1" placeholder="Digite sua dúvida..." disabled={assistantSending || handoffRequested} class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[14px] leading-6 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10 disabled:opacity-55" on:keydown={handleGuestKeydown}></textarea>
           <button type="submit" disabled={assistantSending || handoffRequested || !guestReply.trim()} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white disabled:opacity-40" aria-label="Enviar para o Assistente F10">{#if assistantSending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
-        </div>
-        <div class="mt-2 flex items-center justify-between gap-2">
-          <span class="text-[11px] text-[#999EAA]">O Assistente responde com base no conteúdo publicado pela F10.</span>
-
         </div>
       </form>
     {/if}
