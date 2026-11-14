@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 const logoPath = "/branding/f10-helpdesk-white.png";
@@ -13,6 +14,7 @@ const views = [
 test("public Helpdesk uses the supplied white asset without logo plates", () => {
   const image = readFileSync(`static${logoPath}`);
   assert.equal(image.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(createHash("sha256").update(image).digest("hex"), "12682ffd6ac0ddafa4d9eb426c20b083a6b313f936418b682c604e76c283dbe9");
   for (const view of views) {
     const source = readFileSync(view, "utf8");
     assert.ok(source.includes(logoPath), view);
