@@ -68,6 +68,7 @@
   let messages: ChatMessage[] = data.initial.messages;
   let chat: ChatDetails = data.initial.chat;
   let messageBody = "";
+  let replyFiles: File[] = [];
   let liveCustomerDraft = "";
   let liveDraftSessionId = "";
   let liveDraftStream: EventSource | null = null;
@@ -145,6 +146,7 @@
     loadedSessionId = data.initial.chat.sessionId;
     chat = data.initial.chat;
     messages = data.initial.messages;
+    replyFiles = [];
     conversationInitialized = false;
     composerExpanded = false;
     conversationKey = data.chatInbox.find((item) => item.sessionId === chat.sessionId)?.conversationKey ?? null;
@@ -365,16 +367,22 @@
 
   async function sendMessage(): Promise<void> {
     const body = messageBody.trim();
-    if (!body || sending || !canWrite) return;
+    if ((!body && replyFiles.length === 0) || sending || !canWrite) return;
+    if (replyFiles.length > 4 || replyFiles.reduce((total, file) => total + file.size, 0) > 12 * 1024 * 1024) {
+      errorMessage = "Máximo de 4 arquivos e 12 MB por mensagem.";
+      return;
+    }
 
     sending = true;
     errorMessage = "";
 
     try {
+      const form = new FormData();
+      form.set("body", body);
+      for (const file of replyFiles) form.append("files", file, file.name);
       const response = await fetch(`/api/app/chat/${chat.sessionId}/messages`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body }),
+        body: form,
       });
 
       if (!response.ok) {
@@ -383,6 +391,7 @@
       }
 
       messageBody = "";
+      replyFiles = [];
       persistDraft();
       composerExpanded = false;
       await refreshMessages(true);
@@ -539,10 +548,15 @@
                       {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-[var(--app-info-text)]"><Bot size={13} />{message.authorUserName ?? "Sistema F10"}</div>{/if}
 
                       {#if message.attachments && message.attachments.length > 0}
-                        <div class={`mb-2 grid gap-2 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                        <div class="mb-2 grid gap-2">
                           {#each message.attachments as attachment}
-                            <a href={attachmentUrl(message, attachment.id)} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-xl border border-black/5 bg-[#F2F3F6]">
-                              <img src={attachmentUrl(message, attachment.id)} alt={attachment.originalName} class="max-h-[300px] w-full object-contain" />
+                            <a href={attachmentUrl(message, attachment.id)} target="_blank" rel="noopener noreferrer"
+                              class="flex min-h-12 items-center justify-center gap-2 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-2 text-[var(--app-text)]">
+                              {#if attachment.mimeType.startsWith("image/")}
+                                <img src={attachmentUrl(message, attachment.id)} alt={attachment.originalName} loading="lazy" class="max-h-[300px] w-full object-contain"/>
+                              {:else}
+                                <Download size={17}/><span class="min-w-0 break-all text-[13px]">{attachment.originalName}</span>
+                              {/if}
                             </a>
                           {/each}
                         </div>
@@ -620,18 +634,23 @@
                     <TicketRichTextEditor
                       bind:this={replyEditor}
                       bind:value={messageBody}
+                      bind:files={replyFiles}
                       submitting={sending}
-                      showAttachments={false}
                       sendOnEnter
                       onSend={() => void sendMessage()}
                       placeholder="Escreva uma mensagem para o cliente..."
                     />
                     <div class="mt-2 flex items-center justify-between gap-3 border-t border-[var(--app-border-soft)] pt-2">
-                      <span class="text-[11px] text-[var(--app-text-muted)]">Enter envia · Shift+Enter quebra linha</span>
-                      <button type="submit" disabled={sending || !messageBody.trim()}
+                      <span class="text-[12px] text-[var(--app-text-muted)]">Enter envia · Shift+Enter quebra linha</span>
+                      <div class="flex items-center gap-1">
+                        <button type="button" disabled={sending} aria-label="Anexar arquivos" title="Anexar arquivo"
+                          on:click={() => replyEditor?.openFilePicker()}
+                          class="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Download size={17}/></button>
+                      <button type="submit" disabled={sending || (!messageBody.trim() && replyFiles.length === 0)}
                         class="inline-flex h-10 items-center gap-2 rounded-lg bg-[var(--app-primary)] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
                         <Send size={15}/>{sending ? "Enviando..." : "Enviar"}
                       </button>
+                      </div>
                     </div>
                   </form>
                 {:else if composerMode === "note" && data.canInternalNote}
