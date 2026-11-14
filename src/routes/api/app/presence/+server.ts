@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
-import { requireAppPermission } from "$lib/server/auth/authorization";
+import { requireAppAnyPermission } from "$lib/server/auth/authorization";
 import {
   getSupportAgentPresence,
   heartbeatSupportAgent,
@@ -8,9 +8,9 @@ import {
 } from "$lib/server/support/supportAgentPresence";
 
 export const GET: RequestHandler = async ({ cookies, url }) => {
-  const { session } = await requireAppPermission(
+  const { session } = await requireAppAnyPermission(
     cookies,
-    "chat.respond",
+    ["chat.respond", "tickets.reply"],
     `${url.pathname}${url.search}`,
   );
   return json(await getSupportAgentPresence(session.user.id), {
@@ -23,9 +23,9 @@ export const POST: RequestHandler = async ({ cookies, request, url }) => {
     return json({ error: "INVALID_ORIGIN" }, { status: 403 });
   }
 
-  const { session } = await requireAppPermission(
+  const { session } = await requireAppAnyPermission(
     cookies,
-    "chat.respond",
+    ["chat.respond", "tickets.reply"],
     "/app",
   );
 

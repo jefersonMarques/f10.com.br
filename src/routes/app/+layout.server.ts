@@ -29,7 +29,7 @@ export const load: LayoutServerLoad = async ({ cookies, url }) => {
   const permissionMap = await resolveUserPermissions(session.user.id);
   const [notifications, presence, account] = await Promise.all([
     getNotificationSummary(session.user.id),
-    hasPermission(permissionMap, "chat.respond")
+    (hasPermission(permissionMap, "chat.respond") || hasPermission(permissionMap, "tickets.reply"))
       ? getSupportAgentPresence(session.user.id).catch(() => OFFLINE_PRESENCE)
       : Promise.resolve(null),
     getUserAccount(session.user.id),

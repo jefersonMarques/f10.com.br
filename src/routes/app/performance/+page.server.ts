@@ -5,6 +5,7 @@ import {
   getSupportPerformance,
   type SupportPerformancePeriod,
 } from "$lib/server/reports/supportPerformanceRepository";
+import { getSupportPresenceTimeline } from "$lib/server/reports/supportPresenceTimelineRepository";
 
 function readPeriod(value: string | null): SupportPerformancePeriod {
   if (value === "7") return 7;
@@ -22,7 +23,10 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   }
 
   const periodDays = readPeriod(url.searchParams.get("period"));
-  return {
-    performance: await getSupportPerformance(periodDays),
-  };
+  const [performance, presence] = await Promise.all([
+    getSupportPerformance(periodDays),
+    getSupportPresenceTimeline(url.searchParams.get("date")),
+  ]);
+
+  return { performance, presence };
 };

@@ -9,9 +9,11 @@
     TrendingUp,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import SupportPresencePanel from "$lib/components/operations/SupportPresencePanel.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
+  let activeTab: "results" | "presence" = "results";
 
   let performance: PageData["performance"];
   let traffic: PageData["performance"]["traffic"];
@@ -63,9 +65,23 @@
   }
 </script>
 
-<svelte:head><title>Performance | F10 Operations</title></svelte:head>
+<svelte:head><title>Performance | Helpdesk F10</title></svelte:head>
 
 <ApplicationContent width="wide">
+  <nav class="mb-4 flex gap-2" aria-label="Visões da performance">
+    <button type="button" on:click={() => (activeTab = "results")}
+      class:active={activeTab === "results"}
+      class="application-text-caption min-h-10 rounded-lg border border-app-border-control px-4 font-semibold text-app-text">
+      Resultados
+    </button>
+    <button type="button" on:click={() => (activeTab = "presence")}
+      class:active={activeTab === "presence"}
+      class="application-text-caption min-h-10 rounded-lg border border-app-border-control px-4 font-semibold text-app-text">
+      Presença da equipe
+    </button>
+  </nav>
+  {#if activeTab === "results"}
+
   <div class="flex justify-end">
     <div class="flex rounded-xl border border-[#DDE1EA] bg-white p-1">
       {#each [7, 30, 90] as period}
@@ -199,4 +215,10 @@
   </section>
 
   <p class="application-text-meta mt-4 leading-5 text-[#9196A3]">“Resolvidos” usa o usuário que registrou a mudança para Resolvido/Fechado. “SLA 1ª resp.” considera apenas tickets que possuem prazo de primeira resposta e atribui o resultado ao autor da primeira resposta pública humana.</p>
+  {:else}
+    <SupportPresencePanel initialData={data.presence}/>
+  {/if}
 </ApplicationContent>
+<style>
+  .active { background: var(--app-primary); color: white; border-color: var(--app-primary); }
+</style>
