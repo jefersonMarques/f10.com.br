@@ -131,6 +131,52 @@ ser maior que o total do snapshot se houver registros fora desse recorte.
 Uma auditoria mais detalhada deverá comparar exatamente os IDs do inventário
 com o mapeamento do banco e apontar chats com transcrição ainda não reconstruída.
 
+## 6. Recuperação das ocorrências com IDs de ação repetidos
+
+A importação final constatou 31.085 tickets e 21.070 transcrições reconstruídas,
+mas 45 tickets contêm 48 ocorrências adicionais que reutilizam IDs de ações já
+existentes. Nenhuma ação de ID distinto está ausente. As 48 ocorrências possuem
+metadados diferentes; 29 alteram a descrição e algumas alteram autor e anexos.
+
+A correção é **separada do importador original** e lê exclusivamente o snapshot
+local. Não execute novamente a importação integral para resolver duplicidades.
+
+1. Confirme backup PostgreSQL e a migração `0111_movidesk_duplicate_action_recovery.sql`.
+2. Valide o snapshot completo sem escrita:
+
+   `node scripts/recover-movidesk-duplicate-actions.mjs`
+
+   Deve registrar `ticketsValidated: 31085`, `ticketsAffected: 45` e
+   `duplicateOccurrences: 48`. Os contadores bloqueiam alterações se o inventário mudar.
+
+3. Somente após autorização, aplique o lote controlado:
+
+   `node --env-file-if-exists=.env --env-file-if-exists=.env.production scripts/recover-movidesk-duplicate-actions.mjs --apply --limit 3`
+
+4. Execute a auditoria em modo somente leitura; enquanto faltarem ocorrências,
+   `state: "requires_review"` é esperado.
+
+5. Após aprovação, execute a recuperação completa:
+
+   `node --env-file-if-exists=.env --env-file-if-exists=.env.production scripts/recover-movidesk-duplicate-actions.mjs --apply --all`
+
+6. Repita `scripts/audit-movidesk-final-snapshot-import.mjs`. São esperados:
+   `missingActions: 0`, `missingDuplicateOccurrences: 0`,
+   `recoveredDuplicateOccurrences: 48`, `missingActionIds: 0`,
+   `duplicateArchiveMismatches: 0`, `recoveredMessageAccessIssues: 0`.
+
+A tabela `movidesk_ticket_action_occurrences` preserva o JSON textual e SHA-256
+de cada ocorrência, junto ao índice de repetição. Alterações de data e estado
+sem conteúdo distinto ficam arquivadas sem criar notas repetidas. Mensagens
+com informações próprias são criadas como **internas**, com identificação estável.
+Transcrições adicionais reconhecidas como chat são arquivadas para revisão manual.
+Nenhum anexo binário é transferido, nenhuma sessão de chat é reaberta e
+nenhuma notificação é enviada.
+
+Se a auditoria detectar divergência, não repita o importador original e não faça
+atualizações SQL manuais. A recuperação é transacional por ticket e verifica
+o SHA-256 antes de considerar uma ocorrência já recuperada.
+
 ## Limitações e pós-importação
 
 1. Importar os arquivos de anexos históricos para armazenamento próprio, sem
