@@ -170,6 +170,7 @@ export type TicketDetailsData = {
       queueName: string;
       assignedUserId: string | null;
       assignedUserName: string | null;
+      assignedUserHasAvatar?: boolean;
       customerContactId: string | null;
       customerName: string | null;
       customerEmail: string | null;
@@ -191,6 +192,8 @@ export type TicketDetailsData = {
       sourceTicketNumber?: number;
       authorType: string;
       authorUserName: string | null;
+      authorUserId?: string | null;
+      authorHasAvatar?: boolean;
       customerName: string | null;
       visibility: string;
       channel?: string;
