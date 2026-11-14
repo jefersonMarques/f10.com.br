@@ -30,6 +30,7 @@
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
+  import MessageTaskPopover from "$lib/components/support/MessageTaskPopover.svelte";
   import ChatInbox from "$lib/components/support/ChatInbox.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -69,6 +70,7 @@
   let messages: ChatMessage[] = data.initial.messages;
   let chat: ChatDetails = data.initial.chat;
   let messageBody = "";
+  let messageForTask: ChatMessage | null = null;
   let replyFiles: File[] = [];
   let liveCustomerDraft = "";
   let liveDraftSessionId = "";
@@ -376,6 +378,16 @@
     }
   }
 
+  async function onTaskCreated(task: { id: string; title: string }): Promise<void> {
+    if (!messageForTask) return;
+    const messageId = messageForTask.id;
+    messages = messages.map((entry) =>
+      entry.id === messageId
+        ? { ...entry, taskLinks: [...(entry.taskLinks ?? []), task] }
+        : entry,
+    );
+  }
+
   async function reactMessage(message: ChatMessage, code: "like" | "heart" | "check" | "eyes"): Promise<void> {
     const response = await fetch("/api/app/messages/reactions", {
       method: "POST",
@@ -588,7 +600,10 @@
                       <div class="mb-2 flex items-center justify-between gap-3"><span class="text-[12px] font-semibold text-[var(--app-warning-text)]">Nota interna · {messageAuthor(message)}</span><span class="text-[11px] text-[var(--app-text-muted)]">{formatTime(message.createdAt)}</span></div>
                       <SupportChatMarkdown text={message.body} size="md" className="mt-2 text-[var(--app-text)]"/>
                       <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
-                        onReact={(code) => reactMessage(message, code)}/>
+                        onReact={(code) => reactMessage(message, code)}
+                        taskLinks={message.taskLinks ?? []}
+                        canCreateTask={data.canCreateTask && data.taskProjects.length > 0}
+                        onCreateTask={() => (messageForTask = message)}/>
                     </article>
                   </div>
                 {:else}
@@ -615,7 +630,10 @@
                       <div class={`mt-2 flex items-center gap-1.5 text-[11px] ${message.authorType === "customer" ? "text-[#989EAB]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/65"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
                       {#if message.authorType !== "system"}
                         <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
-                          onReact={(code) => reactMessage(message, code)}/>
+                          onReact={(code) => reactMessage(message, code)}
+                        taskLinks={message.taskLinks ?? []}
+                        canCreateTask={data.canCreateTask && data.taskProjects.length > 0}
+                        onCreateTask={() => (messageForTask = message)}/>
                       {/if}
                     </article>
                   </div>
@@ -837,3 +855,16 @@
     </aside>
   </div>
 </ApplicationContent>
+
+{#if messageForTask}
+  <MessageTaskPopover
+    sourceKind={messageForTask.storageSource ?? "chat"}
+    messageId={messageForTask.id}
+    messageBody={messageForTask.body}
+    sourceSessionId={messageForTask.sourceSessionId ?? chat.sessionId}
+    ticketId={chat.ticketId}
+    projects={data.taskProjects}
+    onCreated={onTaskCreated}
+    onClose={() => (messageForTask = null)}
+  />
+{/if}
