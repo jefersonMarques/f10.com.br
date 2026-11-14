@@ -194,7 +194,8 @@ export async function consultFinancePix(
   return {
     receivableId,
     installment: installment.installment,
-    amount: typeof detail.valor === "string" ? detail.valor : installment.amount,
+    amount: typeof detail.calculo === "string" ? detail.calculo
+      : typeof detail.valor === "string" ? detail.valor : installment.amount,
     dueDate: typeof detail.vencimento === "string" ? detail.vencimento : installment.dueDate,
     expiresAt: typeof detail.validade === "string" ? detail.validade : null,
     copyPaste: code,

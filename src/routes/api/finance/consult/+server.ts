@@ -1,6 +1,8 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { and, eq, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { customerActivityEvents } from "$lib/server/db/customerPortalSchema";
+import { recordAuditEvent } from "$lib/server/auth/audit";
 import { teamMembers, teams } from "$lib/server/db/schema";
 import { getSessionUser, SESSION_COOKIE_NAME } from "$lib/server/auth/session";
 import { getPermissionScope, resolveUserPermissions } from "$lib/server/auth/permissions";
@@ -139,6 +141,24 @@ export const POST: RequestHandler = async ({
       { maxRequests: 12, windowMs: 15 * 60_000, blockMs: 15 * 60_000 },
     );
     if (!allowed) return errorResponse("FINANCE_RATE_LIMITED", 429);
+
+    if (scope === "operator") {
+      await recordAuditEvent({
+        actorUserId: access.sessionKey,
+        action: "operations.finance.read",
+        entityType: "ticket",
+        entityId: typeof ticketId === "string" ? ticketId : "",
+        metadata: { contractId, operation: action },
+      });
+    } else {
+      await getDatabase().insert(customerActivityEvents).values({
+        portalSessionId: access.sessionKey,
+        eventType: "finance.read",
+        source: "customer_portal",
+        path: "/api/finance/consult",
+        metadata: { contractId, operation: action },
+      });
+    }
 
     if (action === "installments") {
       const result = await consultFinanceInstallments(selected, document, birth);
