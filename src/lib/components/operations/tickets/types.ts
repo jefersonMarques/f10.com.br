@@ -195,6 +195,9 @@ export type TicketDetailsData = {
       visibility: string;
       channel?: string;
       body: string;
+      reactions?: Array<{ code: "like" | "heart" | "check" | "eyes"; count: number }>;
+      myReaction?: "like" | "heart" | "check" | "eyes" | null;
+      taskLinks?: Array<{ id: string; title: string }>;
       inlineImages?: Array<{ src: string; alt: string; external: boolean }>;
       attachments?: TicketAttachment[];
       createdAt: string | Date;
