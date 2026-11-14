@@ -135,9 +135,9 @@
   const GUEST_KEY = SUPPORT_CHAT_GUEST_KEY;
   const UNRESOLVED_KEY = "f10-support-chat-unresolved-v1";
   const BOTTOM_THRESHOLD = 100;
-  const MAX_IMAGES = 4;
-  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-  const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+  const MAX_FILES = 4;
+  const MAX_FILE_BYTES = 10 * 1024 * 1024;
+  const ALLOWED_ATTACHMENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
 
   let messagesElement: HTMLDivElement;
   let fileInputElement: HTMLInputElement;
@@ -833,19 +833,19 @@
     attachmentError = "";
     const valid: File[] = [];
     for (const file of files) {
-      if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-        attachmentError = "Use imagens PNG, JPG/JPEG ou WebP.";
+      if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+        attachmentError = "Aceitos: PNG, JPG, WebP e PDF.";
         continue;
       }
-      if (file.size < 1 || file.size > MAX_IMAGE_BYTES) {
-        attachmentError = "Cada imagem pode ter no máximo 8 MB.";
+      if (file.size < 1 || file.size > MAX_FILE_BYTES) {
+        attachmentError = "Cada arquivo pode ter no máximo 10 MB.";
         continue;
       }
       valid.push(file);
     }
 
-    const available = Math.max(MAX_IMAGES - pendingImages.length, 0);
-    if (valid.length > available) attachmentError = "Envie no máximo 4 imagens por mensagem.";
+    const available = Math.max(MAX_FILES - pendingImages.length, 0);
+    if (valid.length > available) attachmentError = "Envie no máximo 4 arquivos por mensagem.";
     pendingImages = [...pendingImages, ...valid.slice(0, available).map(makePendingImage)];
   }
 
@@ -889,7 +889,7 @@
   function handleDrop(event: DragEvent): void {
     event.preventDefault();
     dragActive = false;
-    addImageFiles(Array.from(event.dataTransfer?.files ?? []).filter((file) => file.type.startsWith("image/")));
+    addImageFiles(Array.from(event.dataTransfer?.files ?? []));
   }
 
   async function sendReply(): Promise<void> {
@@ -1103,7 +1103,11 @@
                     {#if message.attachments?.length}
                       <div class={`grid gap-1.5 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                         {#each message.attachments as attachment}
-                          <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-xl bg-white/10"><img src={attachment.url} alt={attachment.originalName} class="max-h-52 w-full object-cover" on:error={hideBrokenImage}/></a>
+                          <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-xl bg-white/10">{#if attachment.mimeType.startsWith("image/")}
+                              <img src={attachment.url} alt={attachment.originalName} class="max-h-52 w-full object-contain" on:error={hideBrokenImage}/>
+                            {:else}
+                              <span class="flex min-h-12 items-center gap-2 px-3 py-2 text-[12px]"><Paperclip size={16}/><span class="min-w-0 truncate">{attachment.originalName}</span></span>
+                            {/if}</a>
                         {/each}
                       </div>
                     {/if}
@@ -1127,7 +1131,11 @@
                       {#if message.attachments?.length}
                         <div class={`grid gap-1.5 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                           {#each message.attachments as attachment}
-                            <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-xl bg-[#F4F5F8]"><img src={attachment.url} alt={attachment.originalName} class="max-h-52 w-full object-cover" on:error={hideBrokenImage}/></a>
+                            <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-xl bg-[#F4F5F8]">{#if attachment.mimeType.startsWith("image/")}
+                              <img src={attachment.url} alt={attachment.originalName} class="max-h-52 w-full object-contain" on:error={hideBrokenImage}/>
+                            {:else}
+                              <span class="flex min-h-12 items-center gap-2 px-3 py-2 text-[12px]"><Paperclip size={16}/><span class="min-w-0 truncate">{attachment.originalName}</span></span>
+                            {/if}</a>
                           {/each}
                         </div>
                       {/if}
@@ -1235,13 +1243,17 @@
 
     {#if session && (entryDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>
-        {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[10px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte a imagem para anexar</div>{/if}
+        {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[10px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte o arquivo para anexar</div>{/if}
         {#if errorMessage}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
         {#if attachmentError}<p class="mb-2 rounded-xl bg-[#FFF8EE] px-3 py-2 text-[9px] leading-4 text-[#8B5B24]">{attachmentError}</p>{/if}
-        {#if pendingImages.length > 0}<div class="mb-2 flex gap-2 overflow-x-auto">{#each pendingImages as image (image.id)}<div class="relative h-14 w-16 shrink-0 overflow-hidden rounded-xl border border-[#DDE1E9]"><img src={image.previewUrl} alt={image.file.name || "Imagem"} class="h-full w-full object-cover"/><button type="button" on:click={() => removePendingImage(image.id)} class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-white" aria-label="Remover imagem"><X size={10}/></button></div>{/each}</div>{/if}
-        <input bind:this={fileInputElement} type="file" multiple accept="image/png,image/jpeg,image/webp" class="hidden" on:change={handleFileInput}/>
+        {#if pendingImages.length > 0}<div class="mb-2 flex gap-2 overflow-x-auto">{#each pendingImages as image (image.id)}<div class="relative h-14 w-16 shrink-0 overflow-hidden rounded-xl border border-[#DDE1E9]">{#if image.file.type.startsWith("image/")}
+          <img src={image.previewUrl} alt={image.file.name || "Imagem"} class="h-full w-full object-cover"/>
+        {:else}
+          <span class="flex h-full w-full flex-col items-center justify-center bg-[var(--app-surface-muted)] text-[var(--app-text)]"><Paperclip size={17}/><span class="max-w-full truncate px-1 text-[10px]">PDF</span></span>
+        {/if}<button type="button" on:click={() => removePendingImage(image.id)} class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-white" aria-label="Remover imagem"><X size={10}/></button></div>{/each}</div>{/if}
+        <input bind:this={fileInputElement} type="file" multiple accept="image/png,image/jpeg,image/webp,application/pdf" class="hidden" on:change={handleFileInput}/>
         <div class="flex items-end gap-2">
-          <button type="button" on:click={() => fileInputElement?.click()} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDE1E9] text-[#667080] hover:text-[#000A57]" aria-label="Anexar imagem"><Paperclip size={16}/></button>
+          <button type="button" on:click={() => fileInputElement?.click()} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDE1E9] text-[#667080] hover:text-[#000A57]" aria-label="Anexar arquivo"><Paperclip size={16}/></button>
           <textarea bind:value={reply} maxlength="4000" rows="1" placeholder="Escreva sua mensagem..." class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[11px] leading-5 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" on:input={handleCustomerDraftInput} on:keydown={handleReplyKeydown} on:paste={handleReplyPaste}></textarea>
           <button type="submit" disabled={sending || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>

@@ -11,7 +11,7 @@ import {
   authorizePublicChatSessionForRead,
   listPublicChatMessages,
 } from "$lib/server/support/publicChatRepository";
-import { SUPPORT_IMAGE_MAX_FILES } from "$lib/server/support/supportMessageAttachmentRepository";
+import { SUPPORT_ATTACHMENT_MAX_FILES } from "$lib/server/support/supportMessageAttachmentRepository";
 import { updateLiveChatDraft } from "$lib/server/support/liveChatDrafts";
 
 const MAX_BODY_BYTES = 36 * 1024 * 1024;
@@ -216,7 +216,7 @@ export const POST: RequestHandler = async ({
   if (body.length > 4000 || (body.length < 1 && files.length === 0)) {
     return json({ error: "INVALID_MESSAGE" }, { status: 400 });
   }
-  if (files.length > SUPPORT_IMAGE_MAX_FILES) {
+  if (files.length > SUPPORT_ATTACHMENT_MAX_FILES) {
     return json({ error: "TOO_MANY_ATTACHMENTS" }, { status: 400 });
   }
 
@@ -267,7 +267,7 @@ export const POST: RequestHandler = async ({
     if (cause instanceof Error && cause.message === "CHAT_TICKET_CLOSED") {
       return json({ error: "CHAT_CLOSED" }, { status: 409 });
     }
-    if (cause instanceof Error && cause.message.startsWith("SUPPORT_IMAGE_")) {
+    if (cause instanceof Error && cause.message.startsWith("SUPPORT_ATTACHMENT_")) {
       return json({ error: cause.message }, { status: 400 });
     }
     if (cause instanceof Error && cause.message.startsWith("ASSET_STORAGE_")) {

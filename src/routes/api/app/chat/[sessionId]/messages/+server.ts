@@ -7,7 +7,7 @@ import {
 import { listInternalChatConversationMessages } from "$lib/server/support/internalChatConversationRepository";
 import { respondToInternalChat } from "$lib/server/support/internalChatRepository";
 
-const MAX_BODY_BYTES = 8 * 1024;
+const MAX_BODY_BYTES = 14 * 1024 * 1024;
 const DEFAULT_PAGE_SIZE = 40;
 const MAX_PAGE_SIZE = 100;
 
@@ -120,16 +120,27 @@ export const POST: RequestHandler = async ({
     return json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  let payload: Record<string, unknown>;
+
+  let body = "";
+  let files: File[] = [];
   try {
-    payload = (await request.json()) as Record<string, unknown>;
+    if (request.headers.get("content-type")?.includes("multipart/form-data")) {
+      const form = await request.formData();
+      body = String(form.get("body") ?? "").trim();
+      files = form.getAll("files").filter((item): item is File => item instanceof File && item.size > 0);
+    } else {
+      const payload = (await request.json()) as Record<string, unknown>;
+      body = typeof payload.body === "string" ? payload.body.trim() : "";
+    }
   } catch {
-    return json({ error: "INVALID_JSON" }, { status: 400 });
+    return json({ error: "INVALID_PAYLOAD" }, { status: 400 });
   }
 
-  const body = typeof payload.body === "string" ? payload.body.trim() : "";
-  if (body.length < 1 || body.length > 4000) {
+  if (body.length > 4000 || (!body && files.length === 0)) {
     return json({ error: "INVALID_MESSAGE" }, { status: 400 });
+  }
+  if (files.length > 4 || files.reduce((total, file) => total + file.size, 0) > 12 * 1024 * 1024) {
+    return json({ error: "INVALID_ATTACHMENTS" }, { status: 413 });
   }
 
   try {
@@ -138,9 +149,13 @@ export const POST: RequestHandler = async ({
       authentication.permissions,
       sessionId,
       body,
+      files,
     );
     return json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (cause) {
+    if (cause instanceof Error && cause.message.startsWith("SUPPORT_ATTACHMENT_")) {
+      return json({ error: cause.message }, { status: 400 });
+    }
     return json({ error: "CHAT_NOT_WRITABLE" }, { status: 403 });
   }
 };
