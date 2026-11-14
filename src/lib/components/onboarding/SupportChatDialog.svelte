@@ -7,6 +7,7 @@
   } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import { isFinancialChatOption } from "$lib/support/chatEntryRouting";
   import {
     ArrowDown,
@@ -84,6 +85,8 @@
     presentation?: "remote_access" | "routing" | "closed" | null;
     attachments?: ChatAttachment[];
     optimistic?: boolean;
+    reactions?: Array<{ code: "like" | "heart" | "check" | "eyes"; count: number }>;
+    myReaction?: "like" | "heart" | "check" | "eyes" | null;
   };
 
   type GuestMessage = {
@@ -892,6 +895,26 @@
     addImageFiles(Array.from(event.dataTransfer?.files ?? []));
   }
 
+  async function reactChatMessage(
+    messageId: string,
+    code: "like" | "heart" | "check" | "eyes",
+  ): Promise<void> {
+    if (!session) return;
+    const response = await fetch(`/api/support/chat/${encodeURIComponent(session.sessionId)}/reactions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messageId, reaction: code }),
+    });
+    if (!response.ok) {
+      attachmentError = "Não foi possível registrar a reação.";
+      return;
+    }
+    await refreshMessages(false);
+  }
+
   async function sendReply(): Promise<void> {
     if (!session || sending) return;
     const body = reply.trim();
@@ -1099,7 +1122,7 @@
                 </div>
               {:else if message.authorType === "customer"}
                 <div class="flex justify-end">
-                  <div class={`max-w-[86%] rounded-2xl rounded-br-md bg-[#000A57] px-3.5 py-2.5 text-white ${message.optimistic ? "opacity-70" : ""}`}>
+                  <div class={`group relative max-w-[86%] rounded-2xl rounded-br-md bg-[#000A57] px-3.5 py-2.5 text-white ${message.optimistic ? "opacity-70" : ""}`}>
                     {#if message.attachments?.length}
                       <div class={`grid gap-1.5 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                         {#each message.attachments as attachment}
@@ -1113,6 +1136,10 @@
                     {/if}
                     {#if message.body}<SupportChatMarkdown text={message.body} isCustomer className={message.attachments?.length ? "mt-2" : ""}/>{/if}
                     <span class="mt-1 block text-[11px] text-white/70">{message.optimistic ? "Enviando..." : formatTime(message.createdAt)}</span>
+                    {#if !message.optimistic}
+                      <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
+                        onReact={(code) => reactChatMessage(message.id, code)}/>
+                    {/if}
                   </div>
                 </div>
               {:else}
@@ -1127,7 +1154,7 @@
                   </span>
                   <div class="max-w-[84%]">
                     <div class="mb-1 px-1 text-[12px] font-semibold text-[#596171]">{message.authorType === "user" ? (message.authorUserName ?? "Equipe F10") : "Atendimento F10"}</div>
-                    <div class="rounded-2xl rounded-tl-md border border-[#E0E4EC] bg-[var(--app-surface)] px-3.5 py-3 text-[var(--app-text)]">
+                    <div class="group relative rounded-2xl rounded-tl-md border border-[#E0E4EC] bg-[var(--app-surface)] px-3.5 py-3 text-[var(--app-text)]">
                       {#if message.attachments?.length}
                         <div class={`grid gap-1.5 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                           {#each message.attachments as attachment}
@@ -1141,6 +1168,10 @@
                       {/if}
                       {#if message.body}<SupportChatMarkdown text={message.body} className={message.attachments?.length ? "mt-2" : ""}/>{/if}
                       <span class="mt-1 block text-[11px] text-[#6D7485]">{formatTime(message.createdAt)}</span>
+                      {#if message.authorType !== "system"}
+                        <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
+                          onReact={(code) => reactChatMessage(message.id, code)}/>
+                      {/if}
                     </div>
                   </div>
                 </div>
