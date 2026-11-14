@@ -80,22 +80,37 @@ export async function toggleMessageReaction(
       .where(predicate)
       .for("update");
 
+    let selected: MessageReactionCode | null = reaction;
     if (current?.reaction === reaction) {
       await tx.delete(supportMessageReactions).where(predicate);
-      return null;
+      selected = null;
+    } else {
+      await tx.insert(supportMessageReactions).values({
+        sourceKind, messageId, actorKind, actorKey, reaction,
+      }).onConflictDoUpdate({
+        target: [
+          supportMessageReactions.sourceKind,
+          supportMessageReactions.messageId,
+          supportMessageReactions.actorKind,
+          supportMessageReactions.actorKey,
+        ],
+        set: { reaction, createdAt: new Date() },
+      });
     }
 
-    await tx.insert(supportMessageReactions).values({
-      sourceKind, messageId, actorKind, actorKey, reaction,
-    }).onConflictDoUpdate({
-      target: [
-        supportMessageReactions.sourceKind,
-        supportMessageReactions.messageId,
-        supportMessageReactions.actorKind,
-        supportMessageReactions.actorKey,
-      ],
-      set: { reaction, createdAt: new Date() },
-    });
-    return reaction;
+    // Atualiza a revisão da conversa para propagar reações sem exigir F5.
+    if (sourceKind === "ticket") {
+      await tx.execute(sql`
+        UPDATE tickets SET updated_at = now()
+        WHERE id = (SELECT ticket_id FROM ticket_messages WHERE id = ${messageId}::uuid)
+      `);
+    } else {
+      await tx.execute(sql`
+        UPDATE web_chat_sessions SET updated_at = now()
+        WHERE id = (SELECT session_id FROM web_chat_messages WHERE id = ${messageId}::uuid)
+      `);
+    }
+
+    return selected;
   });
 }
