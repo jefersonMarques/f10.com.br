@@ -19,6 +19,7 @@
     LoaderCircle,
     LockKeyhole,
     MessageCircleMore,
+    EllipsisVertical,
     Paperclip,
     Send,
     UserRound,
@@ -143,7 +144,10 @@
   const MAX_FILE_BYTES = 10 * 1024 * 1024;
   const ALLOWED_ATTACHMENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
 
+  let chatDialogElement: HTMLDivElement;
   let messagesElement: HTMLDivElement;
+  let conversationMenuOpen = false;
+  let finishingChat = false;
   let fileInputElement: HTMLInputElement;
   let restored = false;
   let authInitialized = false;
@@ -1042,6 +1046,73 @@
     return "Atendimento F10";
   }
 
+  function handleOutsidePointerDown(event: PointerEvent): void {
+    if (!isOpen || !chatDialogElement) return;
+    if (event.target instanceof Node && !chatDialogElement.contains(event.target)) {
+      conversationMenuOpen = false;
+      onClose();
+    }
+  }
+
+  function handleDialogKeydown(event: KeyboardEvent): void {
+    if (!isOpen || event.key !== "Escape") return;
+    event.preventDefault();
+
+    if (conversationMenuOpen) {
+      conversationMenuOpen = false;
+      return;
+    }
+
+    onClose();
+  }
+
+  async function finishCustomerConversation(): Promise<void> {
+    if (finishingChat || !browser) return;
+    if (!window.confirm("Finalizar esta conversa?")) return;
+
+    conversationMenuOpen = false;
+    finishingChat = true;
+    errorMessage = "";
+
+    try {
+      if (session || authState.authenticated) {
+        const response = await fetch("/api/support/chat/close-current", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+        });
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({})) as { error?: string };
+          errorMessage = result.error === "CUSTOMER_AUTH_REQUIRED"
+            ? "Entre novamente no F10 para finalizar a conversa."
+            : result.error === "CHAT_UNIT_REQUIRED"
+              ? "Selecione seu grupo e unidade antes de finalizar."
+              : "Não foi possível finalizar a conversa. Tente novamente.";
+          return;
+        }
+      }
+
+      clearStoredSession();
+      revokeImages(pendingImages);
+      pendingImages = [];
+      guestMessages = [];
+      guestReply = "";
+      reply = "";
+      handoffRequested = false;
+      restored = false;
+      window.sessionStorage.removeItem(GUEST_KEY);
+      window.sessionStorage.removeItem(SUPPORT_ASSISTANT_GUEST_KEY);
+      persistDraft("");
+      updateUnresolvedCount(0);
+      onClose();
+    } catch {
+      errorMessage = "Não foi possível finalizar a conversa. Tente novamente.";
+    } finally {
+      finishingChat = false;
+    }
+  }
+
   onDestroy(() => {
     if (draftSyncTimer) clearTimeout(draftSyncTimer);
     if (draftHeartbeat) clearInterval(draftHeartbeat);
@@ -1052,8 +1123,11 @@
   });
 </script>
 
+<svelte:window on:pointerdown={handleOutsidePointerDown} on:keydown={handleDialogKeydown}/>
+
 {#if isOpen}
   <div
+    bind:this={chatDialogElement}
     class="fixed bottom-4 right-4 z-[10020] flex h-[min(680px,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-[420px] flex-col overflow-hidden rounded-[24px] border border-[#DDE1E9] bg-white shadow-[0_24px_80px_rgba(1,13,40,0.24)] sm:bottom-6 sm:right-6"
     role="dialog"
     aria-modal="false"
@@ -1074,11 +1148,20 @@
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-1.5">
-        <button type="button" on:click={onClose} class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#F2F3F7] text-[#5F6676] transition hover:bg-[#E7E9EF] hover:text-[#000A57]" aria-label="Fechar chat">
-          <X size={18} aria-hidden="true" />
-        </button>
-      </div>
+      <details bind:open={conversationMenuOpen} class="relative shrink-0">
+        <summary aria-label="Opções da conversa" title="Opções da conversa"
+          class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full bg-[#F2F3F7] text-[#5F6676] transition hover:bg-[#E7E9EF] hover:text-[#000A57] focus-visible:ring-2 focus-visible:ring-[#000A57]">
+          <EllipsisVertical size={19} aria-hidden="true"/>
+        </summary>
+        <div class="absolute right-0 top-11 z-50 w-[192px] rounded-xl border border-[#DDE1E9] bg-white p-1.5 shadow-[0_14px_36px_rgba(1,13,40,0.18)]">
+          <button type="button" disabled={finishingChat}
+            on:click={() => void finishCustomerConversation()}
+            class="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-[13px] font-semibold text-[#A83F32] transition hover:bg-[#FFF0EC] disabled:opacity-50">
+            {#if finishingChat}<LoaderCircle size={16} class="animate-spin"/>{:else}<CheckCircle2 size={16}/>{/if}
+            Finalizar conversa
+          </button>
+        </div>
+      </details>
     </header>
 
     <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F8F9FC] px-4 py-4" aria-live="polite">
