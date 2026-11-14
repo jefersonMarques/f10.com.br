@@ -1,98 +1,97 @@
 <script lang="ts">
-  import { Bot, Clock3, HardDrive, Monitor, Save, Settings, ShieldCheck, Ticket, Video } from "lucide-svelte";
-  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import { Monitor, Save, Settings2 } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
   export let form: ActionData;
+
+  let activeSection: "general" | "webview" = "general";
 </script>
 
-<svelte:head><title>Configurações | F10 Operations</title></svelte:head>
+<svelte:head><title>Configurações | Helpdesk F10</title></svelte:head>
 
-<ApplicationContent width="standard">
-  {#if form?.message}
-    <div class={"application-text-caption mb-4 rounded-2xl border px-4 py-3 font-medium " + (form.success ? "border-app-success-border bg-app-success-bg text-app-success-text" : "border-app-danger-border bg-app-danger-bg text-app-danger-text")}>{form.message}</div>
-  {/if}
-
-  <div class="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-    <section class="rounded-[22px] border border-app-border bg-app-surface p-5 sm:p-6">
-      <div class="flex items-center gap-3">
-        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-app-info-bg text-app-primary"><Settings size={18}/></span>
-        <div><h2 class="text-[14px] font-semibold text-[#252C3D]">Geral</h2><p class="application-text-meta mt-1 text-[#9297A5]">Identidade operacional, regionalização e parâmetros globais do Operations.</p></div>
-      </div>
-
-      <form method="POST" action="?/saveGeneral" class="mt-5 space-y-4">
-        <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Nome exibido do suporte</span><input name="supportDisplayName" value={data.general.supportDisplayName} maxlength="120" class="h-10 w-full rounded-xl border border-app-border-control px-3 text-[11px]"/></label>
-        <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Nome do remetente</span><input name="supportSenderName" value={data.general.supportSenderName} maxlength="120" class="h-10 w-full rounded-xl border border-app-border-control px-3 text-[11px]"/></label>
-        <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Timezone</span><input name="timezone" value={data.general.timezone} maxlength="80" class="h-10 w-full rounded-xl border border-app-border-control px-3 text-[11px]"/></label>
-        <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Janela de autorização remota</span><div class="flex items-center gap-2"><input name="remoteConsentMinutes" type="number" min="5" max="120" value={data.general.remoteConsentMinutes} class="h-10 w-28 rounded-xl border border-app-border-control px-3 text-[11px]"/><span class="application-text-caption text-app-text-soft">minutos</span></div><span class="application-text-meta mt-1 block leading-4 text-[#979CA8]">Prazo usado pelos fluxos de autorização remota antes de expirar.</span></label>
-        <button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white"><Save size={14}/>Salvar configurações gerais</button>
-      </form>
-    </section>
-
-    <section class="rounded-[22px] border border-app-border bg-app-surface p-5 sm:p-6">
-      <h2 class="text-[14px] font-semibold text-[#252C3D]">Áreas de configuração</h2>
-      <p class="application-text-meta mt-1 leading-4 text-app-text-soft">Cada área concentra um tipo de responsabilidade para evitar configurações misturadas.</p>
-
-      <div class="mt-5 space-y-2">
-        <a href="/app/settings/atendimento" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
-          <span class="flex items-center gap-3"><Clock3 size={16} class="text-app-accent"/><span><strong class="application-text-caption block text-[#343B4B]">Atendimento</strong><small class="application-text-meta mt-1 block text-app-text-soft">Equipe, entrada do chat, filas, distribuição e horário.</small></span></span>
-          <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
-        </a>
-        <a href="/app/settings/tickets" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
-          <span class="flex items-center gap-3"><Ticket size={16} class="text-app-accent"/><span><strong class="application-text-caption block text-[#343B4B]">Tickets</strong><small class="application-text-meta mt-1 block text-app-text-soft">Notificações, regras e automações dos tickets.</small></span></span>
-          <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
-        </a>
-        <a href="/app/settings/access-profiles" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
-          <span class="flex items-center gap-3"><ShieldCheck size={16} class="text-app-info-text"/><span><strong class="application-text-caption block text-[#343B4B]">Perfis de acesso</strong><small class="application-text-meta mt-1 block text-app-text-soft">Crie perfis e defina os acessos herdados pela equipe.</small></span></span>
-          <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
-        </a>
-        <a href="/app/settings/ai" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
-          <span class="flex items-center gap-3"><Bot size={16} class="text-app-info-text"/><span><strong class="application-text-caption block text-[#343B4B]">Inteligência Artificial</strong><small class="application-text-meta mt-1 block text-app-text-soft">Provedores, modelos, funções, fallbacks e limites.</small></span></span>
-          <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
-        </a>
-        <a href="/app/settings/integracoes" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
-          <span class="flex items-center gap-3"><HardDrive size={16} class="text-app-info-text"/><span><strong class="application-text-caption block text-[#343B4B]">Integrações</strong><small class="application-text-meta mt-1 block text-app-text-soft">MinIO/S3, Brevo, Google, MeshCentral e backend F10.</small></span></span>
-          <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
-        </a>
-        <a href="/app/settings/help-video" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
-          <span class="flex items-center gap-3"><Video size={16} class="text-app-success-text"/><span><strong class="application-text-caption block text-[#343B4B]">Automações</strong><small class="application-text-meta mt-1 block text-app-text-soft">Processamento e automação da Base de Conhecimento.</small></span></span>
-          <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
-        </a>
-      </div>
-    </section>
+{#if form?.message}
+  <div role="status" class={`application-text-caption mb-4 rounded-xl border px-4 py-3 font-medium ${form.success ? "border-app-success-border bg-app-success-bg text-app-success-text" : "border-app-danger-border bg-app-danger-bg text-app-danger-text"}`}>
+    {form.message}
   </div>
+{/if}
 
-  <section class="mt-5 rounded-[22px] border border-app-border bg-app-surface p-5 sm:p-6">
-    <div class="flex items-center gap-3">
-      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-app-info-bg text-app-primary"><Monitor size={18}/></span>
-      <div>
-        <h2 class="text-[14px] font-semibold text-app-text">WebView F10</h2>
-        <p class="application-text-meta mt-1 text-app-text-soft">Marque somente as áreas que devem aparecer para os clientes.</p>
+<div class="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Configurações gerais">
+  <button type="button" role="tab" aria-selected={activeSection === "general"}
+    on:click={() => (activeSection = "general")}
+    class:active={activeSection === "general"}
+    class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-lg border border-app-border-control px-3 font-semibold text-app-text">
+    <Settings2 size={16}/> Geral
+  </button>
+  <button type="button" role="tab" aria-selected={activeSection === "webview"}
+    on:click={() => (activeSection = "webview")}
+    class:active={activeSection === "webview"}
+    class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-lg border border-app-border-control px-3 font-semibold text-app-text">
+    <Monitor size={16}/> WebView F10
+  </button>
+</div>
+
+{#if activeSection === "general"}
+  <section class="rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5">
+    <h2 class="application-text-section font-semibold text-app-text">Identidade e ambiente</h2>
+    <form method="POST" action="?/saveGeneral" class="mt-4 grid gap-4 sm:grid-cols-2">
+      <label class="block">
+        <span class="application-text-caption mb-1 block font-semibold text-app-text">Nome exibido do suporte</span>
+        <input name="supportDisplayName" value={data.general.supportDisplayName} maxlength="120"
+          class="application-text-caption h-11 w-full rounded-lg border border-app-border-control bg-app-surface px-3 text-app-text"/>
+      </label>
+      <label class="block">
+        <span class="application-text-caption mb-1 block font-semibold text-app-text">Nome do remetente</span>
+        <input name="supportSenderName" value={data.general.supportSenderName} maxlength="120"
+          class="application-text-caption h-11 w-full rounded-lg border border-app-border-control bg-app-surface px-3 text-app-text"/>
+      </label>
+      <label class="block">
+        <span class="application-text-caption mb-1 block font-semibold text-app-text">Fuso horário</span>
+        <input name="timezone" value={data.general.timezone} maxlength="80"
+          class="application-text-caption h-11 w-full rounded-lg border border-app-border-control bg-app-surface px-3 text-app-text"/>
+      </label>
+      <label class="block">
+        <span class="application-text-caption mb-1 block font-semibold text-app-text">Autorização remota (minutos)</span>
+        <input name="remoteConsentMinutes" type="number" min="5" max="120" value={data.general.remoteConsentMinutes}
+          class="application-text-caption h-11 w-full rounded-lg border border-app-border-control bg-app-surface px-3 text-app-text"/>
+      </label>
+      <div class="flex justify-end sm:col-span-2">
+        <button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-lg bg-app-primary px-4 font-semibold text-white">
+          <Save size={15}/> Salvar alterações
+        </button>
       </div>
-    </div>
-
-    <form method="POST" action="?/saveIframeF10" class="mt-5">
-      <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-app-border px-3 py-2.5 transition hover:bg-app-subtle">
-          <input name="support" type="checkbox" checked={data.iframeF10.support} class="h-4 w-4 rounded border-app-border-control"/>
-          <span class="text-[11px] font-semibold text-app-text">Suporte</span>
-        </label>
-        <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-app-border px-3 py-2.5 transition hover:bg-app-subtle">
-          <input name="updates" type="checkbox" checked={data.iframeF10.updates} class="h-4 w-4 rounded border-app-border-control"/>
-          <span class="text-[11px] font-semibold text-app-text">Atualizações</span>
-        </label>
-        <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-app-border px-3 py-2.5 transition hover:bg-app-subtle">
-          <input name="resources" type="checkbox" checked={data.iframeF10.resources} class="h-4 w-4 rounded border-app-border-control"/>
-          <span class="text-[11px] font-semibold text-app-text">Recursos</span>
-        </label>
-        <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-app-border px-3 py-2.5 transition hover:bg-app-subtle">
-          <input name="notices" type="checkbox" checked={data.iframeF10.notices} class="h-4 w-4 rounded border-app-border-control"/>
-          <span class="text-[11px] font-semibold text-app-text">Avisos</span>
-        </label>
-      </div>
-
-      <button type="submit" class="application-text-caption mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white"><Save size={14}/>Salvar WebView</button>
     </form>
   </section>
-</ApplicationContent>
+{:else}
+  <section class="rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5">
+    <h2 class="application-text-section font-semibold text-app-text">Áreas disponíveis no WebView F10</h2>
+    <form method="POST" action="?/saveIframeF10" class="mt-4">
+      <div class="grid gap-3 sm:grid-cols-2">
+        {#each [
+          { key: "support", label: "Suporte", checked: data.iframeF10.support },
+          { key: "updates", label: "Atualizações", checked: data.iframeF10.updates },
+          { key: "resources", label: "Recursos", checked: data.iframeF10.resources },
+          { key: "notices", label: "Avisos", checked: data.iframeF10.notices },
+        ] as section (section.key)}
+          <label class="application-text-caption flex min-h-11 items-center gap-3 rounded-lg border border-app-border px-3 font-semibold text-app-text">
+            <input type="checkbox" name={section.key} checked={section.checked} class="h-4 w-4"/>
+            {section.label}
+          </label>
+        {/each}
+      </div>
+      <div class="mt-4 flex justify-end">
+        <button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-lg bg-app-primary px-4 font-semibold text-white">
+          <Save size={15}/> Salvar WebView
+        </button>
+      </div>
+    </form>
+  </section>
+{/if}
+
+<style>
+  .active {
+    background: var(--app-primary);
+    color: white;
+    border-color: var(--app-primary);
+  }
+</style>
