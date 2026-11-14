@@ -10,7 +10,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 export const GET: RequestHandler = async ({ cookies, params, url }) => {
   await requireAppAnyPermission(
     cookies,
-    ["users.view", "performance.view", "tickets.view", "chat.view", "tasks.view"],
+    ["users.view", "performance.view", "tickets.view", "chat.view", "tasks.view", "tasks.create"],
     url.pathname,
   );
 
