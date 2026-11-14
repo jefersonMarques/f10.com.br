@@ -99,17 +99,25 @@ test("CPF requires payer birth validation, CNPJ does not", () => {
 
 test("automatic company lookup rejects missing and ambiguous payer mappings", () => {
   const resolved = parseF10CompanyCandidates([
-    { contractId: "12", holderId: "200" },
-    { contractId: "13", holderId: "200" },
+    { contractId: "12", holderId: "200", personId: "500" },
+    { contractId: "13", holderId: null, personId: "200" },
   ]);
   assert.equal(resolved.holderId, 200);
   assert.deepEqual([...resolved.contractIds], [12, 13]);
   assert.throws(() => parseF10CompanyCandidates([]), /FINANCE_COMPANY_NOT_LINKED/);
   assert.throws(() => parseF10CompanyCandidates([
-    { contractId: "12", holderId: "200" },
-    { contractId: "13", holderId: "201" },
+    { contractId: "12", holderId: "200", personId: "500" },
+    { contractId: "13", holderId: "201", personId: "200" },
   ]), /FINANCE_COMPANY_AMBIGUOUS/);
   assert.throws(() => parseF10CompanyCandidates([
-    { contractId: "12", holderId: null },
+    { contractId: "12", holderId: null, personId: null },
   ]), /FINANCE_COMPANY_UNRESOLVED/);
+});
+
+test("contracts with null holder use the F10 person identifier", () => {
+  const candidate = parseF10CompanyCandidates([
+    { contractId: "1000002", holderId: null, personId: "1000002" },
+  ]);
+  assert.equal(candidate.holderId, 1000002);
+  assert.deepEqual([...candidate.contractIds], [1000002]);
 });

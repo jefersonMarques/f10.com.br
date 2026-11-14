@@ -108,6 +108,7 @@ export function parseF10FinanceContracts(value: unknown): FinanceContract[] {
 export function parseF10CompanyCandidates(rows: Array<{
   contractId: string | number;
   holderId: string | number | null;
+  personId: string | number | null;
 }>): { holderId: number; contractIds: Set<number> } {
   if (!rows.length) throw new Error("FINANCE_COMPANY_NOT_LINKED");
   if (rows.length > 50) throw new Error("FINANCE_COMPANY_AMBIGUOUS");
@@ -116,7 +117,8 @@ export function parseF10CompanyCandidates(rows: Array<{
   const holderIds = new Set<number>();
   for (const row of rows) {
     const contractId = positivePaymentId(row.contractId);
-    const holderId = positivePaymentId(row.holderId);
+    const holderId = positivePaymentId(row.holderId)
+      ?? positivePaymentId(row.personId);
     if (!contractId || !holderId) {
       throw new Error("FINANCE_COMPANY_UNRESOLVED");
     }
