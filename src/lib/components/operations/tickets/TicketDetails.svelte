@@ -27,6 +27,7 @@
   } from "lucide-svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import TicketRemotePanel from "$lib/components/operations/tickets/TicketRemotePanel.svelte";
   import TicketCustomerCard from "./TicketCustomerCard.svelte";
@@ -96,6 +97,27 @@
     && currentComposerFiles.reduce((total, file) => total + file.size, 0) <= 12 * 1024 * 1024
     && currentComposerDraft.length <= 10000
     && (currentComposerDraft.trim().length > 0 || currentComposerFiles.length > 0);
+
+  async function reactTicketMessage(
+    messageId: string,
+    code: "like" | "heart" | "check" | "eyes",
+  ): Promise<void> {
+    const response = await fetch("/api/app/messages/reactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceKind: "ticket",
+        ticketId: ticketData.details.ticket.id,
+        messageId,
+        reaction: code,
+      }),
+    });
+    if (!response.ok) {
+      actionFeedback = { success: false, message: "Não foi possível registrar a reação." };
+      return;
+    }
+    await refreshDetails();
+  }
 
   async function focusComposer(): Promise<void> {
     await tick();
@@ -567,7 +589,7 @@
                   </div>
                 {:else if message.visibility === "internal"}
                   <div class="flex min-w-0 justify-center py-1">
-                    <article class="w-fit min-w-0 max-w-[95%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-3.5 py-3 sm:max-w-[84%] sm:px-4">
+                    <article class="group relative w-fit min-w-0 max-w-[95%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-3.5 py-3 sm:max-w-[84%] sm:px-4">
                       <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
                         <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-warning-text)]">{message.authorUserName ?? "Equipe F10"} · Nota interna</strong>
                         <span class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
@@ -591,11 +613,13 @@
                           <p class="text-[11px] text-[#8A4D13]">Visível apenas para a equipe F10.</p>
                         </div>
                       {/if}
+                      <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
+                        onReact={(code) => reactTicketMessage(message.id, code)}/>
                     </article>
                   </div>
                 {:else}
                   <div class={`flex w-full min-w-0 ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-                    <article class={`w-fit min-w-0 max-w-[95%] rounded-2xl px-3.5 py-3 text-left sm:max-w-[84%] sm:px-4 ${message.authorType === "customer" ? "rounded-bl-md bg-[var(--app-surface-muted)]" : "rounded-br-md bg-[var(--app-info-bg)]"}`}>
+                    <article class={`group relative w-fit min-w-0 max-w-[95%] rounded-2xl px-3.5 py-3 text-left sm:max-w-[84%] sm:px-4 ${message.authorType === "customer" ? "rounded-bl-md bg-[var(--app-surface-muted)]" : "rounded-br-md bg-[var(--app-info-bg)]"}`}>
                       <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
                         <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-text)]">{message.authorUserName ?? message.customerName ?? "Atendimento F10"}</strong>
                         <span class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
@@ -639,6 +663,8 @@
                           {/each}
                         </div>
                       {/if}
+                      <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
+                        onReact={(code) => reactTicketMessage(message.id, code)}/>
                     </article>
                   </div>
                 {/if}
