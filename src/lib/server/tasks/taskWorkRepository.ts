@@ -1,6 +1,10 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { internalNotifications } from "$lib/server/db/notificationSchema";
+import { supportMessageTaskLinks, type TaskMessageOrigin } from "$lib/server/db/supportMessageTaskSchema";
+import { ticketTaskLinks } from "$lib/server/db/supportRoutingSchema";
+import { ticketEvents, tickets } from "$lib/server/db/supportSchema";
 import { users } from "$lib/server/db/schema";
 import {
   taskActivities,
@@ -26,6 +30,7 @@ export type CreateTaskInput = {
   priority: TaskPriority;
   dueOn: string | null;
   assigneeId: string | null;
+  messageOrigin?: TaskMessageOrigin;
 };
 
 export async function listMyTasks(
@@ -182,6 +187,34 @@ export async function createTask(
   }
 
   return db.transaction(async (tx) => {
+    if (input.messageOrigin) {
+      // Serializa tentativas repetidas para não criar tarefas duplicadas.
+      await tx.execute(sql`
+        SELECT pg_advisory_xact_lock(hashtext(${input.messageOrigin.requestKey}))
+      `);
+      const [existing] = await tx
+        .select({
+          taskId: supportMessageTaskLinks.taskId,
+          messageId: supportMessageTaskLinks.messageId,
+          sourceKind: supportMessageTaskLinks.sourceKind,
+          createdBy: supportMessageTaskLinks.createdBy,
+          title: tasks.title,
+        })
+        .from(supportMessageTaskLinks)
+        .innerJoin(tasks, eq(tasks.id, supportMessageTaskLinks.taskId))
+        .where(eq(supportMessageTaskLinks.requestKey, input.messageOrigin.requestKey))
+        .limit(1);
+
+      if (existing) {
+        if (existing.createdBy !== actorUserId ||
+          existing.messageId !== input.messageOrigin.messageId ||
+          existing.sourceKind !== input.messageOrigin.sourceKind) {
+          throw new Error("TASK_REQUEST_CONFLICT");
+        }
+        return { id: existing.taskId, title: existing.title };
+      }
+    }
+
     const [createdTask] = await tx
       .insert(tasks)
       .values({
@@ -210,6 +243,58 @@ export async function createTask(
       action: "task.created",
       metadata: { assigneeId },
     });
+
+    if (input.messageOrigin) {
+      const origin = input.messageOrigin;
+      await tx.insert(supportMessageTaskLinks).values({
+        sourceKind: origin.sourceKind,
+        messageId: origin.messageId,
+        taskId: createdTask.id,
+        createdBy: actorUserId,
+        requestKey: origin.requestKey,
+      });
+
+      if (origin.ticketId) {
+        await tx.insert(ticketTaskLinks).values({
+          ticketId: origin.ticketId,
+          taskId: createdTask.id,
+          createdBy: actorUserId,
+        }).onConflictDoNothing();
+
+        // Compatibilidade com telas anteriores que dependem do vínculo legado.
+        await tx.update(tickets)
+          .set({ linkedTaskId: createdTask.id, updatedAt: new Date() })
+          .where(and(eq(tickets.id, origin.ticketId), isNull(tickets.linkedTaskId)));
+
+        await tx.insert(ticketEvents).values({
+          ticketId: origin.ticketId,
+          actorUserId,
+          eventType: "ticket.task.linked",
+          metadata: { taskId: createdTask.id, sourceMessageId: origin.messageId },
+        });
+      } else {
+        await tx.execute(sql`
+          UPDATE web_chat_sessions SET updated_at = now()
+          WHERE id = (
+            SELECT session_id FROM web_chat_messages
+            WHERE id = ${origin.messageId}::uuid
+          )
+        `);
+      }
+    }
+
+    if (assigneeId !== actorUserId) {
+      await tx.insert(internalNotifications).values({
+        userId: assigneeId,
+        actorUserId,
+        kind: "task.assigned",
+        title: "Nova tarefa atribuída a você",
+        body: createdTask.title.slice(0, 160),
+        href: `/app/tasks/${createdTask.id}`,
+        entityType: "task",
+        entityId: createdTask.id,
+      });
+    }
 
     return createdTask;
   });
