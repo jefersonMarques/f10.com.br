@@ -1,5 +1,4 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
-import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { supportMessageTaskLinks, type TaskMessageOrigin } from "$lib/server/db/supportMessageTaskSchema";
@@ -19,7 +18,7 @@ import {
   requireTaskPermissionScope,
   type TaskPermissionMap,
 } from "$lib/server/tasks/taskAccess";
-import { listProjectMembers } from "$lib/server/tasks/taskProjectRepository";
+import { listAssignableTaskMembers } from "$lib/server/tasks/taskAssigneeAccess";
 
 export type TaskPriority = "low" | "normal" | "high" | "urgent";
 
@@ -177,13 +176,14 @@ export async function createTask(
 
   if (!initialStatus) throw new Error("PROJECT_WITHOUT_OPEN_STATUS");
 
-  const assignScope = getPermissionScope(permissions, "tasks.assign");
-  const assigneeId =
-    assignScope && input.assigneeId ? input.assigneeId : actorUserId;
-  const members = await listProjectMembers(input.projectId);
-
-  if (!members.some((member) => member.id === assigneeId)) {
-    throw new Error("ASSIGNEE_NOT_PROJECT_MEMBER");
+  const assigneeId = input.assigneeId ?? actorUserId;
+  const allowedMembers = await listAssignableTaskMembers(
+    actorUserId,
+    permissions,
+    input.projectId,
+  );
+  if (!allowedMembers.some((member) => member.id === assigneeId)) {
+    throw new Error("TASK_ASSIGNEE_NOT_ALLOWED");
   }
 
   return db.transaction(async (tx) => {
