@@ -10,7 +10,7 @@ import {
 import { SUPPORT_AWAY_AFTER_MS } from "$lib/server/support/supportAgentPresence";
 import { getSupportRoutingSettings } from "$lib/server/support/supportRoutingRepository";
 
-type TimelineStatus = "online" | "busy" | "away" | "offline" | "future";
+type TimelineStatus = "online" | "busy" | "away" | "offline" | "future" | "untracked";
 
 type IntervalRow = {
   userId: string;
@@ -88,13 +88,18 @@ function buildTimeline(
   start: number,
   end: number,
   now: number,
+  trackingStartedAt: number,
 ): { segments: TimelineSegment[]; onlineMinutes: number; onlinePercent: number | null } {
   if (end <= start) return { segments: [], onlineMinutes: 0, onlinePercent: null };
 
   const elapsedEnd = Math.min(end, now);
-  const elapsed = Math.max(0, elapsedEnd - start);
+  const trackedStart = Math.min(end, Math.max(start, trackingStartedAt));
+  const elapsed = Math.max(0, elapsedEnd - trackedStart);
   const segments: TimelineSegment[] = [];
-  let cursor = start;
+  if (trackedStart > start) {
+    segments.push(makeSegment("untracked", start, trackedStart, start, end));
+  }
+  let cursor = trackedStart;
   let gapStatus: TimelineStatus = "offline";
   let connectedMilliseconds = 0;
 
@@ -104,7 +109,7 @@ function buildTimeline(
     const intervalEnd = row.endedAt
       ? new Date(row.endedAt).getTime()
       : Math.min(timeoutAt, now);
-    const intervalStart = Math.max(start, new Date(row.startedAt).getTime(), cursor);
+    const intervalStart = Math.max(trackedStart, new Date(row.startedAt).getTime(), cursor);
     const clippedEnd = Math.min(elapsedEnd, intervalEnd);
     if (clippedEnd <= intervalStart) continue;
 
@@ -137,11 +142,17 @@ function buildTimeline(
 export async function getSupportPresenceTimeline(requestedDate: string | null) {
   const db = getDatabase();
   const now = new Date();
-  const [general, hours, routing] = await Promise.all([
+  const [general, hours, routing, collectionRows] = await Promise.all([
     getGeneralOperationsSettings(),
     getSupportHoursSettings(),
     getSupportRoutingSettings(),
+    db.execute(sql`SELECT applied_at AS "startedAt" FROM schema_migrations
+      WHERE name = '0115_support_presence_timeline.sql' LIMIT 1`),
   ]);
+  const collection = (collectionRows as unknown as Array<{ startedAt: Date }>)[0];
+  const trackingStartedAt = collection
+    ? new Date(collection.startedAt).getTime()
+    : now.getTime();
 
   const timezone = verifiedTimezone(general.timezone);
   const today = getLocalDate(now, timezone);
@@ -215,7 +226,7 @@ export async function getSupportPresenceTimeline(requestedDate: string | null) {
   }
 
   const users = agents.map((agent) => {
-    const timeline = buildTimeline(sessionMap.get(agent.id) ?? [], start, end, now.getTime());
+    const timeline = buildTimeline(sessionMap.get(agent.id) ?? [], start, end, now.getTime(), trackingStartedAt);
     return {
       id: agent.id,
       name: agent.name,
