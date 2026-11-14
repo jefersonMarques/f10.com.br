@@ -28,6 +28,7 @@
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
+  import UserAvatar from "$lib/components/application/UserAvatar.svelte";
   import MessageTaskPopover from "$lib/components/support/MessageTaskPopover.svelte";
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import TicketRemotePanel from "$lib/components/operations/tickets/TicketRemotePanel.svelte";
@@ -593,6 +594,7 @@
                   <div class="flex min-w-0 justify-center py-1">
                     <article class="group relative w-fit min-w-0 max-w-[95%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-3.5 py-3 sm:max-w-[84%] sm:px-4">
                       <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <UserAvatar userId={message.authorUserId ?? null} name={message.authorUserName ?? "Equipe F10"} hasAvatar={message.authorHasAvatar ?? false} size="xs"/>
                         <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-warning-text)]">{message.authorUserName ?? "Equipe F10"} · Nota interna</strong>
                         <span class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
                       </div>
@@ -626,6 +628,7 @@
                   <div class={`flex w-full min-w-0 ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
                     <article class={`group relative w-fit min-w-0 max-w-[95%] rounded-2xl px-3.5 py-3 text-left sm:max-w-[84%] sm:px-4 ${message.authorType === "customer" ? "rounded-bl-md bg-[var(--app-surface-muted)]" : "rounded-br-md bg-[var(--app-info-bg)]"}`}>
                       <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <UserAvatar userId={message.authorUserId ?? null} name={message.authorUserName ?? message.customerName ?? "Atendimento F10"} hasAvatar={message.authorHasAvatar ?? false} size="xs"/>
                         <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-text)]">{message.authorUserName ?? message.customerName ?? "Atendimento F10"}</strong>
                         <span class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
                       </div>
@@ -863,6 +866,17 @@
 
             <label>
               <span class="mb-1 block application-text-caption font-medium text-[var(--app-text-muted)]">Responsável</span>
+              {#if ticketData.details.ticket.assignedUserId}
+                <div class="mb-2 flex items-center gap-2">
+                  <UserAvatar userId={ticketData.details.ticket.assignedUserId}
+                    name={ticketData.details.ticket.assignedUserName ?? "Operador"}
+                    hasAvatar={ticketData.details.ticket.assignedUserHasAvatar ?? false}
+                    size="xs"/>
+                  <span class="truncate text-[12px] font-semibold text-[var(--app-text)]">
+                    {ticketData.details.ticket.assignedUserName ?? "Operador"}
+                  </span>
+                </div>
+              {/if}
               {#if ticketData.canAssign}
                 <select name="assignedUserId" disabled={Boolean(actionLoading)} on:change={(event) => void updateField("assign", "assignedUserId", event)} class="h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption">
                   {#each ticketData.agents as agent}<option value={agent.id} selected={agent.id === ticketData.details.ticket.assignedUserId}>{agent.name}</option>{/each}
