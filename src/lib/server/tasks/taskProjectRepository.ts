@@ -30,8 +30,9 @@ export type UpdateTaskProjectInput = {
 export async function listTaskProjects(
   userId: string,
   permissions: TaskPermissionMap,
+  permissionCode: "tasks.view" | "tasks.create" = "tasks.view",
 ) {
-  const scope = requireTaskPermissionScope(permissions, "tasks.view");
+  const scope = requireTaskPermissionScope(permissions, permissionCode);
   const db = getDatabase();
   const accessibleProjectIds = await getAccessibleTaskProjectIds(userId, scope);
 
@@ -98,7 +99,7 @@ export async function listProjectMembers(projectId: string) {
   const db = getDatabase();
 
   return db
-    .select({ id: users.id, name: users.name, email: users.email })
+    .select({ id: users.id, name: users.name, email: users.email, status: users.status })
     .from(taskProjectMembers)
     .innerJoin(users, eq(taskProjectMembers.userId, users.id))
     .where(eq(taskProjectMembers.projectId, projectId))
