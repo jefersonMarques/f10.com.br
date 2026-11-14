@@ -33,8 +33,6 @@
   let selectedContractId = 0;
   let contractsLoaded = false;
   let lookupVersion = 0;
-  let document = "";
-  let birth = "";
   let openInstallments: Installment[] = [];
   let paidInstallments: Installment[] = [];
   let showPaid = false;
@@ -44,13 +42,10 @@
   let feedback = "";
   let errorMessage = "";
 
-  $: birthRequired = document.replace(/\D/g, "").length === 11;
-  $: documentValid = [11, 14].includes(document.replace(/\D/g, "").length);
-  $: canIdentify = documentValid && (!birthRequired || /^\d{2}\/\d{2}\/\d{4}$/.test(birth));
-  $: canConsult = Boolean(contractsLoaded && selectedContractId && canIdentify);
+  $: canConsult = Boolean(contractsLoaded && selectedContractId);
 
   onMount(() => {
-    void checkAvailability();
+    void loadContracts();
   });
 
   function url(): string {
@@ -62,39 +57,34 @@
   function describeError(code: string): string {
     if (code === "FINANCE_RATE_LIMITED") return "Muitas consultas. Tente novamente mais tarde.";
     if (code === "FINANCE_PAYER_NOT_VALIDATED") return "Não foi possível confirmar os dados do pagador.";
-    if (code === "FINANCE_DOCUMENT_INVALID" || code === "FINANCE_BIRTH_INVALID") {
-      return "Confira o documento e a data de nascimento.";
-    }
     if (code === "FINANCE_PIX_UNAVAILABLE") return "Este PIX não está disponível. Consulte a equipe financeira.";
     if (code === "FINANCE_CONTRACT_NOT_AUTHORIZED") return "Contrato não autorizado para este acesso.";
+    if (code === "FINANCE_COMPANY_AMBIGUOUS") return "Há mais de uma empresa vinculada. Fale com a equipe financeira.";
+    if (code === "FINANCE_COMPANY_UNRESOLVED" || code === "FINANCE_COMPANY_NOT_LINKED") return "Não foi possível identificar a empresa para esta unidade. Fale com a equipe financeira.";
     return "Não foi possível consultar o Financeiro agora.";
   }
 
-  async function checkAvailability(): Promise<void> {
+  async function loadContracts(): Promise<void> {
     pending = "contracts";
+    errorMessage = "";
     try {
       const response = await fetch(url(), { cache: "no-store" });
       if (response.status === 403) {
         allowed = false;
         return;
       }
-      if (!response.ok) throw new Error("FINANCE_UNAVAILABLE");
-      const data = await response.json() as { enabled: boolean };
+      const data = await response.json() as { enabled?: boolean; contracts?: Contract[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "FINANCE_UNAVAILABLE");
       enabled = data.enabled === true;
-    } catch {
-      errorMessage = "Consulta financeira indisponível.";
+      contracts = Array.isArray(data.contracts) ? data.contracts : [];
+      selectedContractId = contracts[0]?.id ?? 0;
+      contractsLoaded = enabled;
+    } catch (cause) {
+      errorMessage = describeError(cause instanceof Error ? cause.message : "");
     } finally {
       initialized = true;
       pending = "";
     }
-  }
-
-  function resetPayer(): void {
-    lookupVersion += 1;
-    contractsLoaded = false;
-    contracts = [];
-    selectedContractId = 0;
-    clearSelection();
   }
 
   function clearSelection(): void {
@@ -108,23 +98,15 @@
   }
 
   async function query(
-    action: "contracts" | "installments" | "pix",
+    action: "installments" | "pix",
     receivableId?: number,
   ): Promise<void> {
-    if (!canIdentify || pending || (action !== "contracts" && !canConsult)) return;
+    if (!canConsult || pending) return;
 
     const activeVersion = lookupVersion;
     pending = action;
     errorMessage = "";
     feedback = "";
-    if (action === "contracts") {
-      contractsLoaded = false;
-      contracts = [];
-      selectedContractId = 0;
-      openInstallments = [];
-      paidInstallments = [];
-      showPaid = false;
-    }
     if (action !== "pix") {
       pix = null;
       qrSvg = "";
@@ -141,19 +123,13 @@
           action,
           contractId: selectedContractId,
           receivableId,
-          document: document.replace(/\D/g, ""),
-          birth: birthRequired ? birth : "",
         }),
       });
       const data = await response.json() as Record<string, unknown>;
       if (activeVersion !== lookupVersion) return;
       if (!response.ok) throw new Error(String(data.error ?? "FINANCE_UNAVAILABLE"));
 
-      if (action === "contracts") {
-        contracts = Array.isArray(data.contracts) ? data.contracts as Contract[] : [];
-        selectedContractId = contracts[0]?.id ?? 0;
-        contractsLoaded = true;
-      } else if (action === "installments") {
+      if (action === "installments") {
         openInstallments = Array.isArray(data.open) ? data.open as Installment[] : [];
         paidInstallments = Array.isArray(data.paid) ? data.paid as Installment[] : [];
       } else {
@@ -209,32 +185,9 @@
     </div>
 
     <div class="mt-3 space-y-3">
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <label class="block text-[12px] font-medium text-[#4D5769]">
-          CPF/CNPJ do pagador
-          <input bind:value={document} on:input={resetPayer} inputmode="numeric"
-            autocomplete="off" maxlength="30" placeholder="Somente números"
-            class="mt-1 h-10 w-full rounded-xl border border-[#DDE2EB] bg-white px-3 text-[13px]"/>
-        </label>
-        {#if birthRequired}
-          <label class="block text-[12px] font-medium text-[#4D5769]">
-            Data de nascimento
-            <input bind:value={birth} on:input={resetPayer} placeholder="DD/MM/AAAA"
-              autocomplete="off" maxlength="10"
-              class="mt-1 h-10 w-full rounded-xl border border-[#DDE2EB] bg-white px-3 text-[13px]"/>
-          </label>
-        {/if}
-      </div>
-      <button type="button" disabled={!canIdentify || Boolean(pending)}
-        on:click={() => void query("contracts")}
-        class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 text-[13px] font-semibold text-white disabled:opacity-40">
-        {#if pending === "contracts"}<LoaderCircle size={16} class="animate-spin"/>{:else}<CreditCard size={16}/>{/if}
-        Buscar contratos
-      </button>
-
       {#if contractsLoaded && contracts.length === 0}
         <p role="status" class="text-[12px] text-[#747D8F]">
-          A F10 não retornou contratos para os dados validados.
+          Nenhum contrato financeiro foi encontrado para esta empresa.
         </p>
       {/if}
 
