@@ -189,6 +189,13 @@
   let selectedGroupId = 0;
   let selectedUnitId = 0;
   let authRequiredForSession = false;
+  let financeOptionSelected = false;
+  let configuredDepartment = entryDepartment;
+  $: if (entryDepartment !== configuredDepartment) {
+    configuredDepartment = entryDepartment;
+    financeOptionSelected = false;
+  }
+  $: activeDepartment = financeOptionSelected ? "finance" : entryDepartment;
   let initializedDepartment: "support" | "finance" | null = null;
   let authState: AuthState = {
     authenticated: false,
@@ -205,15 +212,15 @@
   $: if (browser) syncPolling(isOpen && !authRequiredForSession, session?.sessionId ?? "");
   $: if (browser) syncStatusPolling(isOpen);
   $: if (browser && isOpen && !entryOptionsLoaded && !entryOptionsLoading) void refreshEntryOptions();
-  $: if (browser && isOpen && restored && initializedDepartment !== entryDepartment) {
-    initializedDepartment = entryDepartment;
-    if (entryDepartment === "finance") {
+  $: if (browser && isOpen && restored && initializedDepartment !== activeDepartment) {
+    initializedDepartment = activeDepartment;
+    if (activeDepartment === "finance") {
       handoffRequested = true;
       authStep = authState.authenticated
         ? authState.requiresUnitSelection ? "unit" : "ready"
         : "login";
       // O cliente escolhe entre autoatendimento financeiro e equipe humana.
-    } else if (entryDepartment === "support" && !session) {
+    } else if (activeDepartment === "support" && !session) {
       handoffRequested = false;
       authStep = "login";
       selectedEntryOptionId = "";
@@ -225,7 +232,7 @@
   $: if (browser && restored && guestMessages) persistGuestConversation();
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
   $: departmentSessionMismatch = session !== null
-    && (session.department ?? "support") !== entryDepartment;
+    && (session.department ?? "support") !== activeDepartment;
 
   function initializeAuthState(): void {
     authState = {
@@ -523,6 +530,13 @@
   }
 
   async function selectEntryOption(option: EntryOption): Promise<void> {
+    if (isFinancialChatOption(option)) {
+      financeOptionSelected = true;
+      selectedEntryOptionId = option.id;
+      selectedEntryOptionLabel = option.label;
+      errorMessage = "";
+      return;
+    }
     selectedEntryOptionId = option.id;
     selectedEntryOptionLabel = option.label;
     errorMessage = "";
@@ -703,7 +717,7 @@
       await refreshMessages(true);
       return;
     }
-    if (entryDepartment === "finance") {
+    if (activeDepartment === "finance") {
       handoffRequested = false;
       return;
     }
@@ -717,7 +731,7 @@
     errorMessage = "";
 
     const lastCustomerMessage = [...guestMessages].reverse().find((message) => message.role === "customer")?.body;
-    const message = entryDepartment === "finance"
+    const message = activeDepartment === "finance"
       ? "Solicito atendimento financeiro."
       : lastCustomerMessage?.trim() || "Solicito atendimento com a equipe F10.";
 
@@ -728,11 +742,11 @@
         body: JSON.stringify({
           phone: "",
           message,
-          entryOptionId: entryDepartment === "support" ? selectedEntryOptionId || null : null,
-          department: entryDepartment,
+          entryOptionId: activeDepartment === "support" ? selectedEntryOptionId || null : null,
+          department: activeDepartment,
           contextUrl: browser ? window.location.href : "",
           pageTitle: browser ? document.title : "",
-          helpContext: entryDepartment === "finance" ? "Financeiro F10" : "Central de Ajuda F10",
+          helpContext: activeDepartment === "finance" ? "Financeiro F10" : "Central de Ajuda F10",
           forceHuman: true,
           handoffTranscript: buildGuestTranscript(),
         }),
@@ -1145,7 +1159,7 @@
         </span>
         <div class="min-w-0">
           <h2 id="support-chat-title" class="truncate text-[14px] font-semibold text-[#111A30]">
-            {departmentSessionMismatch ? "Atendimento em andamento" : entryDepartment === "finance" ? "Financeiro F10" : session && session.aiState !== "active" ? "Atendimento F10" : "Helpdesk F10"}
+            {departmentSessionMismatch ? "Atendimento em andamento" : activeDepartment === "finance" ? "Financeiro F10" : session && session.aiState !== "active" ? "Atendimento F10" : "Helpdesk F10"}
           </h2>
           <div class="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#6C7484]">
             <span class={`h-2 w-2 rounded-full ${session ? "bg-[#38A169]" : "bg-[#EA6D0B]"}`}></span>
@@ -1170,8 +1184,11 @@
     </header>
 
     <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F8F9FC] px-4 py-4" aria-live="polite">
-      {#if entryDepartment === "finance" && authState.authenticated && !authState.requiresUnitSelection && !departmentSessionMismatch}
+      {#if activeDepartment === "finance" && authState.authenticated && !authState.requiresUnitSelection && !departmentSessionMismatch}
         <FinancePaymentPanel scope="customer"/>
+        {#if financeOptionSelected && !session}
+          <button type="button" on:click={() => (financeOptionSelected = false)} class="mb-3 text-[12px] font-semibold text-[#000A57] underline underline-offset-2">Voltar ao suporte</button>
+        {/if}
         {#if !session}
           <button type="button" on:click={() => void requestHumanSupport()} disabled={starting}
             class="mb-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#D8DEEA] bg-white px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-50">
@@ -1179,7 +1196,7 @@
           </button>
         {/if}
       {/if}
-      {#if session && (entryDepartment !== "finance" || authState.authenticated)}
+      {#if session && (activeDepartment !== "finance" || authState.authenticated)}
         {#if departmentSessionMismatch}
           <div role="status" class="mb-3 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] p-3 text-[11px] leading-5 text-[#81512A]">
             Existe um atendimento em andamento em outro setor. Solicite a transferência nesta conversa antes de continuar.
@@ -1262,7 +1279,7 @@
         {/if}
       {:else}
         <div class="space-y-3">
-          {#each (entryDepartment === "support" ? guestMessages : []) as message (message.id)}
+          {#each (activeDepartment === "support" ? guestMessages : []) as message (message.id)}
             {#if message.role === "customer"}
               <div class="flex justify-end">
                 <div class="max-w-[84%] rounded-2xl rounded-br-md bg-[#000A57] px-3.5 py-2.5 text-white">
@@ -1279,13 +1296,13 @@
             {/if}
           {/each}
 
-          {#if entryDepartment === "support" && !handoffRequested}
+          {#if activeDepartment === "support" && !handoffRequested}
             <div class="ml-10 flex flex-wrap gap-2 pt-1">
               {#if guestMessages.length <= 3}
                 {#if entryOptionsLoading}
                   <LoaderCircle class="animate-spin text-[#8A909E]" size={16}/>
                 {:else}
-                  {#each entryOptions.filter((option) => !isFinancialChatOption(option)) as option}
+                  {#each entryOptions as option}
                     <button type="button" on:click={() => void selectEntryOption(option)}
                       class="min-h-9 rounded-xl border border-[#DDE1E9] bg-white px-3 text-[12px] font-semibold text-[#3D4556] transition hover:border-[#BFC5D2] hover:text-[#000A57]">
                       {option.label}
@@ -1300,21 +1317,21 @@
             </div>
           {/if}
 
-          {#if entryDepartment === "support" && assistantSending}
+          {#if activeDepartment === "support" && assistantSending}
             <div class="flex items-start gap-2">
               <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Headset size={14}/></span>
               <div class="rounded-2xl rounded-tl-md border border-[#E1E4EB] bg-white px-3.5 py-3 text-[#7B8292]"><LoaderCircle class="animate-spin" size={15}/></div>
             </div>
           {/if}
 
-          {#if handoffRequested && (entryDepartment !== "finance" || authStep !== "ready" || starting || Boolean(errorMessage))}
+          {#if handoffRequested && (activeDepartment !== "finance" || authStep !== "ready" || starting || Boolean(errorMessage))}
             <div class="ml-10 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm">
               {#if authState.authenticated && starting}
                 <div class="flex items-center gap-2.5 text-[12px] font-semibold text-[#4C5363]"><LoaderCircle class="animate-spin" size={16}/>Criando seu atendimento identificado...</div>
               {:else if authStep === "login" && !authState.authenticated}
                 <div class="flex items-start gap-2.5">
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><LockKeyhole size={16}/></span>
-                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">{entryDepartment === "finance" ? "Entre para falar com o Financeiro" : "Entre para falar com a equipe"}</h3><p class="mt-1 text-[12px] leading-5 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
+                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">{activeDepartment === "finance" ? "Entre para acessar o Financeiro" : "Entre para falar com a equipe"}</h3><p class="mt-1 text-[12px] leading-5 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
                 </div>
                 <form class="mt-4 space-y-3" on:submit|preventDefault={submitLogin}>
                   <label class="block text-[11px] font-semibold text-[#596171]">E-mail F10<input bind:value={loginEmail} type="email" required maxlength="254" autocomplete="username" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
@@ -1339,7 +1356,7 @@
                 <button type="button" on:click={() => void startHumanChat()} disabled={starting} class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Tentar conectar ao atendimento</button>
               {/if}
               {#if errorMessage}<p class="mt-3 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[11px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
-              {#if entryDepartment === "support" && !starting}
+              {#if activeDepartment === "support" && !starting}
                 <button type="button" on:click={() => (handoffRequested = false)} class="mt-3 text-[11px] font-semibold text-[#000A57] underline underline-offset-2">
                   Voltar ao Assistente F10
                 </button>
@@ -1354,7 +1371,7 @@
       <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-20 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3 py-2 text-[11px] font-semibold text-white shadow-lg">{newMessageCount} nova{newMessageCount > 1 ? "s" : ""}<ArrowDown size={12}/></button>
     {/if}
 
-    {#if session && (entryDepartment !== "finance" || authState.authenticated)}
+    {#if session && (activeDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>
         {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[12px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte o arquivo para anexar</div>{/if}
         {#if errorMessage}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[12px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
@@ -1371,7 +1388,7 @@
           <button type="submit" disabled={sending || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>
       </form>
-    {:else if entryDepartment === "support" && !handoffRequested}
+    {:else if activeDepartment === "support" && !handoffRequested}
       <form class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-3" on:submit|preventDefault={sendGuestMessage}>
         {#if errorMessage && !handoffRequested}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[12px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
         <div class="flex items-end gap-2">
