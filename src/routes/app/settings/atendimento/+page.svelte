@@ -19,6 +19,7 @@
   let activeTab: "teams" | "chat" | "routing" | "hours" =
     formAction === "save" ? "hours"
       : formAction === "saveRouting" ? "routing"
+        : formAction === "saveFinanceReadOnly" ? "chat"
         : ["createQueue", "saveQueueSla", "saveQueueDueDays",
             "createEntryOption", "updateEntryOption", "deleteEntryOption"].includes(formAction)
           ? "chat" : "teams";
@@ -149,6 +150,15 @@
         <p class="application-text-meta mt-1 max-w-[760px] leading-4 text-[#858B99]">As opções aparecem antes do formulário do cliente. Cada opção direciona para uma fila; a fila define a equipe, o prazo padrão de conclusão e, no modo automático, somente integrantes elegíveis e Online entram no round-robin.</p>
       </div>
     </div>
+
+    <form method="POST" action="?/saveFinanceReadOnly" class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#DDE3EE] bg-[#F7F9FC] p-3">
+      <label class="flex items-center gap-2 text-[13px] font-semibold text-[#3F4656]">
+        <input type="checkbox" name="enabled" checked={data.financeReadOnlyEnabled} class="h-4 w-4"/>
+        Consultas de PIX e parcelas no chat e nos tickets
+      </label>
+      <button type="submit" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white"><Save size={14}/>Salvar</button>
+      <p class="w-full text-[12px] text-[#778094]">Somente consulta de cobranças existentes. Exige contrato vinculado e validação do pagador.</p>
+    </form>
 
     <div class="mt-5 space-y-3">
       {#each data.chatEntry.options as option}

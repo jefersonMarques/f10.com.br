@@ -33,6 +33,7 @@
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import TicketRemotePanel from "$lib/components/operations/tickets/TicketRemotePanel.svelte";
   import TicketCustomerCard from "./TicketCustomerCard.svelte";
+  import FinancePaymentPanel from "$lib/components/finance/FinancePaymentPanel.svelte";
   import TicketRelationshipsInline from "./TicketRelationshipsInline.svelte";
   import TicketHistoryPanel from "./TicketHistoryPanel.svelte";
   import TicketMergeDialog from "./TicketMergeDialog.svelte";
@@ -898,6 +899,7 @@
             onAction={postAction}
             onManageContracts={() => relationshipsPanel?.focusContracts()}
           />
+          <FinancePaymentPanel scope="operator" ticketId={ticketData.details.ticket.id}/>
           {#key ticketData.details.ticket.id}
             <div class="mt-3">
               <TicketRelationshipsInline

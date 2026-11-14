@@ -8,6 +8,7 @@
   } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import FinancePaymentPanel from "$lib/components/finance/FinancePaymentPanel.svelte";
   import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import { isFinancialChatOption } from "$lib/support/chatEntryRouting";
   import {
@@ -211,7 +212,7 @@
       authStep = authState.authenticated
         ? authState.requiresUnitSelection ? "unit" : "ready"
         : "login";
-      if (authStep === "ready" && !session) void startHumanChat();
+      // O cliente escolhe entre autoatendimento financeiro e equipe humana.
     } else if (entryDepartment === "support" && !session) {
       handoffRequested = false;
       authStep = "login";
@@ -702,6 +703,10 @@
       await refreshMessages(true);
       return;
     }
+    if (entryDepartment === "finance") {
+      handoffRequested = false;
+      return;
+    }
     await startHumanChat();
   }
 
@@ -1165,6 +1170,15 @@
     </header>
 
     <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F8F9FC] px-4 py-4" aria-live="polite">
+      {#if entryDepartment === "finance" && authState.authenticated && !authState.requiresUnitSelection && !departmentSessionMismatch}
+        <FinancePaymentPanel scope="customer"/>
+        {#if !session}
+          <button type="button" on:click={() => void requestHumanSupport()} disabled={starting}
+            class="mb-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#D8DEEA] bg-white px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-50">
+            <UserRound size={16}/> Falar com a equipe financeira
+          </button>
+        {/if}
+      {/if}
       {#if session && (entryDepartment !== "finance" || authState.authenticated)}
         {#if departmentSessionMismatch}
           <div role="status" class="mb-3 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] p-3 text-[11px] leading-5 text-[#81512A]">
@@ -1293,7 +1307,7 @@
             </div>
           {/if}
 
-          {#if handoffRequested}
+          {#if handoffRequested && (entryDepartment !== "finance" || authStep !== "ready" || starting || Boolean(errorMessage))}
             <div class="ml-10 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm">
               {#if authState.authenticated && starting}
                 <div class="flex items-center gap-2.5 text-[12px] font-semibold text-[#4C5363]"><LoaderCircle class="animate-spin" size={16}/>Criando seu atendimento identificado...</div>

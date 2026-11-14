@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    Check, Copy, CreditCard, ExternalLink, LoaderCircle, QrCode, Share2,
+    Check, Copy, CreditCard, LoaderCircle, QrCode, Share2,
   } from "lucide-svelte";
   import { renderPixQrCode } from "$lib/finance/financeQrCode";
 
