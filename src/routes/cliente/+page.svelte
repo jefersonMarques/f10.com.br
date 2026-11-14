@@ -25,7 +25,7 @@
 
     <section class="mt-5 overflow-hidden rounded-[28px] border border-[#E1E4EC] bg-white shadow-[0_18px_55px_rgba(1,13,40,0.07)]">
       <header class="bg-[#010D28] px-6 py-7 text-white sm:px-8 sm:py-8">
-        <img src="/branding/f10-helpdesk.webp" alt="Helpdesk F10"
+        <img src="/branding/f10-helpdesk-white.png" alt="Helpdesk F10"
           class="h-auto w-[174px] max-w-full object-contain" width="174" height="70"/>
         <h1 class="mt-5 text-[26px] font-semibold tracking-[-0.04em] sm:text-[32px]">Acesse o Helpdesk F10</h1>
         <p class="application-text-control mt-3 leading-6 text-white/65">Informe seu e-mail e senha para continuar.</p>
