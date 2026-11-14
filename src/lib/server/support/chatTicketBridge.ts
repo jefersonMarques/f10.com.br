@@ -170,6 +170,22 @@ export async function createTicketFromChat(
         WHERE source_kind = 'chat'
           AND message_id IN (${sql.join(messageIds.map((id) => sql`${id}::uuid`), sql`, `)})
       `);
+
+      // Preserva a origem das tarefas quando a conversa passa a pertencer a um ticket.
+      await tx.execute(sql`
+        UPDATE support_message_task_links
+        SET source_kind = 'ticket'
+        WHERE source_kind = 'chat'
+          AND message_id IN (${sql.join(messageIds.map((id) => sql`${id}::uuid`), sql`, `)})
+      `);
+      await tx.execute(sql`
+        INSERT INTO ticket_task_links (ticket_id, task_id, created_by, created_at)
+        SELECT ${ticket.id}::uuid, task_id, created_by, created_at
+        FROM support_message_task_links
+        WHERE source_kind = 'ticket'
+          AND message_id IN (${sql.join(messageIds.map((id) => sql`${id}::uuid`), sql`, `)})
+        ON CONFLICT DO NOTHING
+      `);
     }
 
     const attachments = await tx
