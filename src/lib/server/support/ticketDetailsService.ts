@@ -84,7 +84,7 @@ export async function getTicketDetailsData(
       ? listTicketTasks(actorUserId, permissions, ticketId)
       : Promise.resolve([]),
     canCreateTask
-      ? listTaskProjects(actorUserId, permissions).catch(() => [])
+      ? listTaskProjects(actorUserId, permissions, "tasks.create").catch(() => [])
       : Promise.resolve([]),
     getSupportServiceRequestForTicket(actorUserId, viewScope, ticketId),
     listTicketFollowers(ticketId),
