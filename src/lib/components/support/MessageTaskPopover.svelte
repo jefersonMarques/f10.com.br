@@ -142,12 +142,18 @@
 
     <label class="block text-[13px] font-semibold">
       <span class="flex items-center gap-1"><UserRound size={15}/>Responsável</span>
-      <select bind:value={assigneeId} disabled={loadingMembers || !canAssign} required
+      <select bind:value={assigneeId} disabled={loadingMembers || !canAssign || members.length < 2} required
         class="mt-1 h-11 w-full rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-3 text-[14px] font-normal disabled:opacity-65">
         {#each members as member (member.id)}
           <option value={member.id}>{member.name}</option>
         {/each}
       </select>
+      {#if !loadingMembers && members.length < 2}
+        <span class="mt-1 block text-[12px] font-normal text-[var(--app-text-muted)]"
+          title="A atribuição segue a permissão Atribuir tarefas e os membros do projeto.">
+          {canAssign ? "Adicione integrantes ao projeto para delegar." : "Atribuição limitada pelo perfil de acesso."}
+        </span>
+      {/if}
     </label>
 
     <div class="grid grid-cols-2 gap-3">
