@@ -9,6 +9,7 @@
     TrendingUp,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import UserAvatar from "$lib/components/application/UserAvatar.svelte";
   import SupportPresencePanel from "$lib/components/operations/SupportPresencePanel.svelte";
   import type { PageData } from "./$types";
 
@@ -195,7 +196,15 @@
         <tbody class="divide-y divide-[#EEF0F5]">
           {#each performance.users as user}
             <tr class="application-text-caption text-[#555C6C] hover:bg-[#FAFAFC]">
-              <td class="px-5 py-4"><strong class="block text-[11px] text-[#303746]">{user.name}</strong><span class="application-text-meta mt-1 block text-[#9297A4]">{user.email}</span></td>
+              <td class="px-5 py-4">
+                <div class="flex min-w-0 items-center gap-3">
+                  <UserAvatar userId={user.id} name={user.name} hasAvatar={user.hasAvatar}/>
+                  <span class="min-w-0">
+                    <strong class="block truncate text-[13px] text-[#303746]">{user.name}</strong>
+                    <span class="application-text-meta mt-1 block truncate text-[#9297A4]">{user.email}</span>
+                  </span>
+                </div>
+              </td>
               <td class="px-3 py-4 font-semibold">{user.handledTickets}</td>
               <td class="px-3 py-4">{user.handledChats}</td>
               <td class="px-3 py-4">{user.publicReplies}<span class="application-text-meta ml-1 text-[#9BA0AC]">+ {user.internalNotes} notas</span></td>

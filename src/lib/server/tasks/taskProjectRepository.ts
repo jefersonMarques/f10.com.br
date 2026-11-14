@@ -1,6 +1,7 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
+import { userProfiles } from "$lib/server/db/userProfileSchema";
 import { users } from "$lib/server/db/schema";
 import {
   taskAssignees,
@@ -30,8 +31,9 @@ export type UpdateTaskProjectInput = {
 export async function listTaskProjects(
   userId: string,
   permissions: TaskPermissionMap,
+  permissionCode: "tasks.view" | "tasks.create" = "tasks.view",
 ) {
-  const scope = requireTaskPermissionScope(permissions, "tasks.view");
+  const scope = requireTaskPermissionScope(permissions, permissionCode);
   const db = getDatabase();
   const accessibleProjectIds = await getAccessibleTaskProjectIds(userId, scope);
 
@@ -98,9 +100,16 @@ export async function listProjectMembers(projectId: string) {
   const db = getDatabase();
 
   return db
-    .select({ id: users.id, name: users.name, email: users.email })
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      status: users.status,
+      hasAvatar: sql<boolean>`${userProfiles.avatarKey} IS NOT NULL`,
+    })
     .from(taskProjectMembers)
     .innerJoin(users, eq(taskProjectMembers.userId, users.id))
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .where(eq(taskProjectMembers.projectId, projectId))
     .orderBy(asc(users.name));
 }

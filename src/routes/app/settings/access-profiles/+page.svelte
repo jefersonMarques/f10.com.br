@@ -87,7 +87,7 @@
             {#each data.permissionCatalog.filter((permission) => hasGrant(permission.code)) as permission}
               <div class="flex items-center justify-between gap-4 px-5 py-3 sm:px-6">
                 <span class="application-text-caption font-semibold text-app-text">{permission.name}</span>
-                <span class="application-text-meta rounded-full bg-app-muted px-2 py-1 font-bold text-app-text-muted">{grantScope(permission.code) === "all" ? "Tudo" : grantScope(permission.code) === "team" ? "Equipe" : "Próprio"}</span>
+                <span class="application-text-meta rounded-full bg-app-muted px-2 py-1 font-bold text-app-text-muted">{permission.code === "performance.view" ? "Permitido" : grantScope(permission.code) === "all" ? "Tudo" : grantScope(permission.code) === "team" ? "Equipe" : "Próprio"}</span>
               </div>
             {/each}
           </div>
@@ -133,11 +133,15 @@
                       <span class="application-text-meta mt-0.5 block text-app-text-soft">{permission.description}</span>
                     </span>
                   </label>
-                  <select name={"scope:" + permission.code} value={grantScope(permission.code)} class="application-text-caption h-9 rounded-lg border border-app-border-control bg-app-surface px-2">
-                    <option value="own">Próprio</option>
-                    <option value="team">Equipe</option>
-                    <option value="all">Tudo (acesso global)</option>
-                  </select>
+                  {#if permission.code === "performance.view"}
+                    <input type="hidden" name={"scope:" + permission.code} value="all"/>
+                  {:else}
+                    <select name={"scope:" + permission.code} value={grantScope(permission.code)} class="application-text-caption h-9 rounded-lg border border-app-border-control bg-app-surface px-2">
+                      <option value="own">Próprio</option>
+                      <option value="team">Equipe</option>
+                      <option value="all">Tudo (acesso global)</option>
+                    </select>
+                  {/if}
                 </div>
               {/each}
             </div>

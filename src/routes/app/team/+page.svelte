@@ -5,6 +5,7 @@
     UserPlus, Users, X,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import UserAvatar from "$lib/components/application/UserAvatar.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -156,9 +157,7 @@
         {#each filteredUsers as user (user.id)}
           <button type="button" on:click={() => openModal("person", user.id)}
             class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-app-subtle">
-            <span class="application-text-caption flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-app-info-bg font-semibold text-app-primary">
-              {initials(user.name)}
-            </span>
+            <UserAvatar userId={user.id} name={user.name} hasAvatar={user.hasAvatar} />
             <span class="min-w-0 flex-1">
               <strong class="application-text-caption block truncate text-app-text">{user.name}</strong>
               <span class="application-text-meta block truncate text-app-text-soft">{user.email} · {user.roleNames.join(", ") || "Sem perfil"}</span>
@@ -215,7 +214,7 @@
   {#if modalMode === "person" && selectedUser}
     <div class="space-y-4 p-4">
       <div class="flex items-center gap-3">
-        <span class="flex h-12 w-12 items-center justify-center rounded-full bg-app-info-bg font-semibold text-app-primary">{initials(selectedUser.name)}</span>
+        <UserAvatar userId={selectedUser.id} name={selectedUser.name} hasAvatar={selectedUser.hasAvatar} size="md"/>
         <div class="min-w-0">
           <strong class="application-text-caption block text-app-text">{selectedUser.name}</strong>
           <span class="application-text-caption block truncate text-app-text-soft">{selectedUser.email}</span>

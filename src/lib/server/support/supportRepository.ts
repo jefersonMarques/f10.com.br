@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { userProfiles } from "$lib/server/db/userProfileSchema";
 import { listMessageReactionSummaries, EMPTY_REACTION_SUMMARY } from "$lib/server/support/supportMessageReactionRepository";
 import { listMessageTaskLinks } from "$lib/server/support/messageTaskRepository";
 import { getConfiguredF10UnitId } from "$lib/server/integrations/f10/f10CustomerApi";
@@ -218,8 +219,14 @@ export async function listSupportAgents() {
   const db = getDatabase();
 
   return db
-    .select({ id: users.id, name: users.name, email: users.email })
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      hasAvatar: sql<boolean>`${userProfiles.avatarKey} IS NOT NULL`,
+    })
     .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .where(eq(users.status, "active"))
     .orderBy(asc(users.name));
 }
@@ -244,6 +251,7 @@ export async function listSupportTickets(
       updatedAt: tickets.updatedAt,
       assignedUserId: tickets.assignedUserId,
       assignedUserName: users.name,
+      assignedUserHasAvatar: sql<boolean>`${userProfiles.avatarKey} IS NOT NULL`,
       queueName: supportQueues.name,
       customerContactId: tickets.customerContactId,
       customerName: customerContacts.name,
@@ -257,6 +265,7 @@ export async function listSupportTickets(
       eq(ticketWorkflowStates.ticketId, tickets.id),
     )
     .leftJoin(users, eq(tickets.assignedUserId, users.id))
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
     .leftJoin(
       customerOrganizations,
@@ -844,6 +853,7 @@ export async function getSupportTicket(
       queueName: supportQueues.name,
       assignedUserId: tickets.assignedUserId,
       assignedUserName: users.name,
+      assignedUserHasAvatar: sql<boolean>`${userProfiles.avatarKey} IS NOT NULL`,
       customerContactId: tickets.customerContactId,
       customerName: customerContacts.name,
       customerEmail: customerContacts.email,
@@ -863,6 +873,7 @@ export async function getSupportTicket(
     .from(tickets)
     .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
     .leftJoin(users, eq(tickets.assignedUserId, users.id))
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
     .leftJoin(
       customerOrganizations,
@@ -879,6 +890,8 @@ export async function getSupportTicket(
         id: ticketMessages.id,
         authorType: ticketMessages.authorType,
         authorUserName: users.name,
+        authorUserId: ticketMessages.authorUserId,
+        authorHasAvatar: sql<boolean>`${userProfiles.avatarKey} IS NOT NULL`,
         customerName: customerContacts.name,
         visibility: ticketMessages.visibility,
         channel: ticketMessages.channel,
@@ -888,6 +901,7 @@ export async function getSupportTicket(
       })
       .from(ticketMessages)
       .leftJoin(users, eq(ticketMessages.authorUserId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .leftJoin(
         customerContacts,
         eq(ticketMessages.customerContactId, customerContacts.id),

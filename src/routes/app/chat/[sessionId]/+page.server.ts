@@ -168,7 +168,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         ? listTicketTasks(layout.user.id, permissions, ticketId)
         : Promise.resolve([]),
       canCreateTask
-        ? listTaskProjects(layout.user.id, permissions).catch(() => [])
+        ? listTaskProjects(layout.user.id, permissions, "tasks.create").catch(() => [])
         : Promise.resolve([]),
     ]);
     const personalScheduling = hasPermission(permissions, "scheduling.view")

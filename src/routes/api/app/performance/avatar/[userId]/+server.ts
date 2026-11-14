@@ -8,7 +8,7 @@ import { users } from "$lib/server/db/schema";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const GET: RequestHandler = async ({ cookies, params, url }) => {
-  await requireAppPermission(cookies, "reports.view", url.pathname);
+  await requireAppPermission(cookies, "performance.view", url.pathname);
   if (!params.userId || !UUID_PATTERN.test(params.userId)) {
     throw error(404, "Usuário não encontrado.");
   }
