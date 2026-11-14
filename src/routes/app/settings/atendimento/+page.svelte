@@ -15,7 +15,13 @@
 
   export let data: PageData;
   export let form: ActionData;
-  let activeTab: "teams" | "chat" | "routing" | "hours" = "teams";
+  const formAction = form?.action ?? "";
+  let activeTab: "teams" | "chat" | "routing" | "hours" =
+    formAction === "save" ? "hours"
+      : formAction === "saveRouting" ? "routing"
+        : ["createQueue", "saveQueueSla", "saveQueueDueDays",
+            "createEntryOption", "updateEntryOption", "deleteEntryOption"].includes(formAction)
+          ? "chat" : "teams";
 
   const days = [
     ["monday", "Segunda-feira"],
