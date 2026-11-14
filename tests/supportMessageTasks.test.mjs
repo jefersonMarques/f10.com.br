@@ -24,6 +24,7 @@ test("new tasks validate message access and project assignees on the server", ()
   assert.match(endpoint, /getSupportTicket/);
   assert.match(endpoint, /ensureTaskProjectAccess/);
   assert.match(endpoint, /listProjectMembers/);
+  assert.match(endpoint, /listTaskProjects/);
   assert.match(endpoint, /eq\(users.status, "active"\)/);
   assert.match(endpoint, /createTask\(session.user.id, permissions/);
 });
