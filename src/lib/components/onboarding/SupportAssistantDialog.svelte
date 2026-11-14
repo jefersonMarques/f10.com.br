@@ -113,9 +113,9 @@
   const GUEST_KEY = SUPPORT_ASSISTANT_GUEST_KEY;
   const HANDOFF_KEY = "f10-support-assistant-handoff-v1";
   const HANDOFF_TTL_MS = 60 * 60 * 1000;
-  const MAX_IMAGES = 4;
-  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-  const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+  const MAX_FILES = 4;
+  const MAX_FILE_BYTES = 10 * 1024 * 1024;
+  const ALLOWED_ATTACHMENT_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
 
   let initialized = false;
   let restored = false;
@@ -583,16 +583,16 @@
   function addImages(files: File[]): void {
     attachmentError = "";
     for (const file of files) {
-      if (pendingImages.length >= MAX_IMAGES) {
-        attachmentError = "Envie no máximo 4 imagens por mensagem.";
+      if (pendingImages.length >= MAX_FILES) {
+        attachmentError = "Envie no máximo 4 arquivos por mensagem.";
         break;
       }
-      if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-        attachmentError = "Use imagens PNG, JPG/JPEG ou WebP.";
+      if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+        attachmentError = "Aceitos: PNG, JPG, WebP e PDF.";
         continue;
       }
-      if (file.size > MAX_IMAGE_BYTES) {
-        attachmentError = "Cada imagem pode ter no máximo 8 MB.";
+      if (file.size > MAX_FILE_BYTES) {
+        attachmentError = "Cada arquivo pode ter no máximo 10 MB.";
         continue;
       }
       pendingImages = [
@@ -600,6 +600,13 @@
         { id: `${Date.now()}-${Math.random()}`, file, previewUrl: URL.createObjectURL(file) },
       ];
     }
+  }
+
+  function handleReplyPaste(event: ClipboardEvent): void {
+    const files = Array.from(event.clipboardData?.files ?? []);
+    if (!files.length) return;
+    event.preventDefault();
+    addImages(files);
   }
 
   function handleFiles(event: Event): void {
@@ -714,7 +721,7 @@
                 {/if}
                 {#if message.attachments?.length}
                   <div class="mt-2 grid grid-cols-2 gap-2">
-                    {#each message.attachments as attachment}<a href={attachment.url} target="_blank" rel="noreferrer" class="block overflow-hidden rounded-xl border border-black/10 bg-white"><img src={attachment.url} alt={attachment.originalName} class="h-24 w-full object-cover" /></a>{/each}
+                    {#each message.attachments as attachment}<a href={attachment.url} target="_blank" rel="noreferrer" class="block overflow-hidden rounded-xl border border-black/10 bg-white">{#if attachment.mimeType.startsWith("image/")}<img src={attachment.url} alt={attachment.originalName} class="h-24 w-full object-contain"/>{:else}<span class="flex min-h-12 items-center gap-2 p-2 text-[12px] text-[var(--app-text)]"><Paperclip size={16}/>{attachment.originalName}</span>{/if}</a>{/each}
                   </div>
                 {/if}
                 <p class={`mt-1 text-[10px] ${message.authorType === "customer" ? "text-white/60" : "text-[#9AA0AC]"}`}>{formatTime(message.createdAt)}</p>
@@ -762,16 +769,16 @@
     {:else}
       <form class="border-t border-[#E3E6ED] bg-white p-3" on:submit|preventDefault={sendHumanMessage}>
         {#if pendingImages.length > 0}
-          <div class="mb-2 flex gap-2 overflow-x-auto pb-1">{#each pendingImages as image}<div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[#DDE1E9]"><img src={image.previewUrl} alt="Prévia" class="h-full w-full object-cover" /><button type="button" on:click={() => removeImage(image.id)} class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-white" aria-label="Remover imagem"><X size={11} /></button></div>{/each}</div>
+          <div class="mb-2 flex gap-2 overflow-x-auto pb-1">{#each pendingImages as image}<div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[#DDE1E9]">{#if image.file.type.startsWith("image/")}<img src={image.previewUrl} alt="Prévia" class="h-full w-full object-cover"/>{:else}<span class="flex h-full w-full items-center justify-center text-[12px] text-[var(--app-text)]"><Paperclip size={18}/>PDF</span>{/if}<button type="button" on:click={() => removeImage(image.id)} class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-white" aria-label="Remover imagem"><X size={11} /></button></div>{/each}</div>
         {/if}
         {#if attachmentError}<p class="mb-2 text-[11px] text-[#A04435]">{attachmentError}</p>{/if}
         <div class="flex items-end gap-2 rounded-2xl border border-[#DDE1E9] p-2 focus-within:border-[#000A57]">
-          <input bind:this={fileInputElement} type="file" accept="image/png,image/jpeg,image/webp" multiple class="hidden" on:change={handleFiles} />
-          <button type="button" on:click={() => fileInputElement?.click()} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#6F7787] transition hover:bg-[#F2F4F8] hover:text-[#000A57]" aria-label="Anexar imagens"><Paperclip size={16} /></button>
-          <textarea bind:value={reply} rows="1" maxlength="4000" placeholder="Escreva para a equipe F10..." class="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-[13px] leading-5 outline-none" on:keydown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendHumanMessage(); } }}></textarea>
+          <input bind:this={fileInputElement} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple class="hidden" on:change={handleFiles} />
+          <button type="button" on:click={() => fileInputElement?.click()} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#6F7787] transition hover:bg-[#F2F4F8] hover:text-[#000A57]" aria-label="Anexar arquivos"><Paperclip size={16} /></button>
+          <textarea bind:value={reply} rows="1" maxlength="4000" placeholder="Escreva para a equipe F10..." class="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-[13px] leading-5 outline-none" on:paste={handleReplyPaste} on:keydown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendHumanMessage(); } }}></textarea>
           <button type="submit" disabled={sending || (!reply.trim() && pendingImages.length === 0)} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white disabled:opacity-40" aria-label="Enviar mensagem">{#if sending}<LoaderCircle size={15} class="animate-spin" />{:else}<Send size={16} />{/if}</button>
         </div>
-        <p class="mt-1.5 flex items-center gap-1 text-[10px] text-[#9298A5]"><ImageIcon size={10} />PNG, JPG/JPEG ou WebP · até 8 MB cada</p>
+        <p class="mt-1.5 flex items-center gap-1 text-[10px] text-[#9298A5]"><ImageIcon size={10} />PNG, JPG, WebP ou PDF · até 10 MB cada</p>
       </form>
     {/if}
   </section>
