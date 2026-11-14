@@ -31,6 +31,7 @@ export const PERMISSION_CODES = [
   "users.manage",
   "roles.manage",
   "reports.view",
+  "performance.view",
   "audit.view",
   "integrations.view",
   "integrations.manage",
