@@ -127,7 +127,7 @@ export const POST: RequestHandler = async ({
       return errorResponse("INVALID_REQUEST", 400);
     }
 
-    const access = await authorizeFinanceAccess(scope, ticketId ?? "", cookies);
+    const access = await authorizeFinanceAccess(scope, typeof ticketId === "string" ? ticketId : "", cookies);
     if (!access) return errorResponse("FINANCE_NOT_AUTHORIZED", 403);
     const selected = access.contracts.find((item) => item.id === contractId);
     if (!selected) return errorResponse("FINANCE_CONTRACT_NOT_AUTHORIZED", 403);

@@ -272,7 +272,7 @@
               <p class="mb-2 text-center text-[12px] text-[#66736A]">Válido até {pix.expiresAt}</p>
             {/if}
             <textarea readonly rows="2" value={pix.copyPaste} aria-label="Código PIX Copia e Cola"
-              class="w-full resize-none rounded-lg border border-[#D5DCE5] bg-white p-2 text-[12px] text-[#465265]"/>
+              class="w-full resize-none rounded-lg border border-[#D5DCE5] bg-white p-2 text-[12px] text-[#465265]"></textarea>
             <div class="mt-2 grid grid-cols-2 gap-2">
               <button type="button" on:click={() => void copyPix()}
                 class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#000A57] px-2 text-[12px] font-semibold text-white">
