@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   and,
   asc,
@@ -10,8 +11,9 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
-import { webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
+import { webChatMessageAttachments, webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
+import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import { users } from "$lib/server/db/schema";
 import {
   customerContacts,
@@ -27,6 +29,11 @@ import {
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
 import { listEligibleSupportResponders } from "$lib/server/support/supportRoutingRepository";
+import {
+  deleteStoredSupportImages,
+  uploadSupportAgentChatMessageAttachments,
+  uploadSupportAgentMessageAttachments,
+} from "$lib/server/support/supportMessageAttachmentRepository";
 
 function requireChatScope(
   permissions: SupportPermissionMap,
@@ -467,6 +474,7 @@ export async function respondToInternalChat(
   permissions: SupportPermissionMap,
   sessionId: string,
   body: string,
+  files: File[] = [],
 ): Promise<void> {
   const respondScope = requireChatScope(permissions, "chat.respond");
   const db = getDatabase();
@@ -492,8 +500,19 @@ export async function respondToInternalChat(
     throw new Error("CHAT_ASSIGNED_TO_OTHER_USER");
   }
 
+
+  const normalizedBody = body.trim();
+  if (normalizedBody.length > 4000 || (!normalizedBody && files.length === 0)) {
+    throw new Error("CHAT_MESSAGE_INVALID");
+  }
+  const messageId = randomUUID();
+  const attachments = chat.ticketId
+    ? await uploadSupportAgentMessageAttachments(chat.ticketId, messageId, files)
+    : await uploadSupportAgentChatMessageAttachments(sessionId, messageId, files);
+
   const now = new Date();
-  await db.transaction(async (tx) => {
+  try {
+    await db.transaction(async (tx) => {
     await tx
       .update(webChatSessions)
       .set({
@@ -508,14 +527,29 @@ export async function respondToInternalChat(
       .where(eq(webChatSessions.id, sessionId));
 
     if (chat.ticketId) {
+
       await tx.insert(ticketMessages).values({
+        id: messageId,
         ticketId: chat.ticketId,
         authorType: "user",
         authorUserId: actorUserId,
         visibility: "public",
         channel: "web_chat",
-        body: body.trim(),
+        body: normalizedBody,
       });
+      if (attachments.length) {
+        await tx.insert(ticketMessageAttachments).values(
+          attachments.map((attachment) => ({
+            messageId,
+            ticketId: chat.ticketId!,
+            storageKey: attachment.storageKey,
+            originalName: attachment.originalName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+            checksumSha256: attachment.checksumSha256,
+          })),
+        );
+      }
       await tx
         .update(tickets)
         .set({
@@ -532,13 +566,32 @@ export async function respondToInternalChat(
         metadata: { aiState: "human" },
       });
     } else {
+
       await tx.insert(webChatMessages).values({
+        id: messageId,
         sessionId,
         authorType: "user",
         authorUserId: actorUserId,
         visibility: "public",
-        body: body.trim(),
+        body: normalizedBody,
       });
+      if (attachments.length) {
+        await tx.insert(webChatMessageAttachments).values(
+          attachments.map((attachment) => ({
+            messageId,
+            sessionId,
+            storageKey: attachment.storageKey,
+            originalName: attachment.originalName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+            checksumSha256: attachment.checksumSha256,
+          })),
+        );
+      }
     }
-  });
+    });
+  } catch (cause) {
+    await deleteStoredSupportImages(attachments);
+    throw cause;
+  }
 }
