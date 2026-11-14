@@ -12,6 +12,7 @@ import {
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { listMessageReactionSummaries, EMPTY_REACTION_SUMMARY } from "$lib/server/support/supportMessageReactionRepository";
+import { listMessageTaskLinks } from "$lib/server/support/messageTaskRepository";
 import { selectConversationSession } from "$lib/support/chatInboxClassification";
 import { webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
@@ -462,15 +463,13 @@ export async function listInternalChatConversationMessages(
   );
   const page = await listRawConversationMessages(sessions, options);
   const messages = await hydrateMessageAttachments(page.messages);
-  const [chatReactions, ticketReactions] = await Promise.all([
-    listMessageReactionSummaries(
-      "chat", messages.filter((message) => message.storageSource === "chat").map((message) => message.id),
-      "agent", actorUserId,
-    ),
-    listMessageReactionSummaries(
-      "ticket", messages.filter((message) => message.storageSource === "ticket").map((message) => message.id),
-      "agent", actorUserId,
-    ),
+  const chatIds = messages.filter((message) => message.storageSource === "chat").map((message) => message.id);
+  const ticketIds = messages.filter((message) => message.storageSource === "ticket").map((message) => message.id);
+  const [chatReactions, ticketReactions, chatTasks, ticketTasks] = await Promise.all([
+    listMessageReactionSummaries("chat", chatIds, "agent", actorUserId),
+    listMessageReactionSummaries("ticket", ticketIds, "agent", actorUserId),
+    listMessageTaskLinks(actorUserId, permissions, "chat", chatIds),
+    listMessageTaskLinks(actorUserId, permissions, "ticket", ticketIds),
   ]);
 
   return {
@@ -480,6 +479,7 @@ export async function listInternalChatConversationMessages(
       ...message,
       ...((message.storageSource === "chat" ? chatReactions : ticketReactions).get(message.id)
         ?? EMPTY_REACTION_SUMMARY),
+      taskLinks: (message.storageSource === "chat" ? chatTasks : ticketTasks).get(message.id) ?? [],
     })),
     hasOlder: page.hasOlder,
   };

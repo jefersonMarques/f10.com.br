@@ -28,6 +28,7 @@
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
+  import MessageTaskPopover from "$lib/components/support/MessageTaskPopover.svelte";
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import TicketRemotePanel from "$lib/components/operations/tickets/TicketRemotePanel.svelte";
   import TicketCustomerCard from "./TicketCustomerCard.svelte";
@@ -68,6 +69,7 @@
   let actionFeedback: ActionFeedback = null;
   let actionLoading = "";
   let mergeDialogOpen = false;
+  let taskMessage: TicketDetailsData["details"]["messages"][number] | null = null;
   let ticketMenuOpen = false;
   let labelEditorOpen = false;
   let relationshipsPanel: TicketRelationshipsInline | null = null;
@@ -614,7 +616,10 @@
                         </div>
                       {/if}
                       <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
-                        onReact={(code) => reactTicketMessage(message.id, code)}/>
+                        onReact={(code) => reactTicketMessage(message.id, code)}
+                        taskLinks={message.taskLinks ?? []}
+                        canCreateTask={ticketData.canCreateTask && ticketData.taskProjects.length > 0}
+                        onCreateTask={() => (taskMessage = message)}/>
                     </article>
                   </div>
                 {:else}
@@ -664,7 +669,10 @@
                         </div>
                       {/if}
                       <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
-                        onReact={(code) => reactTicketMessage(message.id, code)}/>
+                        onReact={(code) => reactTicketMessage(message.id, code)}
+                        taskLinks={message.taskLinks ?? []}
+                        canCreateTask={ticketData.canCreateTask && ticketData.taskProjects.length > 0}
+                        onCreateTask={() => (taskMessage = message)}/>
                     </article>
                   </div>
                 {/if}
@@ -1008,4 +1016,16 @@
 
 {#if ticketData.mergeContext.canMerge}
   <TicketMergeDialog bind:open={mergeDialogOpen} {ticketData} saving={Boolean(actionLoading)} onAction={postAction}/>
+{/if}
+
+{#if taskMessage}
+  <MessageTaskPopover
+    sourceKind="ticket"
+    messageId={taskMessage.id}
+    messageBody={taskMessage.body}
+    ticketId={taskMessage.sourceTicketId ?? ticketData.details.ticket.id}
+    projects={ticketData.taskProjects}
+    onCreated={async () => { await refreshDetails(); }}
+    onClose={() => (taskMessage = null)}
+  />
 {/if}
