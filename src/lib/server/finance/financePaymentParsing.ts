@@ -104,3 +104,26 @@ export function parseF10FinanceContracts(value: unknown): FinanceContract[] {
 
   return [...contracts.values()];
 }
+
+export function parseF10CompanyCandidates(rows: Array<{
+  contractId: string | number;
+  holderId: string | number | null;
+}>): { holderId: number; contractIds: Set<number> } {
+  if (!rows.length) throw new Error("FINANCE_COMPANY_NOT_LINKED");
+  if (rows.length > 50) throw new Error("FINANCE_COMPANY_AMBIGUOUS");
+
+  const contractIds = new Set<number>();
+  const holderIds = new Set<number>();
+  for (const row of rows) {
+    const contractId = positivePaymentId(row.contractId);
+    const holderId = positivePaymentId(row.holderId);
+    if (!contractId || !holderId) {
+      throw new Error("FINANCE_COMPANY_UNRESOLVED");
+    }
+    contractIds.add(contractId);
+    holderIds.add(holderId);
+  }
+
+  if (holderIds.size !== 1) throw new Error("FINANCE_COMPANY_AMBIGUOUS");
+  return { holderId: [...holderIds][0], contractIds };
+}

@@ -7,6 +7,7 @@ import {
 import {
   isExistingPixPayable,
   normalizePaymentInstallments,
+  parseF10CompanyCandidates,
   parseF10FinanceContracts,
   requirePaymentRecord,
   type FinanceContract,
@@ -63,7 +64,7 @@ async function getCustomerFinanceCandidates(groupId: number): Promise<FinanceCan
             AND customer_group.source_group_id = ${String(groupId)}
         )
       )
-    ORDER BY contract.contract_id
+    ORDER BY "contractId"
     LIMIT 51
   `);
   return rows as unknown as FinanceCandidate[];
@@ -81,34 +82,12 @@ async function getOperatorFinanceCandidates(ticketId: string): Promise<FinanceCa
     WHERE link.ticket_id = ${ticketId}::uuid
       AND ticket.customer_contact_id IS NOT NULL
       AND link.unit_id = ${unitId}
-    ORDER BY contract.contract_id
+    ORDER BY "contractId"
     LIMIT 51
   `);
   return rows as unknown as FinanceCandidate[];
 }
 
-function determineFinancePayer(rows: FinanceCandidate[]): {
-  holderId: number;
-  contractIds: Set<number>;
-} {
-  if (!rows.length) throw new Error("FINANCE_COMPANY_NOT_LINKED");
-  if (rows.length > 50) throw new Error("FINANCE_COMPANY_AMBIGUOUS");
-
-  const holderIds = new Set<number>();
-  const contractIds = new Set<number>();
-  for (const row of rows) {
-    const contractId = Number(row.contractId);
-    const holderId = Number(row.holderId);
-    if (!Number.isSafeInteger(contractId) || contractId <= 0 ||
-        !Number.isSafeInteger(holderId) || holderId <= 0) {
-      throw new Error("FINANCE_COMPANY_UNRESOLVED");
-    }
-    holderIds.add(holderId);
-    contractIds.add(contractId);
-  }
-  if (holderIds.size !== 1) throw new Error("FINANCE_COMPANY_AMBIGUOUS");
-  return { holderId: [...holderIds][0], contractIds };
-}
 
 export async function authorizeFinancePayerForScope(
   scope: FinanceScope,
@@ -116,7 +95,7 @@ export async function authorizeFinancePayerForScope(
   const candidates = scope.kind === "customer"
     ? await getCustomerFinanceCandidates(scope.groupId)
     : await getOperatorFinanceCandidates(scope.ticketId);
-  const { holderId, contractIds } = determineFinancePayer(candidates);
+  const { holderId, contractIds } = parseF10CompanyCandidates(candidates);
   const unitId = getConfiguredF10UnitId();
 
   const company = await getF10ContractHolder(unitId, holderId);
