@@ -4,6 +4,7 @@ import { getDatabase } from "$lib/server/db";
 import { teamMembers, teams } from "$lib/server/db/schema";
 import { listProjectMembers } from "$lib/server/tasks/taskProjectRepository";
 import type { TaskPermissionMap } from "$lib/server/tasks/taskAccess";
+import { canAssignTaskUser } from "$lib/tasks/taskAssignmentPolicy";
 
 export async function listAssignableTaskMembers(
   actorUserId: string,
@@ -16,7 +17,7 @@ export async function listAssignableTaskMembers(
 
   if (scope === "all") return members;
   if (scope !== "team") {
-    return members.filter((member) => member.id === actorUserId);
+    return members.filter((member) => canAssignTaskUser(scope, actorUserId, member.id, new Set()));
   }
 
   const db = getDatabase();
@@ -39,9 +40,6 @@ export async function listAssignableTaskMembers(
     .from(teamMembers)
     .where(inArray(teamMembers.teamId, teamIds));
 
-  const allowedUserIds = new Set([
-    actorUserId,
-    ...colleagues.map((colleague) => colleague.userId),
-  ]);
-  return members.filter((member) => allowedUserIds.has(member.id));
+  const colleagueIds = new Set(colleagues.map((colleague) => colleague.userId));
+  return members.filter((member) => canAssignTaskUser(scope, actorUserId, member.id, colleagueIds));
 }
