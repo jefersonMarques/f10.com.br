@@ -35,8 +35,8 @@
     <section class="grid w-full overflow-hidden rounded-[30px] border border-[#E3E6EF] bg-white shadow-[0_30px_90px_rgba(1,13,40,0.12)] lg:grid-cols-[1.05fr_0.95fr]">
       <div class="hidden min-h-[650px] flex-col justify-between bg-[#000A57] p-12 text-white lg:flex">
         <div>
-          <div class="inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
-            <img src="/branding/f10-helpdesk.webp" alt="Helpdesk F10" class="max-h-16 max-w-[210px] object-contain"/>
+          <div class="inline-flex items-center">
+            <img src="/branding/f10-helpdesk-white.png" alt="Helpdesk F10" class="max-h-16 max-w-[210px] object-contain"/>
           </div>
 
           <h1 class="mt-16 max-w-[520px] text-[48px] font-semibold leading-[1.05] tracking-[-0.04em]">

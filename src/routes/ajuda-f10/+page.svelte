@@ -122,7 +122,7 @@
     <div class="mx-auto max-w-[980px] px-5 py-14 sm:px-8 sm:py-20">
       <div class="mx-auto max-w-[820px] text-center">
         <a href="/ajuda-f10" aria-label="Helpdesk F10 — Central de Ajuda" class="inline-flex items-center justify-center">
-          <img src="/branding/f10-helpdesk.webp" alt="Helpdesk F10"
+          <img src="/branding/f10-helpdesk-white.png" alt="Helpdesk F10"
             class="h-auto w-[186px] max-w-full object-contain" width="186" height="76"/>
         </a>
         <h1 class="mt-5 text-[34px] font-semibold tracking-[-0.045em] sm:text-[50px]">O que você precisa fazer no F10?</h1>

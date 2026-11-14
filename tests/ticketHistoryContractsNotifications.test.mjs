@@ -32,7 +32,7 @@ test("contract search supports API-sourced contract numbers", () => {
 test("Helpdesk F10 identity is used on the internal login", () => {
   const login = source("src/routes/login/+page.svelte");
   assert.match(login, /Helpdesk F10/);
-  assert.match(login, /\/branding\/f10-helpdesk\.webp/);
+  assert.match(login, /\/branding\/f10-helpdesk-white\.png/);
   assert.doesNotMatch(login, /Acessar F10 Operations/);
 });
 
