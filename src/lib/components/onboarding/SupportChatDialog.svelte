@@ -1190,7 +1190,7 @@
           <button type="button" on:click={() => (financeOptionSelected = false)} class="mb-3 text-[12px] font-semibold text-[#000A57] underline underline-offset-2">Voltar ao suporte</button>
         {/if}
         {#if !session}
-          <button type="button" on:click={() => void requestHumanSupport()} disabled={starting}
+          <button type="button" on:click={requestHumanSupport} disabled={starting}
             class="mb-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#D8DEEA] bg-white px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-50">
             <UserRound size={16}/> Falar com a equipe financeira
           </button>
