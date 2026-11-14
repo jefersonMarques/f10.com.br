@@ -8,7 +8,7 @@ import { users } from "$lib/server/db/schema";
 import { ticketMessages } from "$lib/server/db/supportSchema";
 import { getInternalChat } from "$lib/server/support/internalChatRepository";
 import { getSupportTicket } from "$lib/server/support/supportRepository";
-import { createTask } from "$lib/server/tasks/taskRepository";
+import { createTask, listTaskProjects } from "$lib/server/tasks/taskRepository";
 import { listProjectMembers } from "$lib/server/tasks/taskProjectRepository";
 import { ensureTaskProjectAccess } from "$lib/server/tasks/taskAccess";
 import type { TaskMessageOrigin } from "$lib/server/db/supportMessageTaskSchema";
@@ -88,6 +88,10 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     cookies, "tasks.create", url.pathname,
   );
   const projectId = url.searchParams.get("projectId");
+  if (!projectId) {
+    const projects = await listTaskProjects(session.user.id, permissions).catch(() => []);
+    return json({ projects }, { headers: { "Cache-Control": "private, no-store" } });
+  }
   if (!isUuid(projectId)) return json({ error: "INVALID_PROJECT" }, { status: 400 });
 
   const scope = getPermissionScope(permissions, "tasks.create");
