@@ -8,6 +8,7 @@
     UsersRound,
   } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import UserAvatar from "$lib/components/application/UserAvatar.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -34,7 +35,9 @@
   <ApplicationBackLink href="/app/team" label="Equipe" className="mb-3" />
 
   <section class="mb-3 flex flex-col justify-between gap-4 rounded-[22px] border border-[#E2E5ED] bg-white px-5 py-4 sm:flex-row sm:items-center">
-    <div class="min-w-0">
+    <div class="flex min-w-0 items-center gap-4">
+      <UserAvatar userId={data.details.user.id} name={data.details.user.name} hasAvatar={data.details.user.hasAvatar} size="lg"/>
+      <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2">
         {#each data.details.roleNames as roleName}
           <span class="application-text-caption rounded-full bg-[#EEF0FF] px-2.5 py-1 font-bold text-[#000A57]">{roleName}</span>
@@ -45,6 +48,7 @@
       </div>
       <h2 class="mt-2 truncate text-[20px] font-semibold tracking-[-0.025em] text-[#202637]">{data.details.user.name}</h2>
       <p class="mt-0.5 truncate text-[11px] text-[#7C8291]">{data.details.user.email}</p>
+      </div>
     </div>
   </section>
 
