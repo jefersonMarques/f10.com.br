@@ -11,7 +11,10 @@
   export let form: ActionData;
 
   type ModalMode = "person" | "team" | "invite" | null;
-  let activeTab: "people" | "teams" = "people";
+  let activeTab: "people" | "teams" =
+    form && "action" in form &&
+    (form.action === "createTeam" || form.action === "updateTeam")
+      ? "teams" : "people";
   let search = "";
   let statusFilter = "all";
   let profileFilter = "all";
