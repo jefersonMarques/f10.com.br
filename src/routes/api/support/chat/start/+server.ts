@@ -9,7 +9,7 @@ import {
   listPublicSupportChatEntryOptions,
   resolveSupportChatEntryOption,
 } from "$lib/server/support/supportChatEntryRepository";
-import { isFinancialChatOption, type PublicChatDepartment } from "$lib/support/chatEntryRouting";
+import { getFinanceEntryAction, isFinancialChatOption, type PublicChatDepartment } from "$lib/support/chatEntryRouting";
 import { resumeActiveCustomerChatSession } from "$lib/server/support/customerChatSessionRepository";
 import {
   addPublicChatMessage,
@@ -58,20 +58,30 @@ async function resolveEffectiveEntryOptionId(
   entryOptionId: string | null,
   department: PublicChatDepartment,
 ): Promise<string | null> {
-  if (department === "finance") {
-    const options = await listPublicSupportChatEntryOptions();
-    const financeOption = options.find(isFinancialChatOption);
-    if (!financeOption) throw new Error("FINANCE_QUEUE_UNAVAILABLE");
-    return financeOption.id;
-  }
-
   const options = await listPublicSupportChatEntryOptions();
-  if (entryOptionId) {
-    const selectedOption = options.find((option) => option.id === entryOptionId);
-    if (!selectedOption || isFinancialChatOption(selectedOption)) {
+
+  if (department === "finance") {
+    if (entryOptionId) {
+      const option = options.find((item) => item.id === entryOptionId);
+      if (option && getFinanceEntryAction(option) === "human") {
+        return option.id;
+      }
       throw new Error("CHAT_ENTRY_OPTION_NOT_FOUND");
     }
-    return entryOptionId;
+
+    const humanOption = options.find(
+      (option) => getFinanceEntryAction(option) === "human",
+    );
+    if (!humanOption) throw new Error("FINANCE_QUEUE_UNAVAILABLE");
+    return humanOption.id;
+  }
+
+  if (entryOptionId) {
+    const option = options.find((item) => item.id === entryOptionId);
+    if (!option || isFinancialChatOption(option)) {
+      throw new Error("CHAT_ENTRY_OPTION_NOT_FOUND");
+    }
+    return option.id;
   }
 
   const supportOptions = options.filter((option) => !isFinancialChatOption(option));
