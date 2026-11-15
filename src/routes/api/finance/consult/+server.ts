@@ -168,7 +168,43 @@ export const GET: RequestHandler = async ({ url, cookies, getClientAddress }) =>
 
     const payer = await authorizeFinancePayerForScope(access.financeScope);
     await recordFinanceConsultation(access, "contracts", ticketId, null);
-    return json({ enabled: true, contracts: payer.contracts }, { headers: HEADERS });
+
+    if (access.scope === "operator") {
+      return json({ enabled: true, contracts: payer.contracts }, { headers: HEADERS });
+    }
+
+    if (payer.contracts.length !== 1) {
+      return errorResponse("FINANCE_COMPANY_AMBIGUOUS", 409);
+    }
+
+    const contract = payer.contracts[0];
+    const installments = await consultFinanceInstallments(payer, contract.id);
+    const payable = installments.open.filter((item) => item.payable);
+    let automaticPix = null;
+    let pixUnavailable = false;
+
+    if (payable.length === 1) {
+      try {
+        automaticPix = await consultFinancePix(
+          payer,
+          contract.id,
+          payable[0].receivableId,
+        );
+      } catch (cause) {
+        if (!(cause instanceof Error && cause.message === "FINANCE_PIX_UNAVAILABLE")) {
+          throw cause;
+        }
+        pixUnavailable = true;
+      }
+    }
+
+    return json({
+      enabled: true,
+      contracts: payer.contracts,
+      ...installments,
+      pix: automaticPix,
+      pixUnavailable,
+    }, { headers: HEADERS });
   } catch (cause) {
     return financeError(cause);
   }

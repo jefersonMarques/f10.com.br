@@ -47,6 +47,11 @@ test("only open and payable installments offer PIX", () => {
   }], true)[0].payable, false);
 });
 
+test("missing or null installment collections can be empty in F10 responses", () => {
+  assert.deepEqual(normalizePaymentInstallments([], false), []);
+  assert.deepEqual(normalizePaymentInstallments([], true), []);
+});
+
 test("invalid installment payloads fail closed", () => {
   assert.throws(() => normalizePaymentInstallments({}, false), /FINANCE_RESPONSE_INVALID/);
   assert.throws(() => normalizePaymentInstallments([null], false), /FINANCE_RESPONSE_INVALID/);

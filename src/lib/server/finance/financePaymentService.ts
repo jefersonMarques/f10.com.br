@@ -130,8 +130,8 @@ export async function consultFinanceInstallments(
   );
 
   return {
-    open: normalizePaymentInstallments(data.abertas, false),
-    paid: normalizePaymentInstallments(data.pagas, true),
+    open: normalizePaymentInstallments(data.abertas ?? [], false),
+    paid: normalizePaymentInstallments(data.pagas ?? [], true),
   };
 }
 
@@ -152,7 +152,7 @@ export async function consultFinancePix(
   const installments = requirePaymentRecord(
     await listF10PaymentInstallments(payer.token, contractId),
   );
-  const open = normalizePaymentInstallments(installments.abertas, false);
+  const open = normalizePaymentInstallments(installments.abertas ?? [], false);
   const installment = open.find((item) =>
     item.receivableId === receivableId && item.payable,
   );
