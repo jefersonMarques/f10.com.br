@@ -10,10 +10,16 @@
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import FinancePaymentPanel from "$lib/components/finance/FinancePaymentPanel.svelte";
   import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
-  import { isFinancialChatOption } from "$lib/support/chatEntryRouting";
+  import {
+    filterChatOptionsByDepartment,
+    getFinanceEntryAction,
+    type FinanceEntryAction,
+  } from "$lib/support/chatEntryRouting";
   import {
     ArrowDown,
     CheckCircle2,
+    ChevronRight,
+    CreditCard,
     Image as ImageIcon,
     LifeBuoy,
     Headset,
@@ -165,6 +171,9 @@
   let guestMessages: GuestMessage[] = [];
   let status: SupportStatus | null = null;
   let entryOptions: EntryOption[] = [];
+  $: supportEntryOptions = filterChatOptionsByDepartment(entryOptions, "support");
+  $: financeEntryOptions = filterChatOptionsByDepartment(entryOptions, "finance")
+    .filter((option) => getFinanceEntryAction(option) !== null);
   let entryOptionsLoaded = false;
   let entryOptionsLoading = false;
   let selectedEntryOptionId = "";
@@ -189,13 +198,16 @@
   let selectedGroupId = 0;
   let selectedUnitId = 0;
   let authRequiredForSession = false;
-  let financeOptionSelected = false;
+  let financeAction: FinanceEntryAction | null = null;
   let configuredDepartment = entryDepartment;
   $: if (entryDepartment !== configuredDepartment) {
     configuredDepartment = entryDepartment;
-    financeOptionSelected = false;
+    financeAction = null;
+    handoffRequested = false;
+    selectedEntryOptionId = "";
+    selectedEntryOptionLabel = "";
   }
-  $: activeDepartment = financeOptionSelected ? "finance" : entryDepartment;
+  $: activeDepartment = entryDepartment;
   let initializedDepartment: "support" | "finance" | null = null;
   let authState: AuthState = {
     authenticated: false,
@@ -215,11 +227,7 @@
   $: if (browser && isOpen && restored && initializedDepartment !== activeDepartment) {
     initializedDepartment = activeDepartment;
     if (activeDepartment === "finance") {
-      handoffRequested = true;
-      authStep = authState.authenticated
-        ? authState.requiresUnitSelection ? "unit" : "ready"
-        : "login";
-      // O cliente escolhe entre autoatendimento financeiro e equipe humana.
+      handoffRequested = false;
     } else if (activeDepartment === "support" && !session) {
       handoffRequested = false;
       authStep = "login";
@@ -227,7 +235,10 @@
       selectedEntryOptionLabel = "";
     }
   }
-  $: if (!isOpen) initializedDepartment = null;
+  $: if (!isOpen) {
+    initializedDepartment = null;
+    financeAction = null;
+  }
   $: if (browser && restored) persistDraft(reply);
   $: if (browser && restored && guestMessages) persistGuestConversation();
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
@@ -529,14 +540,42 @@
     newMessageCount = 0;
   }
 
-  async function selectEntryOption(option: EntryOption): Promise<void> {
-    if (isFinancialChatOption(option)) {
-      financeOptionSelected = true;
-      selectedEntryOptionId = option.id;
-      selectedEntryOptionLabel = option.label;
-      errorMessage = "";
+  function resetFinanceChoice(): void {
+    financeAction = null;
+    handoffRequested = false;
+    selectedEntryOptionId = "";
+    selectedEntryOptionLabel = "";
+    errorMessage = "";
+  }
+
+  async function selectFinanceOption(option: EntryOption): Promise<void> {
+    const action = getFinanceEntryAction(option);
+    if (!action) return;
+
+    financeAction = action;
+    selectedEntryOptionId = option.id;
+    selectedEntryOptionLabel = option.label;
+    errorMessage = "";
+
+    if (action === "human") {
+      await requestHumanSupport();
       return;
     }
+
+    if (!authState.authenticated) {
+      authStep = "login";
+      handoffRequested = true;
+    } else if (authState.requiresUnitSelection) {
+      authStep = "unit";
+      prepareUnitSelection();
+      handoffRequested = true;
+    } else {
+      authStep = "ready";
+      handoffRequested = false;
+    }
+  }
+
+  async function selectEntryOption(option: EntryOption): Promise<void> {
     selectedEntryOptionId = option.id;
     selectedEntryOptionLabel = option.label;
     errorMessage = "";
@@ -719,6 +758,7 @@
     }
     if (activeDepartment === "finance") {
       handoffRequested = false;
+      if (financeAction === "human") await startHumanChat();
       return;
     }
     await startHumanChat();
@@ -742,7 +782,7 @@
         body: JSON.stringify({
           phone: "",
           message,
-          entryOptionId: activeDepartment === "support" ? selectedEntryOptionId || null : null,
+          entryOptionId: selectedEntryOptionId || null,
           department: activeDepartment,
           contextUrl: browser ? window.location.href : "",
           pageTitle: browser ? document.title : "",
@@ -1184,17 +1224,44 @@
     </header>
 
     <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F8F9FC] px-4 py-4" aria-live="polite">
-      {#if activeDepartment === "finance" && authState.authenticated && !authState.requiresUnitSelection && !departmentSessionMismatch}
+      {#if activeDepartment === "finance" && !session && financeAction === null}
+        <div class="space-y-3 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm">
+          <h3 class="text-[14px] font-semibold text-[#18233D]">Como podemos ajudar?</h3>
+          {#if entryOptionsLoading}
+            <div class="flex items-center gap-2 py-3 text-[13px] text-[#697184]">
+              <LoaderCircle size={16} class="animate-spin"/> Carregando opções...
+            </div>
+          {:else if financeEntryOptions.length > 0}
+            {#each financeEntryOptions as option (option.id)}
+              <button type="button" on:click={() => void selectFinanceOption(option)}
+                class="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[#DDE2EB] bg-white px-3 py-3 text-left text-[13px] font-semibold text-[#000A57] transition hover:border-[#A8B4D7] hover:bg-[#F5F7FC]">
+                {#if getFinanceEntryAction(option) === "human"}
+                  <UserRound size={18} aria-hidden="true"/>
+                  <span class="min-w-0 flex-1">Falar com financeiro</span>
+                {:else}
+                  <CreditCard size={18} aria-hidden="true"/>
+                  <span class="min-w-0 flex-1">Gerar PIX</span>
+                {/if}
+                <ChevronRight size={16} aria-hidden="true"/>
+              </button>
+            {/each}
+          {:else}
+            <p role="status" class="text-[13px] text-[#747D8F]">
+              Não há opções financeiras disponíveis neste momento.
+            </p>
+          {/if}
+        </div>
+      {/if}
+
+      {#if activeDepartment === "finance" && financeAction === "pix" && !session && authState.authenticated && !authState.requiresUnitSelection}
         <FinancePaymentPanel scope="customer"/>
-        {#if financeOptionSelected && !session}
-          <button type="button" on:click={() => (financeOptionSelected = false)} class="mb-3 text-[12px] font-semibold text-[#000A57] underline underline-offset-2">Voltar ao suporte</button>
-        {/if}
-        {#if !session}
-          <button type="button" on:click={requestHumanSupport} disabled={starting}
-            class="mb-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#D8DEEA] bg-white px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-50">
-            <UserRound size={16}/> Falar com a equipe financeira
-          </button>
-        {/if}
+      {/if}
+
+      {#if activeDepartment === "finance" && financeAction !== null && !session}
+        <button type="button" on:click={resetFinanceChoice}
+          class="mb-3 mt-2 text-[13px] font-semibold text-[#000A57] underline underline-offset-2">
+          Voltar às opções
+        </button>
       {/if}
       {#if session && (activeDepartment !== "finance" || authState.authenticated)}
         {#if departmentSessionMismatch}
@@ -1302,7 +1369,7 @@
                 {#if entryOptionsLoading}
                   <LoaderCircle class="animate-spin text-[#8A909E]" size={16}/>
                 {:else}
-                  {#each entryOptions as option}
+                  {#each supportEntryOptions as option}
                     <button type="button" on:click={() => void selectEntryOption(option)}
                       class="min-h-9 rounded-xl border border-[#DDE1E9] bg-white px-3 text-[12px] font-semibold text-[#3D4556] transition hover:border-[#BFC5D2] hover:text-[#000A57]">
                       {option.label}
