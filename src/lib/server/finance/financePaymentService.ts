@@ -7,6 +7,7 @@ import {
 import {
   isExistingPixPayable,
   normalizePaymentInstallments,
+  normalizeF10PaymentInstallmentGroups,
   parseF10CompanyCandidates,
   parseF10FinanceContracts,
   requirePaymentRecord,
@@ -125,14 +126,8 @@ export async function consultFinanceInstallments(
 ): Promise<{ open: FinanceInstallment[]; paid: FinanceInstallment[] }> {
   requireAuthorizedContract(payer, contractId);
 
-  const data = requirePaymentRecord(
-    await listF10PaymentInstallments(payer.token, contractId),
-  );
-
-  return {
-    open: normalizePaymentInstallments(data.abertas, false),
-    paid: normalizePaymentInstallments(data.pagas, true),
-  };
+  const data = await listF10PaymentInstallments(payer.token, contractId);
+  return normalizeF10PaymentInstallmentGroups(data);
 }
 
 export async function consultFinancePix(
@@ -152,7 +147,7 @@ export async function consultFinancePix(
   const installments = requirePaymentRecord(
     await listF10PaymentInstallments(payer.token, contractId),
   );
-  const open = normalizePaymentInstallments(installments.abertas, false);
+  const open = normalizePaymentInstallments(installments.abertas ?? [], false);
   const installment = open.find((item) =>
     item.receivableId === receivableId && item.payable,
   );

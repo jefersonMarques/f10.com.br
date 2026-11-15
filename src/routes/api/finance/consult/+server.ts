@@ -17,6 +17,7 @@ import {
   consultFinancePix,
 } from "$lib/server/finance/financePaymentService";
 import { isFinanceReadOnlyEnabled } from "$lib/server/finance/financeSettings";
+import { uniquePayableReceivableId } from "$lib/server/finance/financePaymentParsing";
 
 const HEADERS = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -128,6 +129,8 @@ async function recordFinanceConsultation(
 function financeError(cause: unknown) {
   const code = cause instanceof Error ? cause.message : "FINANCE_UNAVAILABLE";
   if (code === "FINANCE_PAYER_NOT_VALIDATED") return errorResponse(code, 401);
+  if (code === "FINANCE_RESPONSE_INVALID") return errorResponse(code, 502);
+  if (code === "FINANCE_BACKEND_UNAVAILABLE") return errorResponse(code, 503);
   if (code === "FINANCE_CONTRACT_NOT_AUTHORIZED") return errorResponse(code, 403);
   if (code === "FINANCE_PIX_UNAVAILABLE" ||
       code === "FINANCE_COMPANY_UNRESOLVED" ||
@@ -168,7 +171,43 @@ export const GET: RequestHandler = async ({ url, cookies, getClientAddress }) =>
 
     const payer = await authorizeFinancePayerForScope(access.financeScope);
     await recordFinanceConsultation(access, "contracts", ticketId, null);
-    return json({ enabled: true, contracts: payer.contracts }, { headers: HEADERS });
+
+    if (access.scope === "operator") {
+      return json({ enabled: true, contracts: payer.contracts }, { headers: HEADERS });
+    }
+
+    if (payer.contracts.length !== 1) {
+      return errorResponse("FINANCE_COMPANY_AMBIGUOUS", 409);
+    }
+
+    const contract = payer.contracts[0];
+    const installments = await consultFinanceInstallments(payer, contract.id);
+    const receivableId = uniquePayableReceivableId(installments.open);
+    let automaticPix = null;
+    let pixUnavailable = false;
+
+    if (receivableId !== null) {
+      try {
+        automaticPix = await consultFinancePix(
+          payer,
+          contract.id,
+          receivableId,
+        );
+      } catch (cause) {
+        if (!(cause instanceof Error && cause.message === "FINANCE_PIX_UNAVAILABLE")) {
+          throw cause;
+        }
+        pixUnavailable = true;
+      }
+    }
+
+    return json({
+      enabled: true,
+      contracts: payer.contracts,
+      ...installments,
+      pix: automaticPix,
+      pixUnavailable,
+    }, { headers: HEADERS });
   } catch (cause) {
     return financeError(cause);
   }

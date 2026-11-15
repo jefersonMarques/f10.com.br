@@ -129,3 +129,21 @@ export function parseF10CompanyCandidates(rows: Array<{
   if (holderIds.size !== 1) throw new Error("FINANCE_COMPANY_AMBIGUOUS");
   return { holderId: [...holderIds][0], contractIds };
 }
+
+export function normalizeF10PaymentInstallmentGroups(
+  value: unknown,
+): { open: FinanceInstallment[]; paid: FinanceInstallment[] } {
+  const data = requirePaymentRecord(value);
+
+  return {
+    open: normalizePaymentInstallments(data.abertas ?? [], false),
+    paid: normalizePaymentInstallments(data.pagas ?? [], true),
+  };
+}
+
+export function uniquePayableReceivableId(
+  installments: readonly FinanceInstallment[],
+): number | null {
+  const payable = installments.filter((item) => item.payable);
+  return payable.length === 1 ? payable[0].receivableId : null;
+}

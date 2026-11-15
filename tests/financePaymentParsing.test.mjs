@@ -4,6 +4,8 @@ import {
   isExistingPixPayable,
   normalizePayerDocument,
   normalizePaymentInstallments,
+  normalizeF10PaymentInstallmentGroups,
+  uniquePayableReceivableId,
   positivePaymentId,
   parseF10FinanceContracts,
   parseF10CompanyCandidates,
@@ -45,6 +47,34 @@ test("only open and payable installments offer PIX", () => {
   assert.equal(normalizePaymentInstallments([{
     receber_id: 1049994, parcela: 94, pago: true, pagavel: true,
   }], true)[0].payable, false);
+});
+
+test("nullable F10 installment arrays normalize without hiding malformed data", () => {
+  assert.deepEqual(normalizeF10PaymentInstallmentGroups({
+    abertas: [],
+    pagas: null,
+  }), { open: [], paid: [] });
+  assert.deepEqual(normalizeF10PaymentInstallmentGroups({
+    abertas: null,
+    pagas: undefined,
+  }), { open: [], paid: [] });
+  assert.throws(() => normalizeF10PaymentInstallmentGroups({
+    abertas: {},
+    pagas: [],
+  }), /FINANCE_RESPONSE_INVALID/);
+});
+
+test("PIX is selected automatically only for one payable installment", () => {
+  const sample = normalizePaymentInstallments([
+    { receber_id: 118, parcela: 1, pago: false, pagavel: true },
+    { receber_id: 119, parcela: 2, pago: false, pagavel: false },
+  ], false);
+  assert.equal(uniquePayableReceivableId(sample), 118);
+  assert.equal(uniquePayableReceivableId([...sample, {
+    ...sample[0],
+    receivableId: 120,
+  }]), null);
+  assert.equal(uniquePayableReceivableId([]), null);
 });
 
 test("invalid installment payloads fail closed", () => {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    Check, Copy, CreditCard, LoaderCircle, QrCode, Share2,
+    Check, Copy, CreditCard, LoaderCircle, QrCode, RefreshCw, Share2,
   } from "lucide-svelte";
   import { renderPixQrCode } from "$lib/finance/financeQrCode";
 
@@ -32,6 +32,8 @@
   let contracts: Contract[] = [];
   let selectedContractId = 0;
   let contractsLoaded = false;
+  let installmentsLoaded = false;
+  let pixUnavailable = false;
   let lookupVersion = 0;
   let openInstallments: Installment[] = [];
   let paidInstallments: Installment[] = [];
@@ -56,6 +58,8 @@
 
   function describeError(code: string): string {
     if (code === "FINANCE_RATE_LIMITED") return "Muitas consultas. Tente novamente mais tarde.";
+    if (code === "FINANCE_RESPONSE_INVALID") return "Não foi possível carregar as parcelas. Tente novamente.";
+    if (code === "FINANCE_BACKEND_UNAVAILABLE") return "O serviço financeiro está temporariamente indisponível.";
     if (code === "FINANCE_PAYER_NOT_VALIDATED") return "Não foi possível confirmar os dados do pagador.";
     if (code === "FINANCE_PIX_UNAVAILABLE") return "Este PIX não está disponível. Consulte a equipe financeira.";
     if (code === "FINANCE_CONTRACT_NOT_AUTHORIZED") return "Contrato não autorizado para este acesso.";
@@ -73,12 +77,32 @@
         allowed = false;
         return;
       }
-      const data = await response.json() as { enabled?: boolean; contracts?: Contract[]; error?: string };
+      const data = await response.json() as {
+        enabled?: boolean;
+        contracts?: Contract[];
+        open?: Installment[];
+        paid?: Installment[];
+        pix?: Pix | null;
+        pixUnavailable?: boolean;
+        error?: string;
+      };
       if (!response.ok) throw new Error(data.error ?? "FINANCE_UNAVAILABLE");
       enabled = data.enabled === true;
       contracts = Array.isArray(data.contracts) ? data.contracts : [];
       selectedContractId = contracts[0]?.id ?? 0;
       contractsLoaded = enabled;
+
+      if (scope === "customer" && enabled) {
+        openInstallments = Array.isArray(data.open) ? data.open : [];
+        paidInstallments = Array.isArray(data.paid) ? data.paid : [];
+        installmentsLoaded = true;
+        pixUnavailable = data.pixUnavailable === true;
+
+        if (data.pix?.copyPaste) {
+          pix = data.pix;
+          qrSvg = renderPixQrCode(data.pix.copyPaste);
+        }
+      }
     } catch (cause) {
       errorMessage = describeError(cause instanceof Error ? cause.message : "");
     } finally {
@@ -93,6 +117,8 @@
     paidInstallments = [];
     pix = null;
     qrSvg = "";
+    pixUnavailable = false;
+    installmentsLoaded = false;
     feedback = "";
     errorMessage = "";
   }
@@ -132,6 +158,7 @@
       if (action === "installments") {
         openInstallments = Array.isArray(data.open) ? data.open as Installment[] : [];
         paidInstallments = Array.isArray(data.paid) ? data.paid as Installment[] : [];
+        installmentsLoaded = true;
       } else {
         pix = data as unknown as Pix;
         qrSvg = renderPixQrCode(pix.copyPaste);
@@ -191,16 +218,18 @@
         </p>
       {/if}
 
-      {#if contracts.length > 0}
-        <label class="block text-[12px] font-medium text-[#4D5769]">
-          Contrato
-          <select bind:value={selectedContractId} on:change={clearSelection}
-            class="mt-1 h-10 w-full rounded-xl border border-[#DDE2EB] bg-white px-3 text-[13px]">
-            {#each contracts as contract (contract.id)}
-              <option value={contract.id}>Contrato {contract.number}</option>
-            {/each}
-          </select>
-        </label>
+      {#if scope === "operator" && contracts.length > 0}
+        {#if contracts.length > 1}
+          <label class="block text-[13px] font-medium text-[#4D5769]">
+            Contrato
+            <select bind:value={selectedContractId} on:change={clearSelection}
+              class="mt-1 h-10 w-full rounded-xl border border-[#DDE2EB] bg-white px-3 text-[13px]">
+              {#each contracts as contract (contract.id)}
+                <option value={contract.id}>Contrato {contract.number}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
         <button type="button" disabled={!canConsult || Boolean(pending)}
           on:click={() => void query("installments")}
           class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 text-[13px] font-semibold text-white disabled:opacity-40">
@@ -209,7 +238,7 @@
         </button>
       {/if}
 
-        {#if openInstallments.length > 0}
+        {#if openInstallments.length > 0 && (!pix || openInstallments.length > 1)}
           <div class="space-y-2">
             <h4 class="text-[12px] font-semibold text-[#424D61]">Parcelas em aberto</h4>
             {#each openInstallments as installment (installment.receivableId)}
@@ -222,7 +251,8 @@
                     Parcela {installment.installment} · {installment.dueDate}
                   </span>
                 </div>
-                <button type="button" disabled={!installment.payable || Boolean(pending)}
+                <button type="button"
+                  disabled={!installment.payable || Boolean(pending) || (pixUnavailable && openInstallments.length === 1)}
                   on:click={() => void query("pix", installment.receivableId)}
                   class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#CCD2E0] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40">
                   <QrCode size={15}/> PIX
@@ -230,8 +260,14 @@
               </div>
             {/each}
           </div>
-        {:else if paidInstallments.length > 0}
-          <p class="text-[12px] text-[#3C7756]">Nenhuma parcela em aberto.</p>
+        {:else if installmentsLoaded && openInstallments.length === 0}
+          <p class="text-[13px] text-[#3C7756]">Nenhuma parcela em aberto.</p>
+        {/if}
+
+        {#if pixUnavailable && scope === "customer" && !pix}
+          <p role="status" class="text-[13px] text-[#747D8F]">
+            PIX ainda não disponível para esta parcela.
+          </p>
         {/if}
 
         {#if paidInstallments.length > 0}
@@ -284,5 +320,15 @@
     </div>
   </section>
 {:else if initialized && allowed && errorMessage}
-  <p role="status" class="mb-3 text-[12px] text-[#9B3C3C]">{errorMessage}</p>
+  <div class="mb-3 flex items-center justify-between gap-2 rounded-xl border border-[#DDE2EB] bg-white p-3">
+    <p role="alert" class="text-[13px] text-[#9B3C3C]">{errorMessage}</p>
+    <button type="button" on:click={() => void loadContracts()} disabled={Boolean(pending)}
+      class="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#CCD2E0] px-2.5 text-[12px] font-semibold text-[#000A57] disabled:opacity-50">
+      <RefreshCw size={14}/> Tentar novamente
+    </button>
+  </div>
+{:else if pending === "contracts" && allowed}
+  <p role="status" class="mb-3 inline-flex items-center gap-2 text-[13px] text-[#5C6575]">
+    <LoaderCircle size={16} class="animate-spin"/> Buscando PIX...
+  </p>
 {/if}
