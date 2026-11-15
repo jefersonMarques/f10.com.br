@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    Check, Copy, CreditCard, LoaderCircle, QrCode, Share2,
+    Check, Copy, CreditCard, LoaderCircle, QrCode, RefreshCw, Share2,
   } from "lucide-svelte";
   import { renderPixQrCode } from "$lib/finance/financeQrCode";
 
@@ -320,5 +320,15 @@
     </div>
   </section>
 {:else if initialized && allowed && errorMessage}
-  <p role="status" class="mb-3 text-[12px] text-[#9B3C3C]">{errorMessage}</p>
+  <div class="mb-3 flex items-center justify-between gap-2 rounded-xl border border-[#DDE2EB] bg-white p-3">
+    <p role="alert" class="text-[13px] text-[#9B3C3C]">{errorMessage}</p>
+    <button type="button" on:click={() => void loadContracts()} disabled={Boolean(pending)}
+      class="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#CCD2E0] px-2.5 text-[12px] font-semibold text-[#000A57] disabled:opacity-50">
+      <RefreshCw size={14}/> Tentar novamente
+    </button>
+  </div>
+{:else if pending === "contracts" && allowed}
+  <p role="status" class="mb-3 inline-flex items-center gap-2 text-[13px] text-[#5C6575]">
+    <LoaderCircle size={16} class="animate-spin"/> Buscando PIX...
+  </p>
 {/if}
