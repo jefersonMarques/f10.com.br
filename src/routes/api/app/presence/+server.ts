@@ -36,18 +36,32 @@ export const POST: RequestHandler = async ({ cookies, request, url }) => {
     return json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  if (body.action === "heartbeat") {
-    return json(await heartbeatSupportAgent(session.user.id), {
+  try {
+    if (body.action === "heartbeat") {
+      return json(await heartbeatSupportAgent(session.user.id), {
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+
+    const status = typeof body.status === "string" ? body.status : "";
+    if (body.action !== "status" || !isSupportAgentManualStatus(status)) {
+      return json({ error: "INVALID_PRESENCE" }, { status: 400 });
+    }
+
+    return json(await setSupportAgentManualStatus(session.user.id, status), {
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (cause) {
+    const error = cause as { code?: string; cause?: { code?: string } } | null;
+    console.error("[support.presence.update]", {
+      action: body.action === "heartbeat" ? "heartbeat" : "status",
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+      databaseCode: error?.code ?? error?.cause?.code ?? null,
+    });
+
+    return json({ error: "PRESENCE_UNAVAILABLE" }, {
+      status: 503,
       headers: { "Cache-Control": "no-store" },
     });
   }
-
-  const status = typeof body.status === "string" ? body.status : "";
-  if (body.action !== "status" || !isSupportAgentManualStatus(status)) {
-    return json({ error: "INVALID_PRESENCE" }, { status: 400 });
-  }
-
-  return json(await setSupportAgentManualStatus(session.user.id, status), {
-    headers: { "Cache-Control": "no-store" },
-  });
 };
