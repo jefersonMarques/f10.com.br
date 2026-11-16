@@ -1,6 +1,7 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
+import { parsePresenceTimestamp } from "$lib/support/presenceTimestamp";
 import {
   supportAgentPresence,
   supportPresenceIntervals,
@@ -19,7 +20,7 @@ export type SupportAgentPresenceState = {
 
 type LockedPresence = {
   manual_status: SupportAgentManualStatus;
-  last_activity_at: Date | null;
+  last_activity_at: unknown;
 };
 
 function effectiveStatus(
@@ -96,6 +97,7 @@ export async function setSupportAgentManualStatus(
 ): Promise<SupportAgentPresenceState> {
   const db = getDatabase();
   const now = new Date();
+  const timestamp = now.toISOString();
 
   await db.transaction(async (tx) => {
     // O bloqueio de linha serializa mudanças de status e heartbeats por usuário.
@@ -120,9 +122,9 @@ export async function setSupportAgentManualStatus(
 
     await tx.execute(sql`
       UPDATE support_presence_intervals
-      SET ended_at = LEAST(${now}::timestamptz, last_activity_at + interval '10 minutes'),
+      SET ended_at = LEAST(${timestamp}::timestamptz, last_activity_at + interval '10 minutes'),
           close_reason = CASE
-            WHEN last_activity_at + interval '10 minutes' < ${now}::timestamptz
+            WHEN last_activity_at + interval '10 minutes' < ${timestamp}::timestamptz
               THEN 'away'
             ELSE 'status'
           END
@@ -159,6 +161,7 @@ export async function heartbeatSupportAgent(
 ): Promise<SupportAgentPresenceState> {
   const db = getDatabase();
   const now = new Date();
+  const timestamp = now.toISOString();
 
   const state = await db.transaction(async (tx) => {
     const rows = await tx.execute(sql`
@@ -168,13 +171,14 @@ export async function heartbeatSupportAgent(
     const previous = (rows as unknown as LockedPresence[])[0];
     if (!previous || previous.manual_status === "offline") return null;
 
-    const stale = !previous.last_activity_at ||
-      previous.last_activity_at.getTime() <= now.getTime() - SUPPORT_AWAY_AFTER_MS;
+    const lastActivityAt = parsePresenceTimestamp(previous.last_activity_at);
+    const stale = !lastActivityAt ||
+      lastActivityAt.getTime() <= now.getTime() - SUPPORT_AWAY_AFTER_MS;
 
     if (stale) {
       await tx.execute(sql`
         UPDATE support_presence_intervals
-        SET ended_at = LEAST(${now}::timestamptz, last_activity_at + interval '10 minutes'),
+        SET ended_at = LEAST(${timestamp}::timestamptz, last_activity_at + interval '10 minutes'),
             close_reason = 'away'
         WHERE user_id = ${userId}::uuid AND ended_at IS NULL
       `);
@@ -188,7 +192,7 @@ export async function heartbeatSupportAgent(
 
     if ((open as unknown as Array<{ id: string }>).length) {
       await tx.execute(sql`
-        UPDATE support_presence_intervals SET last_activity_at = ${now}
+        UPDATE support_presence_intervals SET last_activity_at = ${timestamp}::timestamptz
         WHERE user_id = ${userId}::uuid AND ended_at IS NULL
       `);
     } else {
