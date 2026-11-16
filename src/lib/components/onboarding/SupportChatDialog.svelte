@@ -20,6 +20,7 @@
     CheckCircle2,
     ChevronRight,
     CreditCard,
+    ExternalLink,
     Image as ImageIcon,
     LifeBuoy,
     Headset,
@@ -198,7 +199,7 @@
   let selectedGroupId = 0;
   let selectedUnitId = 0;
   let authRequiredForSession = false;
-  let financeAction: FinanceEntryAction | null = null;
+  let financeAction: FinanceEntryAction | "portal" | null = null;
   let configuredDepartment = entryDepartment;
   $: if (entryDepartment !== configuredDepartment) {
     configuredDepartment = entryDepartment;
@@ -572,6 +573,24 @@
     } else {
       authStep = "ready";
       handoffRequested = false;
+    }
+  }
+
+  function handleFinancePortalClick(event: MouseEvent): void {
+    if (authState.authenticated && !authState.requiresUnitSelection) return;
+
+    event.preventDefault();
+    financeAction = "portal";
+    selectedEntryOptionId = "";
+    selectedEntryOptionLabel = "";
+    errorMessage = "";
+    handoffRequested = true;
+
+    if (!authState.authenticated) {
+      authStep = "login";
+    } else {
+      authStep = "unit";
+      prepareUnitSelection();
     }
   }
 
@@ -1234,17 +1253,43 @@
           {:else if financeEntryOptions.length > 0}
             {#each financeEntryOptions as option (option.id)}
               <button type="button" on:click={() => void selectFinanceOption(option)}
-                class="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[#DDE2EB] bg-white px-3 py-3 text-left text-[13px] font-semibold text-[#000A57] transition hover:border-[#A8B4D7] hover:bg-[#F5F7FC]">
-                {#if getFinanceEntryAction(option) === "human"}
-                  <UserRound size={18} aria-hidden="true"/>
-                  <span class="min-w-0 flex-1">Falar com financeiro</span>
-                {:else}
-                  <CreditCard size={18} aria-hidden="true"/>
-                  <span class="min-w-0 flex-1">Gerar PIX</span>
-                {/if}
-                <ChevronRight size={16} aria-hidden="true"/>
+                class="flex min-h-[64px] w-full items-center gap-3 rounded-xl border border-[#DDE2EB] bg-white px-3 py-3 text-left transition hover:border-[#A8B4D7] hover:bg-[#F5F7FC]">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EDF0FA] text-[#000A57]">
+                  {#if getFinanceEntryAction(option) === "human"}
+                    <UserRound size={18} aria-hidden="true"/>
+                  {:else}
+                    <CreditCard size={18} aria-hidden="true"/>
+                  {/if}
+                </span>
+                <span class="min-w-0 flex-1">
+                  <strong class="block text-[13px] font-semibold text-[#18233D]">
+                    {getFinanceEntryAction(option) === "human" ? "Falar com financeiro" : "Gerar PIX"}
+                  </strong>
+                  <span class="mt-0.5 block text-[12px] text-[#747D8F]">
+                    {getFinanceEntryAction(option) === "human"
+                      ? "Tire dúvidas com nossa equipe"
+                      : "Selecione uma parcela em aberto"}
+                  </span>
+                </span>
+                <ChevronRight size={18} class="shrink-0 text-[#8D97AA]" aria-hidden="true"/>
               </button>
             {/each}
+            <a href="/api/finance/portal" target="_blank" rel="noopener noreferrer"
+              on:click={handleFinancePortalClick}
+              class="flex min-h-[64px] w-full items-center gap-3 rounded-xl border border-[#DDE2EB] bg-white px-3 py-3 text-left transition hover:border-[#A8B4D7] hover:bg-[#F5F7FC]">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EDF0FA] text-[#000A57]">
+                <ExternalLink size={18} aria-hidden="true"/>
+              </span>
+              <span class="min-w-0 flex-1">
+                <strong class="block text-[13px] font-semibold text-[#18233D]">
+                  Meu painel financeiro
+                </strong>
+                <span class="mt-0.5 block text-[12px] text-[#747D8F]">
+                  Acesse pagamentos e histórico
+                </span>
+              </span>
+              <ChevronRight size={18} class="shrink-0 text-[#8D97AA]" aria-hidden="true"/>
+            </a>
           {:else}
             <p role="status" class="text-[13px] text-[#747D8F]">
               Não há opções financeiras disponíveis neste momento.
@@ -1256,6 +1301,24 @@
       {#if activeDepartment === "finance" && financeAction === "pix" && !session && authState.authenticated && !authState.requiresUnitSelection}
         <FinancePaymentPanel scope="customer"/>
       {/if}
+
+      {#if activeDepartment === "finance" && financeAction === "portal" && !session && authState.authenticated && !authState.requiresUnitSelection}
+        <div class="space-y-3 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm">
+          <div class="flex items-center gap-3">
+            <ExternalLink size={20} class="shrink-0 text-[#000A57]" aria-hidden="true"/>
+            <div class="min-w-0">
+              <h3 class="text-[14px] font-semibold text-[#18233D]">Meu painel financeiro</h3>
+              <p class="text-[12px] text-[#747D8F]">Acesse pagamentos e histórico completo.</p>
+            </div>
+          </div>
+          <a href="/api/finance/portal" target="_blank" rel="noopener noreferrer"
+            class="flex min-h-11 w-full items-center justify-between rounded-xl bg-[#000A57] px-4 text-[13px] font-semibold text-white">
+            Abrir painel financeiro
+            <ChevronRight size={17} aria-hidden="true"/>
+          </a>
+        </div>
+      {/if}
+
 
       {#if activeDepartment === "finance" && financeAction !== null && !session}
         <button type="button" on:click={resetFinanceChoice}
