@@ -1,5 +1,6 @@
 import { and, desc, eq, gt, gte, isNull, or, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import type { PermissionScope } from "$lib/server/auth/permissions";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { teams, users } from "$lib/server/db/schema";
 import { supportQueues } from "$lib/server/db/supportSchema";
@@ -19,6 +20,12 @@ import type {
 const REPORT_LIMIT = 10_000;
 const LIST_LIMIT = 80;
 const DEFAULT_ATTENTION_MINUTES = 10;
+
+type ChatReportVisibility = {
+  scope: PermissionScope;
+  actorUserId: string;
+  queueIds: string[];
+};
 
 type MessageSummary = {
   sessionId: string;
@@ -173,6 +180,7 @@ async function getMessageSummaries(since: Date, now: Date): Promise<Map<string, 
 
 export async function getSupportChatPerformance(
   filters: ChatPerformanceFilters,
+  visibility: ChatReportVisibility,
 ): Promise<SupportChatReport> {
   const db = getDatabase();
   const now = new Date();
@@ -274,7 +282,14 @@ export async function getSupportChatPerformance(
     });
   }
 
-  const filtered = items.filter((item) =>
+  const visibleItems = items.filter((item) => {
+    if (visibility.scope === "all") return true;
+    if (visibility.scope === "team") return visibility.queueIds.includes(item.queueId);
+    return item.agentId === visibility.actorUserId
+      || item.firstResponderId === visibility.actorUserId;
+  });
+
+  const filtered = visibleItems.filter((item) =>
     (filters.department === "all" || item.department === filters.department)
     && (filters.queueId === "all" || item.queueId === filters.queueId)
     && (filters.userId === "all"
@@ -324,7 +339,9 @@ export async function getSupportChatPerformance(
     periodDays: filters.periodDays,
     truncated: sessionRows.length > REPORT_LIMIT,
     filters,
-    queues,
+    queues: queues.filter((queue) => visibility.scope === "all"
+      || (visibility.scope === "team" && visibility.queueIds.includes(queue.id))
+      || visibleItems.some((item) => item.queueId === queue.id)),
     users: userRows.filter((user) => filtered.some((item) =>
       item.agentId === user.id || item.firstResponderId === user.id
     )).sort((first, second) => first.name.localeCompare(second.name, "pt-BR")),

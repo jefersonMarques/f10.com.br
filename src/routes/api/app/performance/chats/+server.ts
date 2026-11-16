@@ -1,5 +1,7 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { requireAppPermission } from "$lib/server/auth/authorization";
+import { getPermissionScope } from "$lib/server/auth/permissions";
+import { getUserSupportQueueIds } from "$lib/server/support/supportAccess";
 import { getSupportChatPerformance } from "$lib/server/reports/supportChatPerformanceRepository";
 import type { ChatPerformanceFilters } from "$lib/support/chatPerformanceReport";
 
@@ -25,7 +27,11 @@ function parseId(value: string | null): string {
 }
 
 export const GET: RequestHandler = async ({ cookies, url }) => {
-  await requireAppPermission(cookies, "performance.view", url.pathname);
+  const context = await requireAppPermission(cookies, "performance.view", url.pathname);
+  const scope = getPermissionScope(context.permissions, "performance.view") ?? "own";
+  const queueIds = scope === "team"
+    ? await getUserSupportQueueIds(context.session.user.id)
+    : [];
   const filters: ChatPerformanceFilters = {
     periodDays: parsePeriod(url.searchParams.get("period")),
     department: parseDepartment(url.searchParams.get("department")),
@@ -34,6 +40,10 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     view: parseView(url.searchParams.get("view")),
   };
 
-  const report = await getSupportChatPerformance(filters);
+  const report = await getSupportChatPerformance(filters, {
+    scope,
+    actorUserId: context.session.user.id,
+    queueIds,
+  });
   return json(report, { headers: { "Cache-Control": "private, no-store" } });
 };
