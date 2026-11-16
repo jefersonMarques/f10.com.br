@@ -289,12 +289,14 @@ export async function getSupportChatPerformance(
       || item.firstResponderId === visibility.actorUserId;
   });
 
-  const filtered = visibleItems.filter((item) =>
+  const selectableItems = visibleItems.filter((item) =>
     (filters.department === "all" || item.department === filters.department)
     && (filters.queueId === "all" || item.queueId === filters.queueId)
-    && (filters.userId === "all"
-      || item.agentId === filters.userId
-      || item.firstResponderId === filters.userId)
+  );
+  const filtered = selectableItems.filter((item) =>
+    filters.userId === "all"
+    || item.agentId === filters.userId
+    || item.firstResponderId === filters.userId
   );
 
   const waiting = filtered.filter(needsAttention);
@@ -342,7 +344,7 @@ export async function getSupportChatPerformance(
     queues: queues.filter((queue) => visibility.scope === "all"
       || (visibility.scope === "team" && visibility.queueIds.includes(queue.id))
       || visibleItems.some((item) => item.queueId === queue.id)),
-    users: userRows.filter((user) => filtered.some((item) =>
+    users: userRows.filter((user) => selectableItems.some((item) =>
       item.agentId === user.id || item.firstResponderId === user.id
     )).sort((first, second) => first.name.localeCompare(second.name, "pt-BR")),
     summary,
