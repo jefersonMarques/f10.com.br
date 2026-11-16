@@ -77,6 +77,8 @@ jobs:
           node --test tests/publicHelpdeskBranding.test.mjs
           node --test tests/mentionSuggestionsVisibility.test.mjs
           node --experimental-strip-types --test tests/chatEntryRouting.test.mjs
+          node --experimental-strip-types --test tests/supportPresenceTimestamp.test.mjs
+          node --test tests/supportPresenceHistory.test.mjs
           node --experimental-strip-types --test tests/assistantHelpFallback.test.mjs
           node --experimental-strip-types --test tests/assistantArticleSynthesis.test.mjs
           node --experimental-strip-types --test tests/assistantHelpRelevance.test.mjs

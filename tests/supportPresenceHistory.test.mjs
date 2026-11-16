@@ -13,4 +13,7 @@ test("presence history is explicitly recorded without reconstructing past sessio
   assert.match(source, /FOR UPDATE/);
   assert.match(source, /last_activity_at \+ interval '10 minutes'/);
   assert.match(source, /if \(stale\)/);
+  assert.match(source, /parsePresenceTimestamp\(previous\.last_activity_at\)/);
+  assert.match(source, /const timestamp = now\.toISOString\(\)/);
+  assert.doesNotMatch(source, /\$\{now\}/);
 });
