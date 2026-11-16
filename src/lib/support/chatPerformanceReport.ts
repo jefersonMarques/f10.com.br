@@ -6,6 +6,7 @@ export type ChatPerformanceFilters = {
   queueId: string;
   userId: string;
   view: "all" | "waiting" | "late" | "unanswered" | "abandoned";
+  page: number;
 };
 
 export type ChatPerformanceItem = {
@@ -65,5 +66,7 @@ export type SupportChatReport = {
   };
   agents: ChatAgentPerformance[];
   listTotal: number;
+  page: number;
+  pageCount: number;
   items: ChatPerformanceItem[];
 };

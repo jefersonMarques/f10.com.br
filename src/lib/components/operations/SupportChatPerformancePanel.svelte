@@ -18,6 +18,7 @@
   let queueId = "all";
   let userId = "all";
   let view: ChatPerformanceFilters["view"] = "all";
+  let page = 1;
   let loading = false;
   let errorMessage = "";
   let requestVersion = 0;
@@ -62,6 +63,7 @@
         queue: queueId,
         user: userId,
         view,
+        page: String(page),
       });
       const response = await fetch(`/api/app/performance/chats?${params.toString()}`, {
         cache: "no-store",
@@ -79,17 +81,20 @@
   }
 
   function updateDepartment(): void {
+    page = 1;
     queueId = "all";
     userId = "all";
     void refresh();
   }
 
   function updateQueue(): void {
+    page = 1;
     userId = "all";
     void refresh();
   }
 
   function handleFilterChange(): void {
+    page = 1;
     void refresh();
   }
 
@@ -110,7 +115,20 @@
   }
 
   function setView(next: ChatPerformanceFilters["view"]): void {
+    page = 1;
     view = next;
+    void refresh();
+  }
+
+  function previousPage(): void {
+    if (page <= 1) return;
+    page -= 1;
+    void refresh();
+  }
+
+  function nextPage(): void {
+    if (!report || page >= report.pageCount) return;
+    page += 1;
     void refresh();
   }
 
@@ -310,10 +328,22 @@
           {/each}
         </div>
       {/if}
-      {#if report.listTotal > report.items.length}
-        <p class="application-text-meta border-t border-[#ECEEF4] px-5 py-3 text-[#858D9C]">
-          Exibindo as {report.items.length} conversas prioritárias. Use filtros para detalhar outras.
-        </p>
+      {#if report.pageCount > 1}
+        <div class="flex items-center justify-between gap-3 border-t border-[#ECEEF4] px-5 py-3">
+          <span class="application-text-meta text-[#858D9C]">
+            Página {report.page} de {report.pageCount}
+          </span>
+          <div class="flex gap-2">
+            <button type="button" on:click={previousPage} disabled={loading || page <= 1}
+              class="application-text-caption min-h-9 rounded-lg border border-[#DDE2EA] px-3 font-semibold text-[#000A57] disabled:opacity-40">
+              Anterior
+            </button>
+            <button type="button" on:click={nextPage} disabled={loading || page >= report.pageCount}
+              class="application-text-caption min-h-9 rounded-lg border border-[#DDE2EA] px-3 font-semibold text-[#000A57] disabled:opacity-40">
+              Próxima
+            </button>
+          </div>
+        </div>
       {/if}
     </section>
 

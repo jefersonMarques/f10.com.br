@@ -393,6 +393,8 @@ export async function getSupportChatPerformance(
     summary,
     agents: buildAgentRows(filtered, userNames),
     listTotal: visible.length,
-    items: visible.slice(0, LIST_LIMIT),
+    page: filters.page,
+    pageCount: Math.max(1, Math.ceil(visible.length / LIST_LIMIT)),
+    items: visible.slice((filters.page - 1) * LIST_LIMIT, filters.page * LIST_LIMIT),
   };
 }

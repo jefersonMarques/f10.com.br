@@ -20,6 +20,11 @@ function parseView(value: string | null): ChatPerformanceFilters["view"] {
   return "all";
 }
 
+function parsePage(value: string | null): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 1 && parsed <= 1000 ? parsed : 1;
+}
+
 function parseId(value: string | null): string {
   return value && /^[0-9a-f]{8}-[0-9a-f-]{27,48}$/i.test(value)
     ? value
@@ -38,6 +43,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     queueId: parseId(url.searchParams.get("queue")),
     userId: parseId(url.searchParams.get("user")),
     view: parseView(url.searchParams.get("view")),
+    page: parsePage(url.searchParams.get("page")),
   };
 
   const report = await getSupportChatPerformance(filters, {
