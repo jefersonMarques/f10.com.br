@@ -146,7 +146,9 @@ async function getMessageSummaries(since: Date, now: Date): Promise<Map<string, 
         msg.author_user_id, msg.created_at
       FROM ticket_messages msg
       INNER JOIN selected_chats chat ON chat.ticket_id = msg.ticket_id
-      WHERE msg.visibility = 'public' AND msg.author_type IN ('customer', 'user')
+      WHERE msg.visibility = 'public'
+        AND msg.channel = 'web_chat'
+        AND msg.author_type IN ('customer', 'user')
     ),
     last_human AS (
       SELECT session_id, MAX(created_at) AS last_human_at

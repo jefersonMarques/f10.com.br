@@ -22,6 +22,7 @@ test("chat metrics deduplicate converted messages and separate operator wait", (
   const repository = source("src/lib/server/reports/supportChatPerformanceRepository.ts");
 
   assert.match(repository, /UNION\s+SELECT chat.id AS session_id/);
+  assert.match(repository, /msg.channel = 'web_chat'/);
   assert.match(repository, /latest_assignment AS/);
   assert.match(repository, /response_assignment AS/);
   assert.match(repository, /agentWaitingMinutes/);
