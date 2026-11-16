@@ -228,7 +228,7 @@ export async function startPublicChat(
         sessionId: session.id,
         eventType: "human_requested",
         occurredAt: requestedAt,
-      });
+      }).onConflictDoNothing();
     }
 
     await tx.insert(webChatMessages).values({

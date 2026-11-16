@@ -188,7 +188,7 @@
         class="rounded-2xl border border-[#E2E5ED] bg-white p-4 text-left hover:border-[#AAB8DC]">
         <Users size={20} class="text-[#000A57]"/>
         <strong class="mt-3 block text-[26px] font-semibold text-[#11182C]">{report.summary.waiting}</strong>
-        <span class="application-text-caption text-[#747D8F]">Clientes aguardando agora</span>
+        <span class="application-text-caption text-[#747D8F]">Chats aguardando resposta</span>
       </button>
       <button type="button" on:click={() => setView("late")}
         class="rounded-2xl border border-[#F0DACA] bg-white p-4 text-left hover:border-[#E1AD8B]">

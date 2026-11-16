@@ -41,3 +41,7 @@ CREATE INDEX IF NOT EXISTS support_chat_events_session_idx
 
 CREATE INDEX IF NOT EXISTS support_chat_events_actor_idx
   ON support_chat_events (actor_user_id, occurred_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS support_chat_events_milestone_unique_idx
+  ON support_chat_events (session_id, event_type)
+  WHERE event_type IN ('human_requested', 'first_response');

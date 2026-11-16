@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
@@ -105,6 +106,9 @@ export const supportChatEvents = pgTable(
   (table) => [
     index("support_chat_events_session_idx").on(table.sessionId, table.occurredAt),
     index("support_chat_events_actor_idx").on(table.actorUserId, table.occurredAt),
+    uniqueIndex("support_chat_events_milestone_unique_idx")
+      .on(table.sessionId, table.eventType)
+      .where(sql`event_type IN ('human_requested', 'first_response')`),
   ],
 );
 

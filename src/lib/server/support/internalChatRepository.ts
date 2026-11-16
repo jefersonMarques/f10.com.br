@@ -550,7 +550,7 @@ export async function respondToInternalChat(
         eventType: "first_response",
         actorUserId,
         occurredAt: now,
-      });
+      }).onConflictDoNothing();
     }
 
     if (chat.ticketId) {

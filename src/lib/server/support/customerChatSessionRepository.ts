@@ -110,7 +110,7 @@ export async function resumeActiveCustomerChatSession(input: {
         sessionId: session.id,
         eventType: "human_requested",
         occurredAt: now,
-      });
+      }).onConflictDoNothing();
     }
 
     return {
