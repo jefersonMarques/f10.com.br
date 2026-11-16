@@ -11,7 +11,7 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
-import { webChatMessageAttachments, webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
+import { supportChatEvents, webChatMessageAttachments, webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import { users } from "$lib/server/db/schema";
@@ -332,6 +332,14 @@ export async function claimInternalChat(
       })
       .where(eq(webChatSessions.id, sessionId));
 
+    await tx.insert(supportChatEvents).values({
+      sessionId,
+      eventType: "assigned",
+      actorUserId,
+      targetUserId: actorUserId,
+      occurredAt: now,
+    });
+
     if (chat.ticketId) {
       await tx
         .update(tickets)
@@ -420,6 +428,16 @@ export async function assignInternalChat(
         updatedAt: now,
       })
       .where(eq(webChatSessions.id, sessionId));
+
+    if (targetUserId !== chat.assignedUserId) {
+      await tx.insert(supportChatEvents).values({
+        sessionId,
+        eventType: chat.assignedUserId ? "transferred" : "assigned",
+        actorUserId,
+        targetUserId,
+        occurredAt: now,
+      });
+    }
 
     if (chat.ticketId) {
       await tx
@@ -525,6 +543,15 @@ export async function respondToInternalChat(
         updatedAt: now,
       })
       .where(eq(webChatSessions.id, sessionId));
+
+    if (!chat.firstResponseAt) {
+      await tx.insert(supportChatEvents).values({
+        sessionId,
+        eventType: "first_response",
+        actorUserId,
+        occurredAt: now,
+      });
+    }
 
     if (chat.ticketId) {
 
