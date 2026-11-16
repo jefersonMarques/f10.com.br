@@ -46,7 +46,7 @@ export function elapsedMinutes(start: Date, end: Date): number {
 export function percentileMinutes(values: readonly number[], ratio: number): number | null {
   if (values.length === 0) return null;
   const ordered = [...values].sort((first, second) => first - second);
-  const index = Math.min(ordered.length - 1, Math.max(0, ratio)) * (ordered.length - 1);
+  const index = Math.min(1, Math.max(0, ratio)) * (ordered.length - 1);
   const lower = Math.floor(index);
   const upper = Math.ceil(index);
   const result = ordered[lower] + (ordered[upper] - ordered[lower]) * (index - lower);
