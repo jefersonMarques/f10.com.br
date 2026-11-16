@@ -9,6 +9,7 @@ import {
   calculateChatPerformance,
   parseChatTimestamp,
   percentileMinutes,
+  elapsedMinutes,
 } from "$lib/support/chatPerformanceMetrics";
 import type {
   ChatPerformanceFilters,
@@ -33,6 +34,9 @@ type MessageSummary = {
   firstHumanAt: Date | string | null;
   firstHumanUserId: string | null;
   pendingCustomerAt: Date | string | null;
+  assignedAt: Date | string | null;
+  assignedUserId: string | null;
+  firstResponseAssignedAt: Date | string | null;
 };
 
 function isFinanceQueue(name: string, code: string, teamName: string | null): boolean {
@@ -91,15 +95,15 @@ function buildAgentRows(
       assigned.assigned += 1;
       if (needsAttention(item)) {
         assigned.waiting += 1;
-        if (item.overdue) assigned.late += 1;
+        if (item.agentWaitingMinutes !== null && item.agentWaitingMinutes >= item.thresholdMinutes) assigned.late += 1;
       }
     }
 
     if (item.firstResponderId) {
       const responder = register(item.firstResponderId);
       responder.responded += 1;
-      if (item.firstResponseMinutes !== null) {
-        responder.responseMinutes.push(item.firstResponseMinutes);
+      if (item.agentFirstResponseMinutes !== null) {
+        responder.responseMinutes.push(item.agentFirstResponseMinutes);
       }
     }
   }
@@ -162,16 +166,39 @@ async function getMessageSummaries(since: Date, now: Date): Promise<Map<string, 
       WHERE msg.author_type = 'customer'
         AND (human.last_human_at IS NULL OR msg.created_at > human.last_human_at)
       GROUP BY msg.session_id
+    ),
+    latest_assignment AS (
+      SELECT DISTINCT ON (event.session_id)
+        event.session_id, event.target_user_id, event.occurred_at
+      FROM support_chat_events event
+      INNER JOIN selected_chats chat ON chat.id = event.session_id
+      WHERE event.event_type IN ('assigned', 'transferred')
+      ORDER BY event.session_id, event.occurred_at DESC, event.id DESC
+    ),
+    response_assignment AS (
+      SELECT first_human.session_id, MAX(event.occurred_at) AS assigned_at
+      FROM first_human
+      INNER JOIN support_chat_events event
+        ON event.session_id = first_human.session_id
+        AND event.target_user_id = first_human.author_user_id
+        AND event.event_type IN ('assigned', 'transferred')
+        AND event.occurred_at <= first_human.first_human_at
+      GROUP BY first_human.session_id
     )
     SELECT chat.id::text AS "sessionId",
       last_human.last_human_at AS "lastHumanAt",
       first_human.first_human_at AS "firstHumanAt",
       first_human.author_user_id::text AS "firstHumanUserId",
-      pending_customer.pending_customer_at AS "pendingCustomerAt"
+      pending_customer.pending_customer_at AS "pendingCustomerAt",
+      latest_assignment.occurred_at AS "assignedAt",
+      latest_assignment.target_user_id::text AS "assignedUserId",
+      response_assignment.assigned_at AS "firstResponseAssignedAt"
     FROM selected_chats chat
     LEFT JOIN last_human ON last_human.session_id = chat.id
     LEFT JOIN first_human ON first_human.session_id = chat.id
     LEFT JOIN pending_customer ON pending_customer.session_id = chat.id
+    LEFT JOIN latest_assignment ON latest_assignment.session_id = chat.id
+    LEFT JOIN response_assignment ON response_assignment.session_id = chat.id
   `);
 
   const rows = result as unknown as MessageSummary[];
@@ -261,6 +288,20 @@ export async function getSupportChatPerformance(
       thresholdMinutes: queue.thresholdMinutes,
     });
 
+    const assignedAt = message?.assignedUserId === chat.agentId
+      ? parseChatTimestamp(message?.assignedAt)
+      : null;
+    const firstResponseAssignedAt = parseChatTimestamp(message?.firstResponseAssignedAt);
+    const agentWaitingMinutes = state.waitingSince && assignedAt
+      ? elapsedMinutes(
+        new Date(Math.max(new Date(state.waitingSince).getTime(), assignedAt.getTime())),
+        now,
+      )
+      : null;
+    const agentFirstResponseMinutes = firstResponseAt && firstResponseAssignedAt
+      ? elapsedMinutes(firstResponseAssignedAt, firstResponseAt)
+      : null;
+
     items.push({
       id: chat.id,
       number: chat.chatNumber,
@@ -274,7 +315,9 @@ export async function getSupportChatPerformance(
       closedAt: chat.closedAt?.toISOString() ?? null,
       waitingSince: state.waitingSince,
       waitingMinutes: state.waitingMinutes,
+      agentWaitingMinutes,
       firstResponseMinutes: state.firstResponseMinutes,
+      agentFirstResponseMinutes,
       thresholdMinutes: queue.thresholdMinutes,
       overdue: state.overdue,
       state: state.state,

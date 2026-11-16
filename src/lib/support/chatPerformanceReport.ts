@@ -21,7 +21,9 @@ export type ChatPerformanceItem = {
   closedAt: string | null;
   waitingSince: string | null;
   waitingMinutes: number | null;
+  agentWaitingMinutes: number | null;
   firstResponseMinutes: number | null;
+  agentFirstResponseMinutes: number | null;
   thresholdMinutes: number;
   overdue: boolean;
   state: ChatPerformanceState;

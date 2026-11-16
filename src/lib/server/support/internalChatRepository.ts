@@ -544,6 +544,16 @@ export async function respondToInternalChat(
       })
       .where(eq(webChatSessions.id, sessionId));
 
+    if (!chat.assignedUserId) {
+      await tx.insert(supportChatEvents).values({
+        sessionId,
+        eventType: "assigned",
+        actorUserId,
+        targetUserId: actorUserId,
+        occurredAt: now,
+      });
+    }
+
     if (!chat.firstResponseAt) {
       await tx.insert(supportChatEvents).values({
         sessionId,
