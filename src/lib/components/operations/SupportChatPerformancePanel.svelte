@@ -89,6 +89,26 @@
     void refresh();
   }
 
+  function handleFilterChange(): void {
+    void refresh();
+  }
+
+  function showWaiting(): void {
+    setView("waiting");
+  }
+
+  function showLate(): void {
+    setView("late");
+  }
+
+  function showUnanswered(): void {
+    setView("unanswered");
+  }
+
+  function showAbandoned(): void {
+    setView("abandoned");
+  }
+
   function setView(next: ChatPerformanceFilters["view"]): void {
     view = next;
     void refresh();
@@ -133,7 +153,7 @@
     </div>
 
     <div class="mt-4 flex flex-wrap gap-2">
-      <select bind:value={periodDays} on:change={() => void refresh()}
+      <select bind:value={periodDays} on:change={handleFilterChange}
         aria-label="Período dos chats"
         class="application-text-caption min-h-10 rounded-xl border border-[#DDE2EA] bg-white px-3 text-[#263249]">
         <option value={7}>7 dias</option>
@@ -155,7 +175,7 @@
           <option value={queue.id}>{queue.name}</option>
         {/each}
       </select>
-      <select bind:value={userId} on:change={() => void refresh()}
+      <select bind:value={userId} on:change={handleFilterChange}
         aria-label="Operador dos chats"
         class="application-text-caption min-h-10 min-w-[150px] rounded-xl border border-[#DDE2EA] bg-white px-3 text-[#263249]">
         <option value="all">Todos os operadores</option>
@@ -184,25 +204,25 @@
 
   {#if report}
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <button type="button" on:click={() => setView("waiting")}
+      <button type="button" on:click={showWaiting}
         class="rounded-2xl border border-[#E2E5ED] bg-white p-4 text-left hover:border-[#AAB8DC]">
         <Users size={20} class="text-[#000A57]"/>
         <strong class="mt-3 block text-[26px] font-semibold text-[#11182C]">{report.summary.waiting}</strong>
         <span class="application-text-caption text-[#747D8F]">Chats aguardando resposta</span>
       </button>
-      <button type="button" on:click={() => setView("late")}
+      <button type="button" on:click={showLate}
         class="rounded-2xl border border-[#F0DACA] bg-white p-4 text-left hover:border-[#E1AD8B]">
         <AlertTriangle size={20} class="text-[#B35A2E]"/>
         <strong class="mt-3 block text-[26px] font-semibold text-[#A34B25]">{report.summary.late}</strong>
         <span class="application-text-caption text-[#747D8F]">Espera acima do limite</span>
       </button>
-      <button type="button" on:click={() => setView("unanswered")}
+      <button type="button" on:click={showUnanswered}
         class="rounded-2xl border border-[#E2E5ED] bg-white p-4 text-left hover:border-[#AAB8DC]">
         <Headphones size={20} class="text-[#5D55A1]"/>
         <strong class="mt-3 block text-[26px] font-semibold text-[#11182C]">{report.summary.unansweredClosed}</strong>
         <span class="application-text-caption text-[#747D8F]">Encerrados sem resposta humana</span>
       </button>
-      <button type="button" on:click={() => setView("abandoned")}
+      <button type="button" on:click={showAbandoned}
         class="rounded-2xl border border-[#E2E5ED] bg-white p-4 text-left hover:border-[#AAB8DC]">
         <UserRoundX size={20} class="text-[#B35A2E]"/>
         <strong class="mt-3 block text-[26px] font-semibold text-[#11182C]">{report.summary.abandonedAfterWait}</strong>
@@ -210,7 +230,7 @@
       </button>
     </div>
 
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <article class="rounded-2xl border border-[#E2E5ED] bg-white p-4">
         <Clock3 size={19} class="text-[#000A57]"/>
         <strong class="mt-2 block text-[21px] text-[#11182C]">{formatMinutes(report.summary.longestWaitingMinutes)}</strong>
@@ -231,6 +251,11 @@
         <strong class="mt-2 block text-[21px] text-[#11182C]">{formatMinutes(report.summary.p90FirstMinutes)}</strong>
         <p class="application-text-caption text-[#747D8F]">P90 1ª resposta ({report.summary.firstResponseSamples})</p>
       </article>
+      <article class="rounded-2xl border border-[#E2E5ED] bg-white p-4">
+        <AlertTriangle size={19} class="text-[#B35A2E]"/>
+        <strong class="mt-2 block text-[21px] text-[#11182C]">{report.summary.lateFirstResponses}</strong>
+        <p class="application-text-caption text-[#747D8F]">1ª resposta acima do limite</p>
+      </article>
     </div>
 
     <section class="rounded-2xl border border-[#E2E5ED] bg-white">
@@ -241,7 +266,7 @@
             {report.listTotal} conversa(s) no filtro · clique para ver o histórico
           </p>
         </div>
-        <select bind:value={view} on:change={() => void refresh()}
+        <select bind:value={view} on:change={handleFilterChange}
           aria-label="Filtrar situação do chat"
           class="application-text-caption min-h-10 rounded-xl border border-[#DDE2EA] bg-white px-3 text-[#263249]">
           <option value="all">Todas as situações</option>
@@ -296,7 +321,7 @@
       <div class="border-b border-[#E2E5ED] px-4 py-4 sm:px-5">
         <h3 class="text-[15px] font-semibold text-[#18233D]">Por operador</h3>
         <p class="application-text-caption mt-1 text-[#747D8F]">
-          Atribuídos no momento, primeira resposta enviada e clientes aguardando.
+          Atribuídos no momento, tempo após a atribuição e chats aguardando.
         </p>
       </div>
       <div class="overflow-x-auto">
@@ -307,9 +332,9 @@
               <th class="px-3 py-3">Atribuídos</th>
               <th class="px-3 py-3">Respondidos</th>
               <th class="px-3 py-3">Aguardando</th>
-              <th class="px-3 py-3">Acima do limite</th>
-              <th class="px-3 py-3">Mediana 1ª</th>
-              <th class="px-3 py-3">P90 1ª</th>
+              <th class="px-3 py-3">Atraso após atribuição</th>
+              <th class="px-3 py-3">Mediana após atribuição</th>
+              <th class="px-3 py-3">P90 após atribuição</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-[#EEF0F5]">
@@ -335,7 +360,7 @@
       Tempos em minutos corridos, inclusive fora do expediente. O limite considera o SLA da fila quando ativo; caso contrário, 10 minutos de atenção operacional.
       Encerramento pelo cliente após o limite é um indício de abandono, não prova da motivação.
       Sessões expiradas ficam separadas. Conversas ainda abertas anteriores ao período também entram no monitoramento atual.
-      Resultados por operador não atribuem automaticamente a ele atrasos anteriores à distribuição.
+      Indicadores individuais só consideram o tempo após atribuição registrada; para chats antigos sem esse registro, o valor é exibido como indisponível.
     </p>
   {:else if loading}
     <div role="status" class="flex items-center justify-center gap-3 rounded-2xl border border-[#E2E5ED] bg-white px-5 py-12 text-[13px] text-[#747D8F]">
