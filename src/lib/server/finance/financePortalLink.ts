@@ -1,4 +1,4 @@
-import { positivePaymentId, requirePaymentRecord } from "./financePaymentParsing";
+import { positivePaymentId, requirePaymentRecord } from "./financePaymentParsing.ts";
 
 const TRUSTED_PORTAL_ORIGIN = "https://r.f10.com.br";
 const PORTAL_PATH_PATTERN = /^\/[a-zA-Z0-9_-]{4,128}$/;
