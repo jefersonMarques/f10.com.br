@@ -16,6 +16,7 @@ import {
 import { getDatabase } from "$lib/server/db";
 import { listMessageReactionSummaries, EMPTY_REACTION_SUMMARY } from "$lib/server/support/supportMessageReactionRepository";
 import {
+  supportChatEvents,
   supportPublicLimits,
   webChatMessageAttachments,
   webChatMessages,
@@ -192,6 +193,7 @@ export async function startPublicChat(
 
   const result = await db.transaction(async (tx) => {
     const aiState = enableAi ? "active" : "disabled";
+    const requestedAt = new Date();
     const [session] = await tx
       .insert(webChatSessions)
       .values({
@@ -216,10 +218,18 @@ export async function startPublicChat(
           defaultDueDays: entryOption.defaultDueDays,
         },
         aiState,
+        humanRequestedAt: enableAi ? null : requestedAt,
       })
       .returning({ id: webChatSessions.id });
 
     if (!session) throw new Error("CHAT_SESSION_NOT_CREATED");
+    if (!enableAi) {
+      await tx.insert(supportChatEvents).values({
+        sessionId: session.id,
+        eventType: "human_requested",
+        occurredAt: requestedAt,
+      });
+    }
 
     await tx.insert(webChatMessages).values({
       sessionId: session.id,

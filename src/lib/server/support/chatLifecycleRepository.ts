@@ -2,7 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { users } from "$lib/server/db/schema";
-import { webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
+import { supportChatEvents, webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
 import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import {
   getUserSupportQueueIds,
@@ -70,11 +70,20 @@ export async function finishInternalChat(
       .update(webChatSessions)
       .set({
         closedAt: now,
+        closeReason: "agent",
+        closedByUserId: actorUserId,
         aiState: "disabled",
         aiProcessingAt: null,
         updatedAt: now,
       })
       .where(eq(webChatSessions.id, sessionId));
+
+    await tx.insert(supportChatEvents).values({
+      sessionId,
+      eventType: "closed",
+      actorUserId,
+      occurredAt: now,
+    });
 
     if (chat.ticketId) {
       await tx

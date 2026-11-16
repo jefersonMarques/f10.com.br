@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
+import { supportChatEvents, webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
 import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import type { CustomerF10PortalSession } from "$lib/server/customerPortal/customerF10AuthRepository";
 
@@ -43,11 +43,18 @@ export async function closeCurrentCustomerChat(
     await tx.update(webChatSessions)
       .set({
         closedAt: now,
+        closeReason: "customer",
         aiState: "disabled",
         aiProcessingAt: null,
         updatedAt: now,
       })
       .where(eq(webChatSessions.id, chat.id));
+
+    await tx.insert(supportChatEvents).values({
+      sessionId: chat.id,
+      eventType: "closed",
+      occurredAt: now,
+    });
 
     const body = "Conversa finalizada pelo cliente.";
     if (chat.ticketId) {

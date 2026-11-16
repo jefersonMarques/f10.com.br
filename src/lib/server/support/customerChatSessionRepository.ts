@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, gt, isNull, lte } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { webChatSessions } from "$lib/server/db/chatSchema";
+import { supportChatEvents, webChatSessions } from "$lib/server/db/chatSchema";
 import type { PublicChatCustomerContext } from "$lib/server/support/publicChatRepository";
 
 const CHAT_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
@@ -36,16 +36,24 @@ export async function resumeActiveCustomerChatSession(input: {
     // The unique index covers all non-closed sessions, including expired ones.
     // Retire expired chats in the same customer context before searching for a
     // resumable session or creating another chat for that context.
-    await tx
+    const expiredSessions = await tx
       .update(webChatSessions)
-      .set({ closedAt: now, updatedAt: now })
+      .set({ closedAt: now, closeReason: "expired", updatedAt: now })
       .where(and(
         eq(webChatSessions.legacyUserId, input.customerContext.legacyUserId),
         eq(webChatSessions.groupId, input.customerContext.groupId),
         eq(webChatSessions.unitId, input.customerContext.unitId),
         isNull(webChatSessions.closedAt),
         lte(webChatSessions.expiresAt, now),
-      ));
+      ))
+      .returning({ id: webChatSessions.id });
+    if (expiredSessions.length > 0) {
+      await tx.insert(supportChatEvents).values(expiredSessions.map((item) => ({
+        sessionId: item.id,
+        eventType: "expired",
+        occurredAt: now,
+      })));
+    }
 
     const [session] = await tx
       .select({
@@ -54,6 +62,7 @@ export async function resumeActiveCustomerChatSession(input: {
         chatNumber: webChatSessions.chatNumber,
         aiState: webChatSessions.aiState,
         contextData: webChatSessions.contextData,
+        humanRequestedAt: webChatSessions.humanRequestedAt,
       })
       .from(webChatSessions)
       .where(
@@ -90,10 +99,19 @@ export async function resumeActiveCustomerChatSession(input: {
         contextUrl: input.contextUrl || null,
         contextData: nextContextData,
         aiState: nextAiState,
+        humanRequestedAt: session.humanRequestedAt ?? now,
         aiHandoffReason: input.handoffReason || null,
         aiHandoffAt: now,
       })
       .where(eq(webChatSessions.id, session.id));
+
+    if (!session.humanRequestedAt) {
+      await tx.insert(supportChatEvents).values({
+        sessionId: session.id,
+        eventType: "human_requested",
+        occurredAt: now,
+      });
+    }
 
     return {
       sessionId: session.id,
