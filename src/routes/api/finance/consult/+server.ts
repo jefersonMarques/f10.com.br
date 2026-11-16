@@ -17,7 +17,6 @@ import {
   consultFinancePix,
 } from "$lib/server/finance/financePaymentService";
 import { isFinanceReadOnlyEnabled } from "$lib/server/finance/financeSettings";
-import { uniquePayableReceivableId } from "$lib/server/finance/financePaymentParsing";
 
 const HEADERS = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -182,31 +181,11 @@ export const GET: RequestHandler = async ({ url, cookies, getClientAddress }) =>
 
     const contract = payer.contracts[0];
     const installments = await consultFinanceInstallments(payer, contract.id);
-    const receivableId = uniquePayableReceivableId(installments.open);
-    let automaticPix = null;
-    let pixUnavailable = false;
-
-    if (receivableId !== null) {
-      try {
-        automaticPix = await consultFinancePix(
-          payer,
-          contract.id,
-          receivableId,
-        );
-      } catch (cause) {
-        if (!(cause instanceof Error && cause.message === "FINANCE_PIX_UNAVAILABLE")) {
-          throw cause;
-        }
-        pixUnavailable = true;
-      }
-    }
 
     return json({
       enabled: true,
       contracts: payer.contracts,
-      ...installments,
-      pix: automaticPix,
-      pixUnavailable,
+      open: installments.open,
     }, { headers: HEADERS });
   } catch (cause) {
     return financeError(cause);

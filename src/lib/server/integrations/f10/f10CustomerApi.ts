@@ -98,3 +98,16 @@ export async function getF10ContractHolder(
   const response = await apiGet(`/unidade/pessoas/${unitId}/${holderId}`);
   return parseF10ContractHolder(response, holderId);
 }
+
+export async function listF10CustomerContractInstallments(
+  unitId: number,
+  contractId: number,
+): Promise<unknown> {
+  if (!Number.isSafeInteger(unitId) || unitId <= 0) {
+    throw new Error("F10_UID_INVALID");
+  }
+  if (!Number.isSafeInteger(contractId) || contractId <= 0) {
+    throw new Error("F10_CONTRACT_ID_INVALID");
+  }
+  return apiGet(`/unidade/contratos/${unitId}/${contractId}/parcelas`);
+}

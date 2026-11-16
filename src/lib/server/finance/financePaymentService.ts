@@ -84,6 +84,18 @@ async function getOperatorFinanceCandidates(ticketId: string): Promise<FinanceCa
 }
 
 
+export async function getAuthorizedCustomerFinanceContractId(
+  groupId: number,
+  selectedUnitId: number,
+): Promise<number> {
+  const candidates = await getCustomerFinanceCandidates(groupId, selectedUnitId);
+  const { contractIds } = parseF10CompanyCandidates(candidates);
+  if (contractIds.size !== 1) {
+    throw new Error("FINANCE_COMPANY_AMBIGUOUS");
+  }
+  return [...contractIds][0];
+}
+
 export async function authorizeFinancePayerForScope(
   scope: FinanceScope,
 ): Promise<AuthorizedFinancePayer> {
