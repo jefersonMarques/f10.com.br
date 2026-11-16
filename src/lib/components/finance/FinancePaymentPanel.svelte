@@ -101,6 +101,12 @@
     }
   }
 
+  function returnToOpenInstallments(): void {
+    pix = null;
+    qrSvg = "";
+    errorMessage = "";
+  }
+
   function clearSelection(): void {
     lookupVersion += 1;
     openInstallments = [];
@@ -228,7 +234,7 @@
       {/if}
 
         {#if scope === "customer" && pix}
-          <button type="button" on:click={() => { pix = null; qrSvg = ""; errorMessage = ""; }}
+          <button type="button" on:click={returnToOpenInstallments}
             class="inline-flex min-h-9 items-center gap-2 text-[13px] font-semibold text-[#000A57]">
             <ArrowLeft size={16}/> Voltar às parcelas
           </button>
