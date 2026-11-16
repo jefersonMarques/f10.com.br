@@ -55,3 +55,16 @@ test("chat report is lazy-loaded in a dedicated Performance tab", () => {
   assert.match(panel, /30_000/);
   assert.match(panel, /Aguardando/);
 });
+
+test("chat performance respects application light and dark theme tokens", () => {
+  const panel = source("src/lib/components/operations/SupportChatPerformancePanel.svelte");
+
+  assert.doesNotMatch(panel, /#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})(?![0-9A-Za-z])/);
+  assert.doesNotMatch(panel, /\b(?:bg|border|text|divide)-white\b/);
+  assert.match(panel, /bg-app-surface/);
+  assert.match(panel, /text-app-text/);
+  assert.match(panel, /border-app-border/);
+  assert.match(panel, /text-app-warning-text/);
+  assert.match(panel, /bg-app-info-bg/);
+  assert.match(panel, /hover:bg-app-muted/);
+});
