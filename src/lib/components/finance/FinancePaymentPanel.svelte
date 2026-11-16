@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    Check, Copy, CreditCard, LoaderCircle, QrCode, RefreshCw, Share2,
+    ArrowLeft, Check, ChevronRight, Copy, CreditCard, ExternalLink, LoaderCircle, QrCode, RefreshCw, Share2,
   } from "lucide-svelte";
   import { renderPixQrCode } from "$lib/finance/financeQrCode";
 
@@ -33,7 +33,6 @@
   let selectedContractId = 0;
   let contractsLoaded = false;
   let installmentsLoaded = false;
-  let pixUnavailable = false;
   let lookupVersion = 0;
   let openInstallments: Installment[] = [];
   let paidInstallments: Installment[] = [];
@@ -82,8 +81,6 @@
         contracts?: Contract[];
         open?: Installment[];
         paid?: Installment[];
-        pix?: Pix | null;
-        pixUnavailable?: boolean;
         error?: string;
       };
       if (!response.ok) throw new Error(data.error ?? "FINANCE_UNAVAILABLE");
@@ -94,14 +91,7 @@
 
       if (scope === "customer" && enabled) {
         openInstallments = Array.isArray(data.open) ? data.open : [];
-        paidInstallments = Array.isArray(data.paid) ? data.paid : [];
         installmentsLoaded = true;
-        pixUnavailable = data.pixUnavailable === true;
-
-        if (data.pix?.copyPaste) {
-          pix = data.pix;
-          qrSvg = renderPixQrCode(data.pix.copyPaste);
-        }
       }
     } catch (cause) {
       errorMessage = describeError(cause instanceof Error ? cause.message : "");
@@ -117,7 +107,6 @@
     paidInstallments = [];
     pix = null;
     qrSvg = "";
-    pixUnavailable = false;
     installmentsLoaded = false;
     feedback = "";
     errorMessage = "";
@@ -238,39 +227,66 @@
         </button>
       {/if}
 
-        {#if openInstallments.length > 0 && (!pix || openInstallments.length > 1)}
+        {#if scope === "customer" && pix}
+          <button type="button" on:click={() => { pix = null; qrSvg = ""; errorMessage = ""; }}
+            class="inline-flex min-h-9 items-center gap-2 text-[13px] font-semibold text-[#000A57]">
+            <ArrowLeft size={16}/> Voltar às parcelas
+          </button>
+        {/if}
+
+        {#if openInstallments.length > 0 && (scope === "operator" || !pix)}
           <div class="space-y-2">
-            <h4 class="text-[12px] font-semibold text-[#424D61]">Parcelas em aberto</h4>
+            <h4 class="text-[13px] font-semibold text-[#424D61]">Parcelas em aberto</h4>
             {#each openInstallments as installment (installment.receivableId)}
-              <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#E4E8EF] p-2.5">
-                <div class="min-w-0">
-                  <strong class="block text-[13px] font-semibold text-[#242C3C]">
-                    {installment.amount}
-                  </strong>
-                  <span class="text-[12px] text-[#737C8A]">
-                    Parcela {installment.installment} · {installment.dueDate}
-                  </span>
-                </div>
+              {#if scope === "customer"}
                 <button type="button"
-                  disabled={!installment.payable || Boolean(pending) || (pixUnavailable && openInstallments.length === 1)}
+                  disabled={!installment.payable || Boolean(pending)}
                   on:click={() => void query("pix", installment.receivableId)}
-                  class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#CCD2E0] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40">
-                  <QrCode size={15}/> PIX
+                  class="flex min-h-[64px] w-full items-center gap-3 rounded-xl border border-[#E2E7EF] bg-white px-3 py-3 text-left transition hover:border-[#AFB9D1] hover:bg-[#F6F8FC] disabled:cursor-not-allowed disabled:opacity-60">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EDF0FA] text-[#000A57]">
+                    <CreditCard size={17} aria-hidden="true"/>
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <strong class="block text-[13px] font-semibold text-[#18233D]">
+                      Parcela {installment.installment}
+                    </strong>
+                    <span class="mt-0.5 block text-[12px] text-[#747D8F]">
+                      {installment.amount} · {installment.dueDate || "Vencimento não informado"}
+                    </span>
+                    {#if !installment.payable}
+                      <span class="block text-[12px] text-[#9B3C3C]">PIX indisponível</span>
+                    {/if}
+                  </span>
+                  {#if pending === "pix"}
+                    <LoaderCircle size={16} class="shrink-0 animate-spin text-[#000A57]"/>
+                  {:else}
+                    <ChevronRight size={18} class="shrink-0 text-[#8D97AA]"/>
+                  {/if}
                 </button>
-              </div>
+              {:else}
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#E4E8EF] p-2.5">
+                  <div class="min-w-0">
+                    <strong class="block text-[13px] font-semibold text-[#242C3C]">
+                      {installment.amount}
+                    </strong>
+                    <span class="text-[12px] text-[#737C8A]">
+                      Parcela {installment.installment} · {installment.dueDate}
+                    </span>
+                  </div>
+                  <button type="button" disabled={!installment.payable || Boolean(pending)}
+                    on:click={() => void query("pix", installment.receivableId)}
+                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#CCD2E0] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40">
+                    <QrCode size={15}/> PIX
+                  </button>
+                </div>
+              {/if}
             {/each}
           </div>
         {:else if installmentsLoaded && openInstallments.length === 0}
           <p class="text-[13px] text-[#3C7756]">Nenhuma parcela em aberto.</p>
         {/if}
 
-        {#if pixUnavailable && scope === "customer" && !pix}
-          <p role="status" class="text-[13px] text-[#747D8F]">
-            PIX ainda não disponível para esta parcela.
-          </p>
-        {/if}
-
-        {#if paidInstallments.length > 0}
+        {#if scope === "operator" && paidInstallments.length > 0}
           <button type="button" on:click={() => (showPaid = !showPaid)}
             class="text-[12px] font-semibold text-[#000A57] underline underline-offset-2">
             {showPaid ? "Ocultar pagamentos" : `Ver pagamentos (${paidInstallments.length})`}
@@ -315,6 +331,19 @@
             </div>
           </div>
         {/if}
+        {#if scope === "customer"}
+          <a href="/api/finance/portal" target="_blank" rel="noopener noreferrer"
+            class="flex min-h-[60px] w-full items-center gap-3 rounded-xl border border-[#DDE2EB] bg-white px-3 py-3 text-left transition hover:border-[#A8B4D7] hover:bg-[#F5F7FC]">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EDF0FA] text-[#000A57]">
+              <ExternalLink size={17} aria-hidden="true"/>
+            </span>
+            <span class="min-w-0 flex-1">
+              <strong class="block text-[13px] font-semibold text-[#000A57]">Ver todas</strong>
+              <span class="block text-[12px] text-[#747D8F]">Todas as parcelas no painel financeiro</span>
+            </span>
+            <ChevronRight size={18} class="shrink-0 text-[#8D97AA]"/>
+          </a>
+        {/if}
         {#if feedback}<p role="status" class="text-[12px] font-medium text-[#2F7045]">{feedback}</p>{/if}
         {#if errorMessage}<p role="alert" class="text-[12px] text-[#9B3C3C]">{errorMessage}</p>{/if}
     </div>
@@ -329,6 +358,6 @@
   </div>
 {:else if pending === "contracts" && allowed}
   <p role="status" class="mb-3 inline-flex items-center gap-2 text-[13px] text-[#5C6575]">
-    <LoaderCircle size={16} class="animate-spin"/> Buscando PIX...
+    <LoaderCircle size={16} class="animate-spin"/> Buscando parcelas...
   </p>
 {/if}
