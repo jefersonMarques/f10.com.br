@@ -41,7 +41,7 @@ export function resolveF10CustomerPortalLink(
     if (positivePaymentId(installment.contrato_id) !== contractId) {
       throw new Error("FINANCE_PORTAL_LINK_INVALID");
     }
-    const candidate = installment.link_pagamento_titular;
+    const candidate = installment.link_pagamento_aluno;
     if (candidate === null || candidate === undefined || candidate === "") {
       continue;
     }
