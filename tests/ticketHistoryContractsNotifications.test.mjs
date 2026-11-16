@@ -29,6 +29,20 @@ test("contract search supports API-sourced contract numbers", () => {
   assert.match(inline, /Pesquisar empresas para vincular/);
 });
 
+test("F10 contract search opens independently of requester association", () => {
+  const inline = source("src/lib/components/operations/tickets/TicketRelationshipsInline.svelte");
+  const repository = source("src/lib/server/support/customerContractAccessRepository.ts");
+
+  assert.match(inline, /contractSearchDialog\\.showModal\\(\\)/);
+  assert.match(inline, /<dialog bind:this=\\{contractSearchDialog\\}/);
+  assert.match(inline, /Pesquisar empresas para vincular/);
+  assert.doesNotMatch(inline, /data\\.canEdit && data\\.requester\\.contactId/);
+  assert.match(inline, /\\{#if !data\\.requester\\.contactId\\}/);
+  assert.match(inline, /Solicitante necessário/);
+  assert.match(inline, /contractSearchError/);
+  assert.match(repository, /SUPPORT_TICKET_REQUESTER_REQUIRED/);
+});
+
 test("Helpdesk F10 identity is used on the internal login", () => {
   const login = source("src/routes/login/+page.svelte");
   assert.match(login, /Helpdesk F10/);
