@@ -61,6 +61,10 @@
   let notifications = data.notifications;
   let presence = data.presence;
   let lastHeartbeatAt = 0;
+  let presenceRequestVersion = 0;
+  let presenceSaving = false;
+  let presenceHeartbeatPending = false;
+  let presenceError = "";
   const permissionCodes = new Set(data.permissions.map((permission) => permission.code));
   const canRespondToChat = permissionCodes.has("chat.respond");
   const canTrackPresence = canRespondToChat || permissionCodes.has("tickets.reply");
@@ -150,46 +154,87 @@
   }
 
   async function refreshPresence(): Promise<void> {
-    if (!canTrackPresence) return;
+    if (!canTrackPresence || presenceSaving || presenceHeartbeatPending) return;
+    const version = presenceRequestVersion;
+
     try {
       const response = await fetch("/api/app/presence", { cache: "no-store" });
-      if (response.ok) presence = await response.json() as typeof presence;
+      if (!response.ok) return;
+      const state = await response.json() as typeof presence;
+      if (version === presenceRequestVersion) presence = state;
     } catch {
-      // Presença é auxiliar e não deve interromper o painel.
+      // A consulta não deve interromper a navegação.
     }
   }
 
+  function describePresenceFailure(status: number): string {
+    if (status === 401 || status === 403) {
+      return "Sessão ou permissão inválida. Atualize a página e entre novamente.";
+    }
+    if (status === 409) return "O status mudou em outra sessão. Tente novamente.";
+    if (status === 503) return "Não foi possível salvar o status. Verifique a conexão com o servidor.";
+    return "Não foi possível alterar o status. Tente novamente.";
+  }
+
   async function setPresenceStatus(status: "online" | "busy" | "offline"): Promise<void> {
+    if (presenceSaving) return;
+
+    presenceSaving = true;
+    presenceError = "";
+    const version = ++presenceRequestVersion;
+
     try {
       const response = await fetch("/api/app/presence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "status", status }),
       });
-      if (response.ok) {
-        presence = await response.json() as typeof presence;
+
+      if (!response.ok) {
+        presenceError = describePresenceFailure(response.status);
+        return;
+      }
+
+      const state = await response.json() as typeof presence;
+      if (version === presenceRequestVersion) {
+        presence = state;
         presenceOpen = false;
         lastHeartbeatAt = Date.now();
       }
     } catch {
-      // Mantém o último estado conhecido para nova tentativa explícita.
+      presenceError = "Falha de conexão ao alterar o status. Tente novamente.";
+    } finally {
+      presenceSaving = false;
     }
   }
 
   async function heartbeatPresence(): Promise<void> {
-    if (!canTrackPresence || !presence || presence.manualStatus === "offline") return;
+    if (!canTrackPresence || !presence || presence.manualStatus === "offline"
+      || presenceSaving || presenceHeartbeatPending || document.hidden) return;
+
     const now = Date.now();
     if (now - lastHeartbeatAt < 60_000) return;
-    lastHeartbeatAt = now;
+
+    presenceHeartbeatPending = true;
+    const version = presenceRequestVersion;
+
     try {
       const response = await fetch("/api/app/presence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "heartbeat" }),
       });
-      if (response.ok) presence = await response.json() as typeof presence;
+      if (!response.ok) return;
+
+      const state = await response.json() as typeof presence;
+      if (version === presenceRequestVersion) {
+        presence = state;
+        lastHeartbeatAt = Date.now();
+      }
     } catch {
-      // A próxima interação real tenta novamente.
+      // Heartbeat temporariamente indisponível; próxima tentativa permanece liberada.
+    } finally {
+      presenceHeartbeatPending = false;
     }
   }
 
@@ -218,8 +263,22 @@
     syncNotifications();
 
     if (canTrackPresence) {
-      presenceTimer = setInterval(() => void refreshPresence(), 60_000);
+      presenceTimer = setInterval(() => {
+        if (document.hidden) return;
+        void heartbeatPresence();
+        void refreshPresence();
+      }, 60_000);
+
       const handleActivity = () => void heartbeatPresence();
+      const handleVisibility = () => {
+        if (!document.hidden) {
+          void heartbeatPresence();
+          void refreshPresence();
+        }
+      };
+
+      document.addEventListener("visibilitychange", handleVisibility);
+      window.addEventListener("focus", handleVisibility);
       window.addEventListener("pointerdown", handleActivity, { passive: true });
       window.addEventListener("keydown", handleActivity, { passive: true });
       window.addEventListener("touchstart", handleActivity, { passive: true });
@@ -231,6 +290,8 @@
         window.removeEventListener("pointerdown", handleActivity);
         window.removeEventListener("keydown", handleActivity);
         window.removeEventListener("touchstart", handleActivity);
+        document.removeEventListener("visibilitychange", handleVisibility);
+        window.removeEventListener("focus", handleVisibility);
       };
     }
     return () => {
@@ -293,10 +354,17 @@
             </button>
             {#if presenceOpen}
               <div class="absolute right-0 top-12 z-50 max-h-[calc(100dvh-90px)] w-44 overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-1.5 text-[var(--app-text)] shadow-xl">
-                <button type="button" on:click={() => void setPresenceStatus("online")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]"><span class="h-2.5 w-2.5 rounded-full bg-[#2F9E5B]"></span>Online</button>
-                <button type="button" on:click={() => void setPresenceStatus("busy")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]"><span class="h-2.5 w-2.5 rounded-full bg-[#E59A2F]"></span>Ocupado</button>
-                <button type="button" on:click={() => void setPresenceStatus("offline")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]"><span class="h-2.5 w-2.5 rounded-full bg-[#C7CBD4]"></span>Offline</button>
-                {#if presence.effectiveStatus === "away"}<p class="application-text-meta mt-1 border-t border-[var(--app-border-soft)] px-3 pt-2 leading-4 text-[var(--app-text-muted)]">Ausente por inatividade. Uma nova interação no painel restaura seu estado.</p>{/if}
+                <button type="button" disabled={presenceSaving} on:click={() => void setPresenceStatus("online")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]"><span class="h-2.5 w-2.5 rounded-full bg-[#2F9E5B]"></span>Online</button>
+                <button type="button" disabled={presenceSaving} on:click={() => void setPresenceStatus("busy")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]"><span class="h-2.5 w-2.5 rounded-full bg-[#E59A2F]"></span>Ocupado</button>
+                <button type="button" disabled={presenceSaving} on:click={() => void setPresenceStatus("offline")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]"><span class="h-2.5 w-2.5 rounded-full bg-[#C7CBD4]"></span>Offline</button>
+                {#if presenceSaving}
+                  <p role="status" class="application-text-meta px-3 py-2 text-[var(--app-text-muted)]">Salvando status...</p>
+                {/if}
+                {#if presenceError}
+                  <p role="alert" class="application-text-meta mt-1 border-t border-[var(--app-border-soft)] px-3 pt-2 leading-4 text-[#A83F32]">{presenceError}</p>
+                {:else if presence.effectiveStatus === "away"}
+                  <p class="application-text-meta mt-1 border-t border-[var(--app-border-soft)] px-3 pt-2 leading-4 text-[var(--app-text-muted)]">Ausente por inatividade. A presença será renovada enquanto o painel estiver aberto.</p>
+                {/if}
               </div>
             {/if}
           </div>
