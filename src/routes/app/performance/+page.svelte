@@ -11,10 +11,11 @@
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import UserAvatar from "$lib/components/application/UserAvatar.svelte";
   import SupportPresencePanel from "$lib/components/operations/SupportPresencePanel.svelte";
+  import SupportChatPerformancePanel from "$lib/components/operations/SupportChatPerformancePanel.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
-  let activeTab: "results" | "presence" = "results";
+  let activeTab: "results" | "chats" | "presence" = "results";
 
   let performance: PageData["performance"];
   let traffic: PageData["performance"]["traffic"];
@@ -74,6 +75,11 @@
       class:active={activeTab === "results"}
       class="application-text-caption min-h-10 rounded-lg border border-app-border-control px-4 font-semibold text-app-text">
       Resultados
+    </button>
+    <button type="button" on:click={() => (activeTab = "chats")}
+      class:active={activeTab === "chats"}
+      class="application-text-caption min-h-10 rounded-lg border border-app-border-control px-4 font-semibold text-app-text">
+      Chats
     </button>
     <button type="button" on:click={() => (activeTab = "presence")}
       class:active={activeTab === "presence"}
@@ -224,6 +230,8 @@
   </section>
 
   <p class="application-text-meta mt-4 leading-5 text-[#9196A3]">“Resolvidos” usa o usuário que registrou a mudança para Resolvido/Fechado. “SLA 1ª resp.” considera apenas tickets que possuem prazo de primeira resposta e atribui o resultado ao autor da primeira resposta pública humana.</p>
+  {:else if activeTab === "chats"}
+    <SupportChatPerformancePanel initialPeriodDays={performance.periodDays}/>
   {:else}
     <SupportPresencePanel initialData={data.presence}/>
   {/if}

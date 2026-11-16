@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
@@ -66,6 +67,9 @@ export const webChatSessions = pgTable(
     aiLastRunId: uuid("ai_last_run_id").references(() => supportAiRuns.id, {
       onDelete: "set null",
     }),
+    humanRequestedAt: timestamp("human_requested_at", { withTimezone: true }),
+    closeReason: text("close_reason"),
+    closedByUserId: uuid("closed_by_user_id").references(() => users.id, { onDelete: "set null" }),
     firstResponseAt: timestamp("first_response_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -86,6 +90,25 @@ export const webChatSessions = pgTable(
     index("web_chat_sessions_assigned_idx").on(table.assignedUserId, table.updatedAt),
     index("web_chat_sessions_customer_idx").on(table.customerContactId, table.updatedAt),
     index("web_chat_sessions_legacy_context_idx").on(table.legacyUserId, table.groupId, table.unitId),
+  ],
+);
+
+export const supportChatEvents = pgTable(
+  "support_chat_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id").notNull().references(() => webChatSessions.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    targetUserId: uuid("target_user_id").references(() => users.id, { onDelete: "set null" }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("support_chat_events_session_idx").on(table.sessionId, table.occurredAt),
+    index("support_chat_events_actor_idx").on(table.actorUserId, table.occurredAt),
+    uniqueIndex("support_chat_events_milestone_unique_idx")
+      .on(table.sessionId, table.eventType)
+      .where(sql`event_type IN ('human_requested', 'first_response')`),
   ],
 );
 

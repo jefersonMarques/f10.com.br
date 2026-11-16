@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { webChatSessions } from "$lib/server/db/chatSchema";
+import { supportChatEvents, webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { teamMembers, users } from "$lib/server/db/schema";
 import {
@@ -96,6 +96,13 @@ export async function autoAssignChatIfConfigured(
       )
       .returning({ id: webChatSessions.id });
     if (!assigned) return null;
+
+    await tx.insert(supportChatEvents).values({
+      sessionId,
+      eventType: "assigned",
+      targetUserId: candidate.userId,
+      occurredAt: now,
+    });
 
     await tx
       .update(supportChatRoutingMembers)
