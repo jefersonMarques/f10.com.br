@@ -79,6 +79,7 @@ jobs:
           node --experimental-strip-types --test tests/chatEntryRouting.test.mjs
           node --experimental-strip-types --test tests/supportPresenceTimestamp.test.mjs
           node --experimental-strip-types --test tests/chatPerformanceMetrics.test.mjs
+          node --test tests/chatPerformanceIntegration.test.mjs
           node --test tests/supportPresenceHistory.test.mjs
           node --experimental-strip-types --test tests/assistantHelpFallback.test.mjs
           node --experimental-strip-types --test tests/assistantArticleSynthesis.test.mjs
