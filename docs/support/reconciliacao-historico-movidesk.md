@@ -21,7 +21,7 @@ node --env-file-if-exists=.env --env-file-if-exists=.env.production \
   scripts/reconcile-movidesk-ticket-history.mjs --ticket 42746
 ```
 
-A prévia deve informar três ações originalmente públicas, duas internas, o cliente histórico, a empresa original e as pessoas envolvidas. Para os operadores, os campos `operatorMatches`, `alreadyLinkedOperators`, `readyToLinkOperators` e `unresolvedOperators` distinguem vínculos existentes, vínculos que serão criados e contas sem correspondência exata de e-mail. Candidatos encontrados apenas pelo nome aparecem em `nameCandidates`, sem vínculo automático. Ela também informa quantas mensagens públicas ainda precisam ser restauradas no banco.
+A prévia deve informar três ações originalmente públicas, duas internas, o cliente histórico, a empresa original e as pessoas envolvidas. Para os operadores, os campos `operatorMatches`, `alreadyLinkedOperators`, `readyToLinkOperators` e `unresolvedOperators` distinguem vínculos existentes, vínculos que serão criados e contas sem correspondência exata de e-mail. Candidatos encontrados apenas pelo nome aparecem em `nameCandidates`, sem vínculo automático. Os campos `actionAuthors` e `authorsReadyToLink` mostram as mensagens antigas que ainda podem receber um autor F10 confirmado por e-mail; `linkedMessageAuthors` informa quantas foram associadas após `--apply`. Ela também informa quantas mensagens públicas ainda precisam ser restauradas no banco.
 
 `publicMessagesToRestore` pode ser inferior a três se a visibilidade já tiver sido corrigida.
 
@@ -38,7 +38,7 @@ O comando:
 2. Restaura a visibilidade **somente** das ações públicas ainda indevidamente internas.
 3. Registra a identificação histórica do solicitante somente onde não há uma edição manual prévia.
 4. Relaciona a organização original do Movidesk ao contato histórico usando o identificador de origem, sem vincular automaticamente contratos F10.
-5. Complementa os participantes vinculados aos contatos Movidesk e usuários F10 identificados sem ambiguidade.
+5. Complementa os participantes vinculados aos contatos Movidesk e usuários F10 identificados sem ambiguidade, e corrige a autoria histórica de mensagens que ainda ficaram como `system` quando há correspondência exata de e-mail.
 6. Registra nomes, e-mails e papéis históricos em evento de auditoria para exibição na área do operador.
 
 **Importante:** nenhuma mensagem originalmente interna será exposta. Mensagens originalmente públicas recebem o estado `public`, mantendo `portalAccessApproved=false`. Este comando não libera o histórico no portal, não cria usuários e não vincula contrato/unidade comercial por semelhança de nome.
