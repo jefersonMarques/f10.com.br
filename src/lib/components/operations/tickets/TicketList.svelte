@@ -290,6 +290,9 @@
                     {#if ticket.movideskSourceId && ticket.movideskSourceId !== String(ticket.ticketNumber)}
                       <span class="shrink-0 text-[11px] text-[#737989]">MD #{ticket.movideskSourceId}</span>
                     {/if}
+                    {#if ticket.matchedPreviousNumber}
+                      <span class="shrink-0 text-[11px] text-[#737989]">Anterior #{ticket.matchedPreviousNumber}</span>
+                    {/if}
                   </div>
                   <span class="shrink-0 whitespace-nowrap text-[11px] text-[#9298A5]">{relativeUpdated(ticket.updatedAt)}</span>
                 </div>
@@ -402,6 +405,9 @@
               {#if ticket.movideskSourceId && ticket.movideskSourceId !== String(ticket.ticketNumber)}
                 <span class="font-medium text-[#737989]">MD #{ticket.movideskSourceId}</span>
               {/if}
+              {#if ticket.matchedPreviousNumber}
+                <span class="font-medium text-[#737989]">Anterior #{ticket.matchedPreviousNumber}</span>
+              {/if}
               {#if ticket.channel === "email"}<Mail size={11} aria-label="Recebido por e-mail"/>{/if}
             </span>
 
@@ -453,6 +459,9 @@
             <span class="application-text-caption font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
             {#if ticket.movideskSourceId && ticket.movideskSourceId !== String(ticket.ticketNumber)}
               <span class="ml-2 text-[11px] text-[#737989]">MD #{ticket.movideskSourceId}</span>
+            {/if}
+            {#if ticket.matchedPreviousNumber}
+              <span class="ml-2 text-[11px] text-[#737989]">Anterior #{ticket.matchedPreviousNumber}</span>
             {/if}
             <strong class="mt-1 block text-[13px] font-semibold leading-5 text-[#2D3342]">{shortTicketSubject(ticket.subject)}</strong>
           </div>

@@ -11,6 +11,7 @@ import {
 } from "$lib/server/customerPortal/customerF10TicketRepository";
 import { getCustomerF10TicketSummary } from "$lib/server/customerPortal/customerF10TicketSummaryRepository";
 import { requireCustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { parseTicketNumberSearch } from "$lib/support/ticketNumberSearch";
 
 const PAGE_SIZE = 20;
 const MAX_PAGE = 100;
@@ -96,11 +97,14 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
     ? null
     : parseId(groupParam);
   const unitId = groupId === null ? null : parseId(url.searchParams.get("unitId"));
-  const statusFilter = parseStatusFilter(url.searchParams.get("status"));
+  const search = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
+  const requestedStatus = url.searchParams.get("status");
+  const statusFilter = requestedStatus === null && parseTicketNumberSearch(search)
+    ? "all"
+    : parseStatusFilter(requestedStatus);
   const status = statusFilter === "active" || statusFilter === "all" ? null : statusFilter;
   const priority = parsePriority(url.searchParams.get("priority"));
   const period = parsePeriod(url.searchParams.get("period"));
-  const search = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
   const page = parsePage(url.searchParams.get("page"));
   const view = url.searchParams.get("view") === "table" ? "table" : "cards";
 

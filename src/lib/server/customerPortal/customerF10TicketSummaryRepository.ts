@@ -10,6 +10,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { parseTicketNumberSearch } from "$lib/support/ticketNumberSearch";
 import { customerTicketOwnershipCondition, explicitTicketRequesterCondition, originalEmailSenderCondition } from "$lib/server/customerPortal/ticketOwnership";
 import {
   customerActivityEvents,
@@ -124,9 +125,17 @@ function buildWhere(
 
   const search = filters.search.trim();
   if (search) {
-    const ticketNumber = /^\d+$/.test(search) ? Number(search) : null;
-    const searchCondition = Number.isSafeInteger(ticketNumber)
-      ? or(ilike(tickets.subject, `%${search}%`), eq(tickets.ticketNumber, ticketNumber as number))
+    const ticketNumber = parseTicketNumberSearch(search);
+    const searchCondition = ticketNumber
+      ? or(
+          ilike(tickets.subject, `%${search}%`),
+          eq(tickets.ticketNumber, Number(ticketNumber)),
+          sql`EXISTS (
+            SELECT 1 FROM ticket_number_aliases alias
+            WHERE alias.ticket_id = ${tickets.id}
+              AND alias.previous_number = ${Number(ticketNumber)}
+          )`,
+        )
       : ilike(tickets.subject, `%${search}%`);
     if (searchCondition) conditions.push(searchCondition);
   }

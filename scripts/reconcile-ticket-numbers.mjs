@@ -1,0 +1,261 @@
+import postgres from "postgres";
+import { buildTicketNumberPlan } from "./lib/ticketNumberReconciliationPlan.mjs";
+
+const OPERATION_KEY = "movidesk_continuity_v1";
+
+function parseOptions(args) {
+  const options = { apply: false, expectedHash: null };
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === "--apply") {
+      options.apply = true;
+    } else if (argument === "--expect-hash") {
+      options.expectedHash = args[++index] ?? null;
+    } else {
+      throw new Error("UNKNOWN_ARGUMENT:" + argument);
+    }
+  }
+
+  if (options.apply && !/^[a-f0-9]{64}$/.test(options.expectedHash ?? "")) {
+    throw new Error("EXPECTED_PLAN_HASH_REQUIRED");
+  }
+  if (!options.apply && options.expectedHash !== null) {
+    throw new Error("EXPECTED_HASH_REQUIRES_APPLY");
+  }
+  return options;
+}
+
+function databaseUrl() {
+  const value = process.env.DATABASE_URL?.trim();
+  if (!value) throw new Error("DATABASE_URL_MISSING");
+  return value;
+}
+
+async function previousRun(tx) {
+  const [schema] = await tx.unsafe(
+    "SELECT to_regclass('public.ticket_number_reconciliation_runs') IS NOT NULL AS available",
+  );
+  if (!schema.available) return null;
+
+  const [run] = await tx.unsafe(
+    "SELECT plan_hash, tickets_processed, numbers_changed, applied_at " +
+    "FROM ticket_number_reconciliation_runs WHERE operation_key = $1",
+    [OPERATION_KEY],
+  );
+  return run ?? null;
+}
+
+async function inspectPlan(tx) {
+  const rows = await tx.unsafe(
+    "SELECT t.id::text, t.ticket_number::text AS current_number, " +
+    "imported.source_ticket_id " +
+    "FROM tickets t " +
+    "LEFT JOIN movidesk_ticket_imports imported ON imported.ticket_id = t.id " +
+    "ORDER BY t.created_at, t.id",
+  );
+  return buildTicketNumberPlan(rows);
+}
+
+function summary(plan) {
+  return {
+    planHash: plan.planHash,
+    ticketCount: plan.ticketCount,
+    importedTickets: plan.importedTickets,
+    nativeTickets: plan.nativeTickets,
+    maximumMovideskNumber: plan.maximumMovideskNumber,
+    nativeStartingNumber: plan.nativeStartingNumber,
+    nativeEndingNumber: plan.maximumTargetNumber,
+    numbersToChange: plan.changes.length,
+    aliasesRequired: plan.aliasesRequired,
+    collidingPreviousNumbers: plan.collidingPreviousNumbers,
+    nextTicketNumber: plan.maximumTargetNumber + 1,
+  };
+}
+
+async function recordStagingPlan(tx, plan) {
+  await tx.unsafe(
+    "CREATE TEMP TABLE ticket_number_staging (" +
+    "ticket_id uuid PRIMARY KEY, previous_number bigint NOT NULL, " +
+    "next_number bigint NOT NULL UNIQUE, temporary_number bigint NOT NULL UNIQUE" +
+    ") ON COMMIT DROP",
+  );
+
+  const payload = plan.changes.map((entry) => ({
+    ticket_id: entry.ticketId,
+    previous_number: entry.previousNumber,
+    next_number: entry.nextNumber,
+    temporary_number: entry.temporaryNumber,
+  }));
+  await tx.unsafe(
+    "INSERT INTO ticket_number_staging " +
+    "(ticket_id, previous_number, next_number, temporary_number) " +
+    "SELECT ticket_id::uuid, previous_number, next_number, temporary_number " +
+    "FROM jsonb_to_recordset($1::jsonb) AS item(" +
+    "ticket_id text, previous_number bigint, next_number bigint, temporary_number bigint)",
+    [JSON.stringify(payload)],
+  );
+
+  const [staged] = await tx.unsafe(
+    "SELECT count(*)::int AS total FROM ticket_number_staging",
+  );
+  if (staged.total !== plan.changes.length) {
+    throw new Error("STAGING_PLAN_INCOMPLETE");
+  }
+}
+
+async function migrateNumbers(tx, plan) {
+  const [schema] = await tx.unsafe(
+    "SELECT to_regclass('public.ticket_number_aliases') IS NOT NULL AS aliases, " +
+    "to_regclass('public.ticket_number_reconciliation_runs') IS NOT NULL AS runs",
+  );
+  if (!schema.aliases || !schema.runs) {
+    throw new Error("TICKET_NUMBER_MIGRATION_REQUIRED");
+  }
+  if (plan.changes.length === 0) {
+    throw new Error("NO_TICKET_NUMBER_CHANGES_TO_APPLY");
+  }
+
+  const [identity] = await tx.unsafe(
+    "SELECT attidentity AS generation FROM pg_attribute " +
+    "WHERE attrelid = 'public.tickets'::regclass " +
+    "AND attname = 'ticket_number' AND NOT attisdropped",
+  );
+  if (identity?.generation !== "a") {
+    throw new Error("TICKET_NUMBER_IDENTITY_UNEXPECTED");
+  }
+
+  await recordStagingPlan(tx, plan);
+
+  await tx.unsafe(
+    "INSERT INTO ticket_number_aliases " +
+    "(ticket_id, previous_number, alias_source) " +
+    "SELECT ticket_id, previous_number, 'f10_before_migration' " +
+    "FROM ticket_number_staging ON CONFLICT DO NOTHING",
+  );
+
+  const [unrecorded] = await tx.unsafe(
+    "SELECT count(*)::int AS total FROM ticket_number_staging staged " +
+    "LEFT JOIN ticket_number_aliases alias ON alias.ticket_id = staged.ticket_id " +
+    "AND alias.previous_number = staged.previous_number " +
+    "WHERE alias.ticket_id IS NULL",
+  );
+  if (unrecorded.total !== 0) {
+    throw new Error("TICKET_NUMBER_ALIASES_INCOMPLETE");
+  }
+
+  await tx.unsafe(
+    "ALTER TABLE tickets ALTER COLUMN ticket_number SET GENERATED BY DEFAULT",
+  );
+
+  const [temporary] = await tx.unsafe(
+    "WITH updated AS (" +
+    "UPDATE tickets t SET ticket_number = staged.temporary_number " +
+    "FROM ticket_number_staging staged " +
+    "WHERE t.id = staged.ticket_id " +
+    "AND t.ticket_number = staged.previous_number " +
+    "RETURNING t.id" +
+    ") SELECT count(*)::int AS total FROM updated",
+  );
+  if (temporary.total !== plan.changes.length) {
+    throw new Error("TEMPORARY_TICKET_RENUMBER_FAILED");
+  }
+
+  const [final] = await tx.unsafe(
+    "WITH updated AS (" +
+    "UPDATE tickets t SET ticket_number = staged.next_number " +
+    "FROM ticket_number_staging staged " +
+    "WHERE t.id = staged.ticket_id " +
+    "AND t.ticket_number = staged.temporary_number " +
+    "RETURNING t.id" +
+    ") SELECT count(*)::int AS total FROM updated",
+  );
+  if (final.total !== plan.changes.length) {
+    throw new Error("FINAL_TICKET_RENUMBER_FAILED");
+  }
+
+  await tx.unsafe(
+    "ALTER TABLE tickets ALTER COLUMN ticket_number SET GENERATED ALWAYS",
+  );
+
+  const verified = await inspectPlan(tx);
+  if (verified.changes.length !== 0 ||
+      verified.maximumTargetNumber !== plan.maximumTargetNumber ||
+      verified.ticketCount !== plan.ticketCount) {
+    throw new Error("TICKET_NUMBER_FINAL_VERIFICATION_FAILED");
+  }
+
+  const [sequence] = await tx.unsafe(
+    "SELECT pg_get_serial_sequence('public.tickets', 'ticket_number') AS name",
+  );
+  if (!sequence?.name) throw new Error("TICKET_NUMBER_SEQUENCE_NOT_FOUND");
+
+  await tx.unsafe(
+    "SELECT setval($1::regclass, $2::bigint, true)",
+    [sequence.name, plan.maximumTargetNumber],
+  );
+  await tx.unsafe(
+    "INSERT INTO ticket_number_reconciliation_runs " +
+    "(operation_key, plan_hash, tickets_processed, numbers_changed) " +
+    "VALUES ($1, $2, $3, $4)",
+    [OPERATION_KEY, plan.planHash, plan.ticketCount, plan.changes.length],
+  );
+}
+
+async function main() {
+  const options = parseOptions(process.argv.slice(2));
+  const db = postgres(databaseUrl(), {
+    max: 1,
+    prepare: false,
+    connect_timeout: 10,
+  });
+
+  try {
+    const result = await db.begin(async (tx) => {
+      if (!options.apply) {
+        await tx.unsafe("SET TRANSACTION READ ONLY");
+      } else {
+        await tx.unsafe("SET LOCAL lock_timeout = '5s'");
+        await tx.unsafe("SET LOCAL statement_timeout = '180s'");
+        await tx.unsafe(
+          "SELECT pg_advisory_xact_lock(hashtext($1))",
+          [OPERATION_KEY],
+        );
+        await tx.unsafe("LOCK TABLE tickets IN ACCESS EXCLUSIVE MODE");
+      }
+
+      const previous = await previousRun(tx);
+      if (previous) {
+        return {
+          state: "ticket_number_already_applied",
+          readOnly: true,
+          planHash: previous.plan_hash,
+          ticketsProcessed: previous.tickets_processed,
+          numbersChanged: previous.numbers_changed,
+          appliedAt: previous.applied_at,
+        };
+      }
+
+      const plan = await inspectPlan(tx);
+      if (!options.apply) {
+        return { state: "ticket_number_plan_preview", readOnly: true, ...summary(plan) };
+      }
+      if (plan.planHash !== options.expectedHash) {
+        throw new Error("TICKET_NUMBER_PLAN_CHANGED_RERUN_PREVIEW");
+      }
+      await migrateNumbers(tx, plan);
+      return { state: "ticket_number_plan_applied", readOnly: false, ...summary(plan) };
+    });
+
+    console.log(JSON.stringify(result, null, 2));
+  } finally {
+    await db.end({ timeout: 5 });
+  }
+}
+
+main().catch((cause) => {
+  console.error(JSON.stringify({
+    state: "error",
+    reason: cause instanceof Error ? cause.message : "UNKNOWN_ERROR",
+  }));
+  process.exitCode = 1;
+});

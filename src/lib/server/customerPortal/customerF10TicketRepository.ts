@@ -12,6 +12,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { parseTicketNumberSearch } from "$lib/support/ticketNumberSearch";
 import { reuseTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import {
   customerActivityEvents,
@@ -254,10 +255,18 @@ export async function listCustomerF10Tickets(
   if (start) conditions.push(gte(tickets.createdAt, start));
 
   const search = filters.search.trim();
+  const ticketNumber = parseTicketNumberSearch(search);
   if (search) {
-    const ticketNumber = /^\d+$/.test(search) ? Number(search) : null;
-    const searchCondition = Number.isSafeInteger(ticketNumber)
-      ? or(ilike(tickets.subject, `%${search}%`), eq(tickets.ticketNumber, ticketNumber as number))
+    const searchCondition = ticketNumber
+      ? or(
+          ilike(tickets.subject, `%${search}%`),
+          eq(tickets.ticketNumber, Number(ticketNumber)),
+          sql`EXISTS (
+            SELECT 1 FROM ticket_number_aliases alias
+            WHERE alias.ticket_id = ${tickets.id}
+              AND alias.previous_number = ${Number(ticketNumber)}
+          )`,
+        )
       : ilike(tickets.subject, `%${search}%`);
     if (searchCondition) conditions.push(searchCondition);
   }
@@ -278,6 +287,15 @@ export async function listCustomerF10Tickets(
     .select({
       id: tickets.id,
       ticketNumber: tickets.ticketNumber,
+      matchedPreviousNumber: ticketNumber
+        ? sql<string | null>`(
+            SELECT alias.previous_number::text
+            FROM ticket_number_aliases alias
+            WHERE alias.ticket_id = ${tickets.id}
+              AND alias.previous_number = ${Number(ticketNumber)}
+            LIMIT 1
+          )`
+        : sql<string | null>`NULL::text`,
       subject: tickets.subject,
       status: tickets.status,
       priority: tickets.priority,
@@ -357,6 +375,7 @@ export async function listCustomerF10Tickets(
       return {
         id: row.id,
         ticketNumber: row.ticketNumber,
+        matchedPreviousNumber: row.matchedPreviousNumber,
         subject: row.subject,
         status: row.status,
         priority: row.priority,
