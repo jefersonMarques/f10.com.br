@@ -130,14 +130,60 @@ async function readSnapshot(directory, sourceId) {
   throw new Error("SOURCE_TICKET_NOT_FOUND");
 }
 
-async function uniqueOperator(tx, person) {
+async function inspectOperator(tx, person, ticketId) {
+  const sourceId = personId(person);
+  const name = personName(person);
   const email = textValue(object(person).email).toLowerCase();
-  if (!email) return null;
-  const matches = await tx.unsafe(
-    "SELECT id::text FROM users WHERE lower(email) = $1 LIMIT 2",
-    [email],
+  const matches = email
+    ? await tx.unsafe(
+        "SELECT id::text, name, email, status FROM users " +
+        "WHERE lower(btrim(email)) = $1 LIMIT 2",
+        [email],
+      )
+    : [];
+
+  if (matches.length !== 1) {
+    const candidates = name
+      ? await tx.unsafe(
+          "SELECT id::text, name, email FROM users " +
+          "WHERE lower(btrim(name)) = lower($1) LIMIT 3",
+          [name],
+        )
+      : [];
+    return {
+      sourceId,
+      name,
+      sourceEmail: email || null,
+      userId: null,
+      userEmail: null,
+      userStatus: null,
+      status: matches.length > 1 ? "ambiguous_email"
+        : candidates.length ? "name_match_only" : "not_found",
+      nameCandidates: candidates.map((candidate) => ({
+        userId: candidate.id,
+        email: candidate.email,
+      })),
+    };
+  }
+
+  const user = matches[0];
+  const [linked] = await tx.unsafe(
+    "SELECT 1 FROM ticket_participants " +
+    "WHERE ticket_id = $1::uuid AND participant_type = 'operator' " +
+    "AND user_id = $2::uuid LIMIT 1",
+    [ticketId, user.id],
   );
-  return matches.length === 1 ? matches[0].id : null;
+
+  return {
+    sourceId,
+    name,
+    sourceEmail: email,
+    userId: user.id,
+    userEmail: user.email,
+    userStatus: user.status,
+    status: linked ? "already_linked" : "ready_to_link",
+    nameCandidates: [],
+  };
 }
 
 async function sourceContact(tx, person, apply) {
@@ -248,6 +294,16 @@ async function reconcile(tx, sourceId, ticket, apply) {
     .map((person) => personDetail(person, "customer"))
     .filter(Boolean);
 
+  const sourceOperators = [ticket.owner, ticket.createdBy,
+    ...activeActions.map((action) => action.createdBy)];
+  const operatorsById = new Map(sourceOperators
+    .filter((person) => [1, 3].includes(Number(object(person).profileType)) && personId(person))
+    .map((person) => [personId(person), person]));
+  const operatorMatches = [];
+  for (const person of operatorsById.values()) {
+    operatorMatches.push(await inspectOperator(tx, person, mapping.ticket_id));
+  }
+
   const [existingHistory] = await tx.unsafe(
     "SELECT id::text FROM ticket_events " +
     "WHERE ticket_id = $1::uuid AND event_type = 'movidesk.ticket.reconciled' LIMIT 1",
@@ -270,6 +326,10 @@ async function reconcile(tx, sourceId, ticket, apply) {
     currentCustomerLinked: Boolean(mapping.customer_contact_id),
     missingRequesterProfile: !requesterProfile,
     historicalContextRecorded: Boolean(existingHistory),
+    operatorMatches,
+    alreadyLinkedOperators: operatorMatches.filter((match) => match.status === "already_linked").length,
+    readyToLinkOperators: operatorMatches.filter((match) => match.status === "ready_to_link").length,
+    unresolvedOperators: operatorMatches.filter((match) => !match.userId).length,
     portalAccessGranted: false,
   };
   if (!apply) return preview;
@@ -333,24 +393,18 @@ async function reconcile(tx, sourceId, ticket, apply) {
     );
   }
 
-  const operators = [ticket.owner, ticket.createdBy,
-    ...activeActions.map((action) => action.createdBy)];
-  const operatorsById = new Map(operators
-    .filter((person) => [1, 3].includes(Number(object(person).profileType)) && personId(person))
-    .map((person) => [personId(person), person]));
-
   let linkedOperators = 0;
-  for (const person of operatorsById.values()) {
-    const userId = await uniqueOperator(tx, person);
-    if (!userId) continue;
+  for (const match of operatorMatches) {
+    if (match.status !== "ready_to_link") continue;
     const inserted = await tx.unsafe(
       "INSERT INTO ticket_participants " +
       "(ticket_id, participant_type, user_id, source_system, source_person_id) " +
       "VALUES ($1::uuid, 'operator', $2::uuid, 'movidesk', $3) " +
       "ON CONFLICT DO NOTHING RETURNING id",
-      [mapping.ticket_id, userId, personId(person)],
+      [mapping.ticket_id, match.userId, match.sourceId],
     );
     linkedOperators += inserted.length;
+    match.status = inserted.length ? "linked" : "already_linked";
   }
 
   if (!existingHistory) {
