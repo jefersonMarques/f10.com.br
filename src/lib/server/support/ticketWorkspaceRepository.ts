@@ -216,8 +216,15 @@ export async function listTicketWorkspaceTickets(
           AND imported.source_ticket_id = ${ticketNumberSearch}
       )`
     : undefined;
+  const aliasNumberCondition = ticketNumberSearch
+    ? sql`EXISTS (
+        SELECT 1 FROM ticket_number_aliases alias
+        WHERE alias.ticket_id = ${tickets.id}
+          AND alias.previous_number = ${Number(ticketNumberSearch)}
+      )`
+    : undefined;
   const searchCondition = ticketNumberSearch
-    ? or(eq(tickets.ticketNumber, Number(ticketNumberSearch)), sourceIdCondition)
+    ? or(eq(tickets.ticketNumber, Number(ticketNumberSearch)), sourceIdCondition, aliasNumberCondition)
     : filters.search.trim()
       ? or(
           ilike(tickets.subject, searchPattern),
@@ -307,6 +314,15 @@ export async function listTicketWorkspaceTickets(
     .select({
       id: tickets.id,
       ticketNumber: tickets.ticketNumber,
+      matchedPreviousNumber: ticketNumberSearch
+        ? sql<string | null>`(
+            SELECT alias.previous_number::text
+            FROM ticket_number_aliases alias
+            WHERE alias.ticket_id = ${tickets.id}
+              AND alias.previous_number = ${Number(ticketNumberSearch)}
+            LIMIT 1
+          )`
+        : sql<string | null>`NULL::text`,
       movideskSourceId: sql<string | null>`(
         SELECT imported.source_ticket_id
         FROM movidesk_ticket_imports imported
