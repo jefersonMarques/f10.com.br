@@ -53,7 +53,7 @@ test("rejects unsafe and nonnumeric source numbers", () => {
 test("reconciled numbers require no further updates", () => {
   const plan = buildTicketNumberPlan([
     { id: "import", current_number: "9", source_ticket_id: "9" },
-    { id: "native", current_number: "13", source_ticket_id: null },
+    { id: "native", current_number: "10", source_ticket_id: null },
   ]);
   assert.equal(plan.changes.length, 0);
 });
