@@ -80,6 +80,13 @@ function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function networkErrorCode(cause) {
+  const direct = cause?.code;
+  const nested = cause?.cause;
+  const code = direct || nested?.code || nested?.errors?.[0]?.code || nested?.cause?.code;
+  return typeof code === "string" && /^[A-Z0-9_]+$/.test(code) ? code : "UNKNOWN";
+}
+
 class MovideskDownloader {
   constructor(token) {
     this.token = token;
@@ -98,12 +105,14 @@ class MovideskDownloader {
       try {
         response = await fetch(url, {
           headers: { Accept: "application/octet-stream" },
-          redirect: "error",
+          redirect: "follow",
           cache: "no-store",
           signal: AbortSignal.timeout(120000),
         });
       } catch (cause) {
-        if (attempt === 2) throw new Error("MOVIDESK_NETWORK_ERROR", { cause });
+        if (attempt === 2) {
+          throw new Error("MOVIDESK_NETWORK_ERROR_" + networkErrorCode(cause), { cause });
+        }
         continue;
       }
 
@@ -252,6 +261,9 @@ async function recoverTicket(db, downloader, record, options, totals) {
           name: fileNameOf(file),
           reason: cause instanceof Error ? cause.message : "UNKNOWN_ERROR",
         });
+        if (cause instanceof Error && cause.message.startsWith("MOVIDESK_NETWORK_ERROR_")) {
+          throw new Error("MOVIDESK_CONNECTION_INTERRUPTED");
+        }
       }
     }
     if (complete) await markActionComplete(db, message.message_id, ticketId, actionId);
