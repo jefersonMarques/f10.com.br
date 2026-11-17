@@ -57,4 +57,36 @@ Abra o ticket de origem 42746 no F10 e confira:
 
 A reexecução é idempotente: mensagens já restauradas, perfis existentes, participantes repetidos e eventos históricos já gravados são mantidos.
 
-O processamento dos demais tickets só será liberado depois de validar o piloto; este comando aceita apenas um ticket por execução.
+## Processamento em lotes
+
+O ticket 42746 foi usado como piloto e está reconciliado. Antes do primeiro lote, confirme que os vínculos históricos estão corretos na interface.
+
+Prévia dos primeiros 100 registros do snapshot, sem escrita no banco:
+
+```bash
+cd /opt/f10.com.br
+node --env-file-if-exists=.env --env-file-if-exists=.env.production \
+  scripts/reconcile-movidesk-ticket-history.mjs --all --limit 100
+```
+
+Após revisar o resumo, aplicar somente o primeiro lote:
+
+```bash
+node --env-file-if-exists=.env --env-file-if-exists=.env.production \
+  scripts/reconcile-movidesk-ticket-history.mjs --all --limit 100 --apply
+```
+
+Para continuar a partir da posição 100, sem repetir os primeiros registros:
+
+```bash
+node --env-file-if-exists=.env --env-file-if-exists=.env.production \
+  scripts/reconcile-movidesk-ticket-history.mjs --all --offset 100 --limit 100
+```
+
+O índice é baseado na posição do registro em `tickets.jsonl`, começando em zero, e não no número do ticket. O campo `nextOffset` indica a posição inicial do próximo lote. Não altere o snapshot enquanto estiver usando o mesmo índice de retomada.
+
+Todos os tickets do lote são processados em transações separadas. Se um ticket falhar, a falha será informada com `state=failed` e os seguintes continuarão; o processo terminará com código 2 quando houver falhas. O resumo inclui quantidades de mensagens públicas a restaurar, operadores encontrados, autores a associar e erros.
+
+A prévia usa transações de leitura. A aplicação atualiza somente o necessário e pode ser repetida. Contratos comerciais continuam vinculados manualmente. Não há notificações automáticas nem concessão de acesso ao portal.
+
+Para executar um lote maior após validação, altere `--limit`; o padrão de `--all` é 100 registros.
