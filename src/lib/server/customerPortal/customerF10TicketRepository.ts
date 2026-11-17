@@ -287,6 +287,15 @@ export async function listCustomerF10Tickets(
     .select({
       id: tickets.id,
       ticketNumber: tickets.ticketNumber,
+      matchedPreviousNumber: parseTicketNumberSearch(filters.search)
+        ? sql<string | null>`(
+            SELECT alias.previous_number::text
+            FROM ticket_number_aliases alias
+            WHERE alias.ticket_id = ${tickets.id}
+              AND alias.previous_number = ${Number(parseTicketNumberSearch(filters.search))}
+            LIMIT 1
+          )`
+        : sql<string | null>`NULL::text`,
       subject: tickets.subject,
       status: tickets.status,
       priority: tickets.priority,
@@ -366,6 +375,7 @@ export async function listCustomerF10Tickets(
       return {
         id: row.id,
         ticketNumber: row.ticketNumber,
+        matchedPreviousNumber: row.matchedPreviousNumber,
         subject: row.subject,
         status: row.status,
         priority: row.priority,
