@@ -80,8 +80,12 @@ function historicalPeople(ticket) {
       if (!current.name) current.name = item.name;
       if (!current.email) current.email = item.email;
     } else {
-      byId.set(item.sourceId, { ...item, roles: [role] });
-      byId.get(item.sourceId).role = undefined;
+      byId.set(item.sourceId, {
+        sourceId: item.sourceId,
+        name: item.name,
+        email: item.email,
+        roles: [role],
+      });
     }
   }
 
@@ -93,7 +97,7 @@ function historicalPeople(ticket) {
   for (const action of list(ticket.actions)) {
     if (action?.isDeleted !== true) register(action.createdBy, "author");
   }
-  return [...byId.values()].map(({ role: _role, ...person }) => person);
+  return [...byId.values()];
 }
 
 function historicalOrganization(client) {
@@ -181,7 +185,7 @@ async function reconcile(tx, sourceId, ticket, apply) {
     "SELECT i.ticket_id::text, t.customer_contact_id::text " +
     "FROM movidesk_ticket_imports i " +
     "JOIN tickets t ON t.id = i.ticket_id " +
-    "WHERE i.source_ticket_id = $1 FOR UPDATE OF t",
+    "WHERE i.source_ticket_id = $1" + (apply ? " FOR UPDATE OF t" : ""),
     [sourceId],
   );
   if (!mapping) throw new Error("IMPORTED_TICKET_NOT_FOUND");
@@ -254,7 +258,16 @@ async function reconcile(tx, sourceId, ticket, apply) {
     if (updated.length !== 1) throw new Error("VISIBILITY_UPDATE_FAILED");
   }
 
-  if (client && !requesterProfile) {
+  const [historicalLinkedContact] = mapping.customer_contact_id
+    ? await tx.unsafe(
+        "SELECT 1 FROM customer_contacts WHERE id = $1::uuid " +
+        "AND import_source = 'movidesk' LIMIT 1",
+        [mapping.customer_contact_id],
+      )
+    : [];
+
+  if (client && !requesterProfile &&
+      (!mapping.customer_contact_id || historicalLinkedContact)) {
     await tx.unsafe(
       "INSERT INTO ticket_requester_profiles " +
       "(ticket_id, display_name, display_email) VALUES ($1::uuid, $2, $3) " +
