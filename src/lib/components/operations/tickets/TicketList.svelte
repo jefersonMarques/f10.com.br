@@ -453,7 +453,7 @@
             <span class="application-text-caption font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
             {#if ticket.movideskSourceId && ticket.movideskSourceId !== String(ticket.ticketNumber)}
               <span class="ml-2 text-[11px] text-[#737989]">MD #{ticket.movideskSourceId}</span>
-            {/if>
+            {/if}
             <strong class="mt-1 block text-[13px] font-semibold leading-5 text-[#2D3342]">{shortTicketSubject(ticket.subject)}</strong>
           </div>
           <span class={`application-text-caption shrink-0 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
