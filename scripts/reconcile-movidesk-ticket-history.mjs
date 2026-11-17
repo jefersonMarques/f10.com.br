@@ -5,19 +5,53 @@ import postgres from "postgres";
 const DEFAULT_DIRECTORY = "/var/lib/f10/movidesk-final-snapshot";
 
 function parseOptions(argv) {
-  const options = { ticket: "42746", directory: DEFAULT_DIRECTORY, apply: false };
+  const options = {
+    ticket: "42746",
+    directory: DEFAULT_DIRECTORY,
+    apply: false,
+    all: false,
+    offset: 0,
+    limit: 100,
+  };
+  let ticketSpecified = false;
+  let batchOptionsSpecified = false;
+
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument === "--ticket") options.ticket = argv[++index];
-    else if (argument === "--directory") options.directory = argv[++index];
-    else if (argument === "--apply") options.apply = true;
-    else throw new Error("UNKNOWN_ARGUMENT");
+    if (argument === "--ticket") {
+      options.ticket = argv[++index];
+      ticketSpecified = true;
+    } else if (argument === "--directory") {
+      options.directory = argv[++index];
+    } else if (argument === "--apply") {
+      options.apply = true;
+    } else if (argument === "--all") {
+      options.all = true;
+    } else if (argument === "--offset") {
+      options.offset = Number(argv[++index]);
+      batchOptionsSpecified = true;
+    } else if (argument === "--limit") {
+      options.limit = Number(argv[++index]);
+      batchOptionsSpecified = true;
+    } else {
+      throw new Error("UNKNOWN_ARGUMENT:" + argument);
+    }
   }
-  if (!/^[0-9]+$/.test(options.ticket ?? "") || !options.directory?.startsWith("/")) {
+
+  if (!options.directory?.startsWith("/") ||
+      (options.all && ticketSpecified) ||
+      (!options.all && batchOptionsSpecified) ||
+      (!options.all && !/^[0-9]+$/.test(options.ticket ?? "")) ||
+      !Number.isSafeInteger(options.offset) ||
+      options.offset < 0 ||
+      !Number.isSafeInteger(options.limit) ||
+      options.limit < 1 ||
+      options.offset + options.limit > Number.MAX_SAFE_INTEGER) {
     throw new Error("INVALID_ARGUMENTS");
   }
   return options;
 }
+
 
 function object(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -111,24 +145,40 @@ function historicalOrganization(client) {
   };
 }
 
-async function readSnapshot(directory, sourceId) {
-  const stream = createReadStream(directory + "/tickets.jsonl", { encoding: "utf8" });
+async function* readSnapshotTickets(options) {
+  const stream = createReadStream(options.directory + "/tickets.jsonl", { encoding: "utf8" });
   const reader = createInterface({ input: stream, crlfDelay: Infinity });
+  let index = 0;
+
   try {
     for await (const line of reader) {
-      if (!line.includes('"sourceId":"' + sourceId + '"')) continue;
-      const record = JSON.parse(line);
-      if (String(record.sourceId) !== sourceId || String(record.ticket?.id) !== sourceId) {
-        throw new Error("SNAPSHOT_SOURCE_ID_MISMATCH");
+      if (!line.trim()) continue;
+      const snapshotIndex = index;
+      index += 1;
+
+      if (options.all) {
+        if (snapshotIndex < options.offset) continue;
+        if (snapshotIndex >= options.offset + options.limit) break;
+      } else if (!line.includes('"sourceId":"' + options.ticket + '"')) {
+        continue;
       }
-      return record.ticket;
+
+      const record = JSON.parse(line);
+      const sourceId = String(record.sourceId ?? "");
+      if (sourceId !== String(record.ticket?.id ?? "")) {
+        throw new Error("SNAPSHOT_SOURCE_ID_MISMATCH_AT:" + snapshotIndex);
+      }
+      if (!options.all && sourceId !== options.ticket) continue;
+
+      yield { sourceId, ticket: record.ticket, snapshotIndex };
+      if (!options.all) break;
     }
   } finally {
     reader.close();
     stream.destroy();
   }
-  throw new Error("SOURCE_TICKET_NOT_FOUND");
 }
+
 
 async function inspectOperator(tx, person, ticketId) {
   const sourceId = personId(person);
@@ -508,27 +558,105 @@ async function reconcile(tx, sourceId, ticket, apply) {
   };
 }
 
+function batchResult(result, snapshotIndex) {
+  return {
+    state: result.state,
+    snapshotIndex,
+    sourceTicketId: result.sourceTicketId,
+    publicMessagesToRestore: result.publicMessagesToRestore,
+    alreadyLinkedOperators: result.alreadyLinkedOperators,
+    readyToLinkOperators: result.readyToLinkOperators,
+    unresolvedOperators: result.unresolvedOperators,
+    authorsReadyToLink: result.authorsReadyToLink,
+    restoredMessages: result.restoredMessages ?? 0,
+    linkedOperators: result.linkedOperators ?? 0,
+    linkedMessageAuthors: result.linkedMessageAuthors ?? 0,
+  };
+}
+
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) throw new Error("DATABASE_URL_MISSING");
 
-  const ticket = await readSnapshot(options.directory, options.ticket);
+  const totals = {
+    processed: 0,
+    succeeded: 0,
+    failed: 0,
+    publicMessagesToRestore: 0,
+    restoredMessages: 0,
+    alreadyLinkedOperators: 0,
+    readyToLinkOperators: 0,
+    unresolvedOperators: 0,
+    authorsReadyToLink: 0,
+    linkedOperators: 0,
+    linkedMessageAuthors: 0,
+  };
   const db = postgres(databaseUrl, {
     max: 1,
     prepare: false,
     connect_timeout: 10,
   });
+
   try {
-    const result = await db.begin(async (tx) => {
-      if (options.apply) {
-        await tx.unsafe("SELECT pg_advisory_xact_lock(hashtext($1))", ["movidesk:" + options.ticket]);
-      } else {
-        await tx.unsafe("SET TRANSACTION READ ONLY");
+    for await (const record of readSnapshotTickets(options)) {
+      totals.processed += 1;
+      try {
+        const result = await db.begin(async (tx) => {
+          if (options.apply) {
+            await tx.unsafe("SELECT pg_advisory_xact_lock(hashtext($1))", [
+              "movidesk:" + record.sourceId,
+            ]);
+          } else {
+            await tx.unsafe("SET TRANSACTION READ ONLY");
+          }
+          return reconcile(tx, record.sourceId, record.ticket, options.apply);
+        });
+
+        totals.succeeded += 1;
+        for (const key of [
+          "publicMessagesToRestore",
+          "restoredMessages",
+          "alreadyLinkedOperators",
+          "readyToLinkOperators",
+          "unresolvedOperators",
+          "authorsReadyToLink",
+          "linkedOperators",
+          "linkedMessageAuthors",
+        ]) {
+          totals[key] += Number(result[key] ?? 0);
+        }
+
+        console.log(JSON.stringify(
+          options.all ? batchResult(result, record.snapshotIndex) : result,
+          null,
+          options.all ? 0 : 2,
+        ));
+      } catch (cause) {
+        if (!options.all) throw cause;
+        totals.failed += 1;
+        console.error(JSON.stringify({
+          state: "failed",
+          snapshotIndex: record.snapshotIndex,
+          sourceTicketId: record.sourceId,
+          reason: cause instanceof Error ? cause.message : "UNKNOWN_ERROR",
+        }));
       }
-      return reconcile(tx, options.ticket, ticket, options.apply);
-    });
-    console.log(JSON.stringify(result, null, 2));
+    }
+
+    if (!options.all && totals.processed === 0) {
+      throw new Error("SOURCE_TICKET_NOT_FOUND");
+    }
+    if (options.all) {
+      console.log(JSON.stringify({
+        state: options.apply ? "batch_completed" : "batch_preview",
+        offset: options.offset,
+        limit: options.limit,
+        nextOffset: options.offset + totals.processed,
+        ...totals,
+      }, null, 2));
+      if (totals.failed > 0) process.exitCode = 2;
+    }
   } finally {
     await db.end({ timeout: 5 });
   }
