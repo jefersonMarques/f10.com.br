@@ -92,7 +92,7 @@ function networkErrorDetails(cause, token) {
   const detail = nested?.message || nested?.errors?.[0]?.message || cause?.message || "unknown";
   return String(detail)
     .replaceAll(token, "[REDACTED]")
-    .replace(/token=[^&\\s]+/gi, "token=[REDACTED]")
+    .replace(/token=[^&\s]+/gi, "token=[REDACTED]")
     .slice(0, 180);
 }
 
