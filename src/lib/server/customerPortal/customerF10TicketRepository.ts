@@ -255,8 +255,8 @@ export async function listCustomerF10Tickets(
   if (start) conditions.push(gte(tickets.createdAt, start));
 
   const search = filters.search.trim();
+  const ticketNumber = parseTicketNumberSearch(search);
   if (search) {
-    const ticketNumber = parseTicketNumberSearch(search);
     const searchCondition = ticketNumber
       ? or(
           ilike(tickets.subject, `%${search}%`),
@@ -287,12 +287,12 @@ export async function listCustomerF10Tickets(
     .select({
       id: tickets.id,
       ticketNumber: tickets.ticketNumber,
-      matchedPreviousNumber: parseTicketNumberSearch(filters.search)
+      matchedPreviousNumber: ticketNumber
         ? sql<string | null>`(
             SELECT alias.previous_number::text
             FROM ticket_number_aliases alias
             WHERE alias.ticket_id = ${tickets.id}
-              AND alias.previous_number = ${Number(parseTicketNumberSearch(filters.search))}
+              AND alias.previous_number = ${Number(ticketNumber)}
             LIMIT 1
           )`
         : sql<string | null>`NULL::text`,
