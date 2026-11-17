@@ -169,6 +169,32 @@ async function sourceContact(tx, person, apply) {
   return retry[0].id;
 }
 
+async function sourceOrganization(tx, client) {
+  const organization = historicalOrganization(client);
+  if (!organization) return null;
+  const sourceReference = "movidesk:" + organization.sourceId;
+
+  await tx.unsafe(
+    "SELECT pg_advisory_xact_lock(hashtext($1))",
+    ["movidesk:organization:" + organization.sourceId],
+  );
+  const matches = await tx.unsafe(
+    "SELECT id::text FROM customer_organizations " +
+    "WHERE external_reference = $1 LIMIT 2",
+    [sourceReference],
+  );
+  if (matches.length > 1) throw new Error("HISTORICAL_ORGANIZATION_AMBIGUOUS");
+  if (matches.length) return matches[0].id;
+
+  const inserted = await tx.unsafe(
+    "INSERT INTO customer_organizations (name, external_reference) " +
+    "VALUES ($1, $2) RETURNING id::text",
+    [organization.name || "Organização histórica Movidesk", sourceReference],
+  );
+  if (inserted.length !== 1) throw new Error("HISTORICAL_ORGANIZATION_CREATE_FAILED");
+  return inserted[0].id;
+}
+
 async function linkedActions(tx, sourceId, ticketId) {
   return tx.unsafe(
     "SELECT a.source_action_id, a.source_visibility, m.id::text AS message_id, " +
@@ -276,9 +302,20 @@ async function reconcile(tx, sourceId, ticket, apply) {
     );
   }
 
+  let linkedOrganizations = 0;
   for (const item of list(ticket.clients)) {
     if (!personId(item) || item.isDeleted === true) continue;
     const contactId = await sourceContact(tx, item, true);
+    const organizationId = await sourceOrganization(tx, item);
+    if (organizationId) {
+      const organizationLink = await tx.unsafe(
+        "UPDATE customer_contacts SET organization_id = $2::uuid " +
+        "WHERE id = $1::uuid AND organization_id IS NULL " +
+        "AND import_source = 'movidesk' RETURNING id",
+        [contactId, organizationId],
+      );
+      linkedOrganizations += organizationLink.length;
+    }
     await tx.unsafe(
       "INSERT INTO ticket_participants " +
       "(ticket_id, participant_type, customer_contact_id, source_system, source_person_id) " +
@@ -332,7 +369,7 @@ async function reconcile(tx, sourceId, ticket, apply) {
     );
   }
 
-  return { ...preview, linkedOperators, restoredMessages: restoreIds.length };
+  return { ...preview, linkedOrganizations, linkedOperators, restoredMessages: restoreIds.length };
 }
 
 async function main() {
