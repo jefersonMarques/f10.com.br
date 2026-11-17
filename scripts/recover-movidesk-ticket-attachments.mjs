@@ -87,6 +87,15 @@ function networkErrorCode(cause) {
   return typeof code === "string" && /^[A-Z0-9_]+$/.test(code) ? code : "UNKNOWN";
 }
 
+function networkErrorDetails(cause, token) {
+  const nested = cause?.cause;
+  const detail = nested?.message || nested?.errors?.[0]?.message || cause?.message || "unknown";
+  return String(detail)
+    .replaceAll(token, "[REDACTED]")
+    .replace(/token=[^&\\s]+/gi, "token=[REDACTED]")
+    .slice(0, 180);
+}
+
 class MovideskDownloader {
   constructor(token) {
     this.token = token;
@@ -110,10 +119,9 @@ class MovideskDownloader {
           signal: AbortSignal.timeout(120000),
         });
       } catch (cause) {
-        if (attempt === 2) {
-          throw new Error("MOVIDESK_NETWORK_ERROR_" + networkErrorCode(cause), { cause });
-        }
-        continue;
+        const message = "MOVIDESK_NETWORK_ERROR_" + networkErrorCode(cause) +
+          ":" + networkErrorDetails(cause, this.token);
+        throw new Error(message, { cause });
       }
 
       if (response.status === 429 || response.status >= 500) {
