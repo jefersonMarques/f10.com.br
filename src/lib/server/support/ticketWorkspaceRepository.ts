@@ -18,6 +18,7 @@ import {
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { users } from "$lib/server/db/schema";
+import { parseTicketNumberSearch } from "$lib/support/ticketNumberSearch";
 import {
   customerContacts,
   customerOrganizations,
@@ -206,55 +207,65 @@ export async function listTicketWorkspaceTickets(
         ? isNull(tickets.assignedUserId)
         : undefined;
 
+  const ticketNumberSearch = parseTicketNumberSearch(filters.search);
   const searchPattern = `%${filters.search.trim()}%`;
-  const searchCondition = filters.search.trim()
-    ? or(
-        ilike(tickets.subject, searchPattern),
-        ilike(customerContacts.name, searchPattern),
-        ilike(customerOrganizations.name, searchPattern),
-        canViewCommercialCustomer ? sql`EXISTS (
-          SELECT 1 FROM ticket_contract_links link
-          JOIN f10_customer_contracts c
-            ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id
-          LEFT JOIN f10_customer_holder_profiles holder
-            ON holder.unit_id = c.unit_id AND holder.holder_id = c.titular_id
-          WHERE link.ticket_id = ${tickets.id}
-            AND (
-              coalesce(c.numero_contrato, '') ILIKE ${searchPattern}
-              OR coalesce(holder.name, '') ILIKE ${searchPattern}
-            )
-        )` : undefined,
-        canViewCommercialCustomer ? sql`EXISTS (
-          SELECT 1 FROM ticket_f10_contract_links link
-          JOIN f10_customer_contracts c
-            ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id
-          LEFT JOIN f10_customer_contract_profiles p
-            ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
-          LEFT JOIN f10_customer_holder_profiles holder
-            ON holder.unit_id = c.unit_id AND holder.holder_id = c.titular_id
-          WHERE link.ticket_id = ${tickets.id}
-            AND (
-              coalesce(c.numero_contrato, '') ILIKE ${searchPattern}
-              OR coalesce(p.spreadsheet_student_name, '') ILIKE ${searchPattern}
-              OR coalesce(p.apelido, '') ILIKE ${searchPattern}
-              OR coalesce(holder.name, '') ILIKE ${searchPattern}
-            )
-        )` : undefined,
-        canViewCommercialCustomer ? sql`EXISTS (
-          SELECT 1 FROM ticket_commercial_unit_links link
-          JOIN customer_units unit ON unit.id = link.customer_unit_id
-          JOIN customer_groups grp ON grp.id = unit.group_id
-          WHERE link.ticket_id = ${tickets.id}
-            AND (
-              unit.source_id ILIKE ${searchPattern}
-              OR coalesce(nullif(unit.apelido, ''), unit.name) ILIKE ${searchPattern}
-              OR grp.name ILIKE ${searchPattern}
-            )
-        )` : undefined,
-        ilike(supportQueues.name, searchPattern),
-        sql`cast(${tickets.ticketNumber} as text) ilike ${searchPattern}`,
-      )
+  const sourceIdCondition = ticketNumberSearch
+    ? sql`EXISTS (
+        SELECT 1 FROM movidesk_ticket_imports imported
+        WHERE imported.ticket_id = ${tickets.id}
+          AND imported.source_ticket_id = ${ticketNumberSearch}
+      )`
     : undefined;
+  const searchCondition = ticketNumberSearch
+    ? or(eq(tickets.ticketNumber, Number(ticketNumberSearch)), sourceIdCondition)
+    : filters.search.trim()
+      ? or(
+          ilike(tickets.subject, searchPattern),
+          ilike(customerContacts.name, searchPattern),
+          ilike(customerOrganizations.name, searchPattern),
+          canViewCommercialCustomer ? sql`EXISTS (
+            SELECT 1 FROM ticket_contract_links link
+            JOIN f10_customer_contracts c
+              ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id
+            LEFT JOIN f10_customer_holder_profiles holder
+              ON holder.unit_id = c.unit_id AND holder.holder_id = c.titular_id
+            WHERE link.ticket_id = ${tickets.id}
+              AND (
+                coalesce(c.numero_contrato, '') ILIKE ${searchPattern}
+                OR coalesce(holder.name, '') ILIKE ${searchPattern}
+              )
+          )` : undefined,
+          canViewCommercialCustomer ? sql`EXISTS (
+            SELECT 1 FROM ticket_f10_contract_links link
+            JOIN f10_customer_contracts c
+              ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id
+            LEFT JOIN f10_customer_contract_profiles p
+              ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
+            LEFT JOIN f10_customer_holder_profiles holder
+              ON holder.unit_id = c.unit_id AND holder.holder_id = c.titular_id
+            WHERE link.ticket_id = ${tickets.id}
+              AND (
+                coalesce(c.numero_contrato, '') ILIKE ${searchPattern}
+                OR coalesce(p.spreadsheet_student_name, '') ILIKE ${searchPattern}
+                OR coalesce(p.apelido, '') ILIKE ${searchPattern}
+                OR coalesce(holder.name, '') ILIKE ${searchPattern}
+              )
+          )` : undefined,
+          canViewCommercialCustomer ? sql`EXISTS (
+            SELECT 1 FROM ticket_commercial_unit_links link
+            JOIN customer_units unit ON unit.id = link.customer_unit_id
+            JOIN customer_groups grp ON grp.id = unit.group_id
+            WHERE link.ticket_id = ${tickets.id}
+              AND (
+                unit.source_id ILIKE ${searchPattern}
+                OR coalesce(nullif(unit.apelido, ''), unit.name) ILIKE ${searchPattern}
+                OR grp.name ILIKE ${searchPattern}
+              )
+          )` : undefined,
+          ilike(supportQueues.name, searchPattern),
+          sql`cast(${tickets.ticketNumber} as text) ilike ${searchPattern}`,
+        )
+      : undefined;
 
   const tagTicketIds = tagRows.map((row) => row.ticketId);
   const tagCondition = filters.tagId
@@ -270,7 +281,7 @@ export async function listTicketWorkspaceTickets(
     searchCondition,
     filters.status
       ? eq(tickets.status, filters.status)
-      : filters.includeFinished
+      : filters.includeFinished || ticketNumberSearch
         ? undefined
         : activeTicketCondition(),
     filters.priority ? eq(tickets.priority, filters.priority) : undefined,
@@ -296,6 +307,12 @@ export async function listTicketWorkspaceTickets(
     .select({
       id: tickets.id,
       ticketNumber: tickets.ticketNumber,
+      movideskSourceId: sql<string | null>`(
+        SELECT imported.source_ticket_id
+        FROM movidesk_ticket_imports imported
+        WHERE imported.ticket_id = ${tickets.id}
+        LIMIT 1
+      )`,
       subject: tickets.subject,
       descriptionPreview: sql<string | null>`(
         SELECT left(m.body, 600)
