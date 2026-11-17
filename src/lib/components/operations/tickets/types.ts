@@ -20,6 +20,7 @@ export type TicketWorkflowState = {
 export type TicketItem = {
   id: string;
   ticketNumber: number;
+  movideskSourceId?: string | null;
   unread?: boolean;
   subject: string;
   descriptionPreview?: string | null;
