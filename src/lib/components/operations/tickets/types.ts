@@ -159,6 +159,18 @@ export type TicketCommercialUnit = {
 
 export type TicketDetailsData = {
   details: {
+    historicalContext?: {
+      sourceTicketId: string | null;
+      clientName: string | null;
+      clientEmail: string | null;
+      organizationName: string | null;
+      people: Array<{
+        sourceId: string;
+        name: string;
+        email: string | null;
+        roles: string[];
+      }>;
+    } | null;
     ticket: {
       id: string;
       ticketNumber: number;

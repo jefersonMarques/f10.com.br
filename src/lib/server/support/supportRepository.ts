@@ -831,6 +831,58 @@ export async function linkTicketCustomer(
   });
 }
 
+type HistoricalTicketPerson = {
+  sourceId: string;
+  name: string;
+  email: string | null;
+  roles: string[];
+};
+
+function historicalField(value: unknown): string | null {
+  return typeof value === "string" && value.trim()
+    ? value.trim().slice(0, 254)
+    : null;
+}
+
+function historicalPerson(value: unknown): HistoricalTicketPerson | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const person = value as Record<string, unknown>;
+  const sourceId = historicalField(person.sourceId);
+  const name = historicalField(person.name);
+  if (!sourceId || !name) return null;
+  return {
+    sourceId,
+    name,
+    email: historicalField(person.email),
+    roles: Array.isArray(person.roles)
+      ? person.roles.filter((role): role is string => typeof role === "string").slice(0, 5)
+      : [],
+  };
+}
+
+function historicalTicketContext(metadata: Record<string, unknown> | undefined) {
+  if (!metadata || metadata.source !== "movidesk") return null;
+  const client = historicalPerson(metadata.primaryClient);
+  const organization = metadata.organization;
+  const organizationName = organization && typeof organization === "object" &&
+    !Array.isArray(organization)
+    ? historicalField((organization as Record<string, unknown>).name)
+    : null;
+  const people = Array.isArray(metadata.people)
+    ? metadata.people.flatMap((person) => {
+        const result = historicalPerson(person);
+        return result ? [result] : [];
+      }).slice(0, 100)
+    : [];
+  return {
+    sourceTicketId: historicalField(metadata.sourceTicketId),
+    clientName: client?.name ?? null,
+    clientEmail: client?.email ?? null,
+    organizationName,
+    people,
+  };
+}
+
 export async function getSupportTicket(
   actorUserId: string,
   permissions: SupportPermissionMap,
@@ -884,7 +936,7 @@ export async function getSupportTicket(
 
   if (!ticket) throw new Error("TICKET_NOT_FOUND");
 
-  const [messages, events] = await Promise.all([
+  const [messages, events, historicalRows] = await Promise.all([
     db
       .select({
         id: ticketMessages.id,
@@ -921,6 +973,15 @@ export async function getSupportTicket(
       .where(eq(ticketEvents.ticketId, ticketId))
       .orderBy(desc(ticketEvents.createdAt))
       .limit(100),
+    db
+      .select({ metadata: ticketEvents.metadata })
+      .from(ticketEvents)
+      .where(and(
+        eq(ticketEvents.ticketId, ticketId),
+        eq(ticketEvents.eventType, "movidesk.ticket.reconciled"),
+      ))
+      .orderBy(desc(ticketEvents.createdAt))
+      .limit(1),
   ]);
 
   const [reactionSummaries, taskLinks] = await Promise.all([
@@ -930,8 +991,17 @@ export async function getSupportTicket(
 
   return {
     ticket,
+    historicalContext: historicalTicketContext(historicalRows[0]?.metadata),
     messages: messages.map(({ externalMetadata, ...message }) => ({
       ...message,
+      authorUserName: externalMetadata?.source === "movidesk" &&
+        message.authorType !== "customer"
+        ? historicalField(externalMetadata.sourceAuthorName) ?? message.authorUserName
+        : message.authorUserName,
+      customerName: externalMetadata?.source === "movidesk" &&
+        message.authorType === "customer"
+        ? historicalField(externalMetadata.sourceAuthorName) ?? message.customerName
+        : message.customerName,
       ...(reactionSummaries.get(message.id) ?? EMPTY_REACTION_SUMMARY),
       taskLinks: taskLinks.get(message.id) ?? [],
       inlineImages: (

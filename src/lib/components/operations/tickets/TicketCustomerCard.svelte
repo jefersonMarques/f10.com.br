@@ -23,6 +23,14 @@
   let menuOpen = false;
 
   $: overview = ticketData.customerOverview;
+  $: historicalContext = ticketData.details.historicalContext ?? null;
+
+  const historicalRoleLabels: Record<string, string> = {
+    customer: "Cliente",
+    owner: "Responsável",
+    creator: "Criador",
+    author: "Participante",
+  };
 
   const originLabels: Record<string, string> = {
     manual: "Informado pelo operador",
@@ -175,6 +183,34 @@
     <span>Origem: {originLabels[overview.requesterSource] ?? "Não identificada"}</span>
     {#if overview.legacyUserId}<span>Usuário F10: {overview.legacyUserId}</span>{/if}
   </div>
+
+  {#if historicalContext}
+    <details class="mt-3 border-t border-[var(--app-border-soft)] pt-3">
+      <summary class="flex cursor-pointer items-center gap-2 text-[12px] font-semibold text-[var(--app-text)]">
+        <UserRound size={15}/>
+        Envolvidos no Movidesk ({historicalContext.people.length})
+      </summary>
+      <div class="mt-3 space-y-2 text-[12px] text-[var(--app-text-muted)]">
+        {#if historicalContext.organizationName}
+          <p><strong class="font-medium text-[var(--app-text)]">Empresa original:</strong> {historicalContext.organizationName}</p>
+        {/if}
+        {#if historicalContext.clientName}
+          <p><strong class="font-medium text-[var(--app-text)]">Solicitante original:</strong> {historicalContext.clientName}
+            {#if historicalContext.clientEmail} · {historicalContext.clientEmail}{/if}
+          </p>
+        {/if}
+        <ul class="space-y-1.5">
+          {#each historicalContext.people as person (person.sourceId)}
+            <li class="flex flex-wrap items-baseline gap-x-2">
+              <span class="font-medium text-[var(--app-text)]">{person.name}</span>
+              <span>{person.roles.map((role) => historicalRoleLabels[role] ?? role).join(", ")}</span>
+              {#if person.email}<span class="break-all">{person.email}</span>{/if}
+            </li>
+          {/each}
+        </ul>
+      </div>
+    </details>
+  {/if}
 
   {#if editMode && ticketData.canLinkCustomer}
     <div class="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-subtle)] p-3 sm:p-4">
