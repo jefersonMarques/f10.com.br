@@ -287,6 +287,9 @@
                       <span class="h-2 w-2 shrink-0 rounded-full bg-[#EA6D0B]" aria-label="Ticket não visualizado" title="Não visualizado"></span>
                     {/if}
                     <span class="shrink-0 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
+                    {#if ticket.movideskSourceId && ticket.movideskSourceId !== String(ticket.ticketNumber)}
+                      <span class="shrink-0 text-[11px] text-[#737989]">MD #{ticket.movideskSourceId}</span>
+                    {/if}
                   </div>
                   <span class="shrink-0 whitespace-nowrap text-[11px] text-[#9298A5]">{relativeUpdated(ticket.updatedAt)}</span>
                 </div>
@@ -394,8 +397,11 @@
             on:click={() => void onOpenTicket(ticket.id)}
             class={`grid w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-[var(--app-surface-subtle)] ${selectedTicketId === ticket.id ? "bg-[var(--app-info-bg)]" : ""} ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(320px,2fr)_minmax(220px,1.4fr)_minmax(175px,1fr)_115px_minmax(160px,1fr)_125px_110px_54px]"}`}
           >
-            <span class="application-text-caption flex items-center gap-1.5 font-bold text-[#000A57]">
-              #{ticket.ticketNumber}
+            <span class="application-text-caption flex flex-col items-start gap-0.5 font-bold text-[#000A57]">
+              <span>#{ticket.ticketNumber}</span>
+              {#if ticket.movideskSourceId && ticket.movideskSourceId !== String(ticket.ticketNumber)}
+                <span class="font-medium text-[#737989]">MD #{ticket.movideskSourceId}</span>
+              {/if}
               {#if ticket.channel === "email"}<Mail size={11} aria-label="Recebido por e-mail"/>{/if}
             </span>
 
@@ -445,6 +451,9 @@
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <span class="application-text-caption font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
+            {#if ticket.movideskSourceId && ticket.movideskSourceId !== String(ticket.ticketNumber)}
+              <span class="ml-2 text-[11px] text-[#737989]">MD #{ticket.movideskSourceId}</span>
+            {/if>
             <strong class="mt-1 block text-[13px] font-semibold leading-5 text-[#2D3342]">{shortTicketSubject(ticket.subject)}</strong>
           </div>
           <span class={`application-text-caption shrink-0 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
