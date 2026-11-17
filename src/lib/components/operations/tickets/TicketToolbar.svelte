@@ -133,7 +133,7 @@
 
       <form on:submit|preventDefault={onApply} class={workspace ? "relative min-w-[170px] flex-[1_1_220px]" : "relative min-w-[220px] flex-1 xl:min-w-[300px]"}>
         <Search size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-[#9499A5]"/>
-        <input bind:value={search} placeholder="Buscar ticket, cliente, empresa ou fila" class={workspace ? "application-text-control h-9 w-full rounded-lg border border-[#E6E8EF] bg-[#F8F9FC] pl-9 pr-3 text-[13px]" : "application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3"}/>
+        <input bind:value={search} placeholder="ID do ticket, cliente ou empresa" class={workspace ? "application-text-control h-9 w-full rounded-lg border border-[#E6E8EF] bg-[#F8F9FC] pl-9 pr-3 text-[13px]" : "application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3"}/>
       </form>
 
       <details class="relative" bind:this={filterDetails} bind:open={filterOpen}
