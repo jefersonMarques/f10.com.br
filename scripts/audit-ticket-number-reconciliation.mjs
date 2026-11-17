@@ -81,6 +81,22 @@ async function auditTicketNumbers(tx) {
     "ORDER BY imported.source_ticket_id::bigint LIMIT 12",
   );
 
+  const [migrationSchema] = await tx.unsafe(
+    "SELECT to_regclass('public.ticket_number_aliases') IS NOT NULL AS aliases, " +
+    "to_regclass('public.ticket_number_reconciliation_runs') IS NOT NULL AS runs",
+  );
+  const [aliases] = migrationSchema.aliases
+    ? await tx.unsafe(
+        "SELECT count(*)::int AS recorded FROM ticket_number_aliases",
+      )
+    : [{ recorded: 0 }];
+  const [migration] = migrationSchema.runs
+    ? await tx.unsafe(
+        "SELECT 1 AS applied FROM ticket_number_reconciliation_runs " +
+        "WHERE operation_key = 'movidesk_continuity_v1' LIMIT 1",
+      )
+    : [];
+
   const currentMaximumNumber = safeNumber(totals.maximum_number);
   const nextAvailableNumber = Math.max(currentMaximumNumber ?? 0, maximumSourceNumber) + 1;
 
@@ -102,7 +118,9 @@ async function auditTicketNumbers(tx) {
     nativeTicketsWithinMovideskRange: native.native_tickets_within_movidesk_range,
     proposedNativeStartingNumber: nextAvailableNumber,
     collisionSamples,
-    emailNumberAliasesRequired: true,
+    previousNumbersRecorded: aliases.recorded,
+    numberingMigrationApplied: Boolean(migration),
+    emailNumberAliasesRequired: !migration,
   };
 }
 
