@@ -321,6 +321,9 @@
           {#if ticket.hasUnreadUpdate}<span class="absolute right-4 top-4 h-2.5 w-2.5 rounded-full bg-[#EA6D0B]" aria-label="Nova atualização"></span>{/if}
           <div class="flex flex-wrap items-center gap-2 pr-5">
             <span class="application-text-caption font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
+            {#if ticket.matchedPreviousNumber}
+              <span class="application-text-meta text-[#737989]">Anterior #{ticket.matchedPreviousNumber}</span>
+            {/if}
             <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span>
             <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span>
           </div>
@@ -352,7 +355,7 @@
       {#each data.tickets as ticket}
         <a href={`/cliente/chamados/${ticket.id}`} class={`group relative grid gap-3 border-b border-[#ECEEF3] px-4 py-3.5 transition last:border-b-0 hover:bg-[#FAFBFC] md:grid-cols-[100px_minmax(220px,1.5fr)_minmax(170px,1fr)_160px_150px_20px] md:items-center ${ticket.hasUnreadUpdate ? "bg-[#FFFBF7]" : "bg-white"}`}>
           {#if ticket.hasUnreadUpdate}<span class="absolute inset-y-0 left-0 w-[3px] bg-[#EA6D0B]"></span>{/if}
-          <div><span class="text-[11px] font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>{#if ticket.hasUnreadUpdate}<Bell size={11} class="ml-2 inline text-[#EA6D0B]" />{/if}</div>
+          <div><span class="text-[11px] font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>{#if ticket.matchedPreviousNumber}<span class="application-text-meta mt-1 block text-[#737989]">Anterior #{ticket.matchedPreviousNumber}</span>{/if}{#if ticket.hasUnreadUpdate}<Bell size={11} class="ml-2 inline text-[#EA6D0B]" />{/if}</div>
           <div class="min-w-0"><h3 class="truncate text-[12px] font-semibold text-[#303746] group-hover:text-[#000A57]">{ticket.subject}</h3><div class="application-text-meta mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[#8A91A0]">{#if ticket.context?.scope === "global"}<span class="inline-flex items-center gap-1"><Globe2 size={11} />Global</span>{:else if ticket.context}<span class="inline-flex items-center gap-1"><School size={11} />{ticket.context.groupName} · {ticket.context.unitName}</span>{/if}<span>{channelLabels[ticket.channel] ?? ticket.channel}</span></div></div>
           <div class="flex flex-wrap items-center gap-1.5"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span></div>
           <div class="text-[10px] text-[#687081]"><span class="application-text-meta block text-[#9A9FAC]">Equipe</span>{ticket.lastTeamActivityAt ? activityAge(ticket.lastTeamActivityAt) : "Aguardando movimentação"}</div>
