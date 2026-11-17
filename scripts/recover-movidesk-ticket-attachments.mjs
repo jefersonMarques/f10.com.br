@@ -2,6 +2,12 @@ import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 import postgres from "postgres";
 import { putStoredObject } from "./lib/s3-object-storage.mjs";
+import {
+  htmlContentImages,
+  inlineSourceLinks,
+  isImageAttachment,
+  rewriteStoredLinks,
+} from "./lib/movideskInlineMedia.mjs";
 
 const SNAPSHOT_DIRECTORY = "/var/lib/f10/movidesk-final-snapshot";
 const DOWNLOAD_ENDPOINT = "https://api.movidesk.com/public/v1/storage/download";
@@ -27,7 +33,7 @@ const MIME_BY_EXTENSION = {
 };
 
 function parseOptions(args) {
-  const options = { apply: false, ticket: "42746", directory: SNAPSHOT_DIRECTORY, limit: null };
+  const options = { apply: false, ticket: "42746", directory: SNAPSHOT_DIRECTORY, offset: 0, limit: null };
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--apply") options.apply = true;
@@ -35,12 +41,14 @@ function parseOptions(args) {
     else if (argument === "--ticket") options.ticket = args[++index];
     else if (argument === "--directory") options.directory = args[++index];
     else if (argument === "--limit") options.limit = Number(args[++index]);
+    else if (argument === "--offset") options.offset = Number(args[++index]);
     else throw new Error("UNKNOWN_ARGUMENT:" + argument);
   }
   if (!options.directory?.startsWith("/") ||
       (options.ticket !== null && !/^[0-9]+$/.test(options.ticket ?? "")) ||
       (options.limit !== null && (!Number.isSafeInteger(options.limit) || options.limit < 1)) ||
-      (options.ticket !== null && options.limit !== null)) {
+      !Number.isSafeInteger(options.offset) || options.offset < 0 ||
+      (options.ticket !== null && (options.limit !== null || options.offset !== 0))) {
     throw new Error("INVALID_ARGUMENTS");
   }
   return options;
@@ -57,10 +65,13 @@ function extensionOf(name) {
   return name.match(/\.([a-z0-9]{1,12})$/i)?.[1].toLowerCase() ?? "bin";
 }
 
-function actionsWithAttachments(ticket) {
+function actionsWithMedia(ticket) {
   return (Array.isArray(ticket?.actions) ? ticket.actions : [])
     .filter((action) => action && action.isDeleted !== true)
-    .filter((action) => Array.isArray(action.attachments) && action.attachments.length > 0);
+    .filter((action) =>
+      (Array.isArray(action.attachments) && action.attachments.length > 0) ||
+      inlineSourceLinks(action.description).length > 0 ||
+      htmlContentImages(action.htmlDescription).length > 0);
 }
 
 async function* snapshotRecords(filePath) {
@@ -176,11 +187,11 @@ async function recoverAttachment(db, downloader, message, sourceFile, index) {
   const extension = extensionOf(name);
   const key = "support/tickets/" + message.ticket_id + "/" + message.message_id +
     "/movidesk-" + hash + "-" + index + "." + extension;
-  const query = "SELECT id::text FROM ticket_message_attachments " +
+  const query = "SELECT id::text, mime_type FROM ticket_message_attachments " +
     "WHERE storage_key = $1 AND ticket_id = $2::uuid AND message_id = $3::uuid";
   const params = [key, message.ticket_id, message.message_id];
   const [existing] = await db.unsafe(query, params);
-  if (existing) return "existing";
+  if (existing) return { state: "existing", id: existing.id, mimeType: existing.mime_type };
 
   const source = await downloader.download(hash);
   const receivedType = source.contentType.split(";")[0].trim().toLowerCase();
@@ -199,11 +210,11 @@ async function recoverAttachment(db, downloader, message, sourceFile, index) {
     "ON CONFLICT (storage_key) DO NOTHING RETURNING id::text",
     [message.ticket_id, message.message_id, stored.key, name, mimeType, stored.size, stored.checksumSha256],
   );
-  if (inserted) return "stored";
+  if (inserted) return { state: "stored", id: inserted.id, mimeType };
 
   const [confirmed] = await db.unsafe(query, params);
   if (!confirmed) throw new Error("DESTINATION_ATTACHMENT_CONFLICT");
-  return "existing";
+  return { state: "existing", id: confirmed.id, mimeType: confirmed.mime_type };
 }
 
 async function markActionComplete(db, messageId, ticketId, actionId) {
