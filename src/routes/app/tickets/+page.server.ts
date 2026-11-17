@@ -6,6 +6,7 @@ import {
 } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
+import { parseTicketNumberSearch } from "$lib/support/ticketNumberSearch";
 import { listUnreadTicketIds } from "$lib/server/notifications/notificationRepository";
 import {
   getPermissionScope,
@@ -182,8 +183,10 @@ export const load: PageServerLoad = async ({ parent, url, depends }) => {
   const view = parseView(url.searchParams.get("view"));
   const page = parsePage(url.searchParams.get("page"));
   const status = parseStatus(url.searchParams.get("status"));
+  const search = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
   const includeFinished =
-    url.searchParams.get("finished") === "1"
+    Boolean(parseTicketNumberSearch(search))
+    || url.searchParams.get("finished") === "1"
     || status === "resolved"
     || status === "closed";
   const sort = parseSort(url.searchParams.get("sort"));
@@ -200,7 +203,7 @@ export const load: PageServerLoad = async ({ parent, url, depends }) => {
 
   const filters = {
     scope: parseScope(url.searchParams.get("scope")),
-    search: (url.searchParams.get("q") ?? "").trim().slice(0, 120),
+    search,
     status,
     includeFinished,
     sort,
