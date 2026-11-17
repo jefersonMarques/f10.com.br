@@ -37,8 +37,9 @@ O comando:
 1. Verifica os IDs das ações, os mapeamentos originais e a marca de proteção do portal.
 2. Restaura a visibilidade **somente** das ações públicas ainda indevidamente internas.
 3. Registra a identificação histórica do solicitante somente onde não há uma edição manual prévia.
-4. Complementa os participantes vinculados aos contatos Movidesk e usuários F10 identificados sem ambiguidade.
-5. Registra nomes, e-mails e papéis históricos em evento de auditoria para exibição na área do operador.
+4. Relaciona a organização original do Movidesk ao contato histórico usando o identificador de origem, sem vincular automaticamente contratos F10.
+5. Complementa os participantes vinculados aos contatos Movidesk e usuários F10 identificados sem ambiguidade.
+6. Registra nomes, e-mails e papéis históricos em evento de auditoria para exibição na área do operador.
 
 **Importante:** nenhuma mensagem originalmente interna será exposta. Mensagens originalmente públicas recebem o estado `public`, mantendo `portalAccessApproved=false`. Este comando não libera o histórico no portal, não cria usuários e não vincula contrato/unidade comercial por semelhança de nome.
 
