@@ -21,7 +21,7 @@ node --env-file-if-exists=.env --env-file-if-exists=.env.production \
   scripts/reconcile-movidesk-ticket-history.mjs --ticket 42746
 ```
 
-A prévia deve informar três ações originalmente públicas, duas internas, o cliente histórico, a empresa original e as pessoas envolvidas. Ela também informa quantas mensagens públicas ainda precisam ser restauradas no banco.
+A prévia deve informar três ações originalmente públicas, duas internas, o cliente histórico, a empresa original e as pessoas envolvidas. Para os operadores, os campos `operatorMatches`, `alreadyLinkedOperators`, `readyToLinkOperators` e `unresolvedOperators` distinguem vínculos existentes, vínculos que serão criados e contas sem correspondência exata de e-mail. Candidatos encontrados apenas pelo nome aparecem em `nameCandidates`, sem vínculo automático. Ela também informa quantas mensagens públicas ainda precisam ser restauradas no banco.
 
 `publicMessagesToRestore` pode ser inferior a três se a visibilidade já tiver sido corrigida.
 
