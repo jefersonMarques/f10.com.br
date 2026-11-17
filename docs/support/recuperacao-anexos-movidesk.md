@@ -1,18 +1,20 @@
-# Recover Movidesk ticket attachments
+# Recuperação de anexos históricos do Movidesk
 
-The historical ticket importer stores attachment names in message metadata but does not download the binaries. This script restores files to the existing F10 MinIO storage and associates them with existing ticket messages. It does not import tickets, reassign customers, alter statuses, or change message visibility.
+A importação original registrou as referências dos anexos, mas não transferiu os arquivos binários. O script recupera os arquivos pela API do Movidesk, salva no MinIO atual e associa cada arquivo à mensagem já importada no F10.
 
-## Requirements
+Não recria tickets, mensagens ou clientes. Não altera status, responsáveis nem visibilidade. Não precisa de migração de banco ou alteração de frontend.
 
-- Existing snapshot: /var/lib/f10/movidesk-final-snapshot/tickets.jsonl
-- Project: /opt/f10.com.br
-- Existing PostgreSQL migration 0103 and attachment table from migration 0025
-- Environment variables: DATABASE_URL, ASSET_STORAGE=s3, S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, and MOVIDESK_KB_API_TOKEN or MOVIDESK_API_TOKEN
-- PostgreSQL backup before applying database changes
+## Pré-requisitos
 
-## Ticket 42746: first run
+- Snapshot: `/var/lib/f10/movidesk-final-snapshot/tickets.jsonl`
+- Projeto: `/opt/f10.com.br`
+- Tabelas das migrações 0025 e 0103
+- Variáveis existentes: `DATABASE_URL`, `ASSET_STORAGE=s3`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` e `MOVIDESK_KB_API_TOKEN` ou `MOVIDESK_API_TOKEN`
+- Backup recuperável do PostgreSQL antes da primeira execução com escrita
 
-Run from the project directory after updating the branch:
+## Primeiro teste — ticket 42746
+
+Após disponibilizar a alteração no projeto:
 
 ```bash
 cd /opt/f10.com.br
@@ -23,11 +25,11 @@ node --env-file-if-exists=.env --env-file-if-exists=.env.production \
   scripts/recover-movidesk-ticket-attachments.mjs --ticket 42746 --apply
 ```
 
-The preview reads the snapshot only. It should report 11 attachments belonging to action 1. The apply command downloads using the Movidesk attachment hash, stores the binaries in MinIO, and adds rows to ticket_message_attachments for the original F10 message.
+O primeiro comando apenas lê o snapshot e deve identificar **11 PDFs na ação 1**, sem escrita. O segundo baixa pelo hash do Movidesk, envia ao MinIO e registra os vínculos em `ticket_message_attachments`.
 
-Only run the apply command after checking that the preview matches the desired ticket and a database backup exists. No new migrations are required.
+A execução com `--apply` deve ocorrer apenas após conferir a prévia e o backup.
 
-## Verify ticket 42746
+## Verificação no banco
 
 ```sql
 SELECT
@@ -45,32 +47,34 @@ GROUP BY i.source_ticket_id, a.source_action_id
 ORDER BY a.source_action_id;
 ```
 
-For action 1, expect 11 attachments after a successful recovery. Open the ticket in the operator interface and check that the PDF files open or download.
+Após sucesso, a ação 1 deve ter 11 anexos. Verifique também na interface do operador se todos podem ser abertos ou baixados.
 
-## Follow-up batches
+## Processamento por lotes
 
-Preview the full snapshot without writing:
+Prévia dos primeiros 100 tickets do snapshot:
 
 ```bash
 node scripts/recover-movidesk-ticket-attachments.mjs --all --limit 100
 ```
 
-Run a controlled batch:
+Reprocessamento dos primeiros 100 tickets:
 
 ```bash
 node --env-file-if-exists=.env --env-file-if-exists=.env.production \
   scripts/recover-movidesk-ticket-attachments.mjs --all --limit 100 --apply
 ```
 
-Run the full snapshot once the initial batch has been verified:
+Processamento completo após validação:
 
 ```bash
 node --env-file-if-exists=.env --env-file-if-exists=.env.production \
   scripts/recover-movidesk-ticket-attachments.mjs --all --apply
 ```
 
-The script respects the documented Movidesk limit of 10 requests/minute, follows Retry-After for throttling, and retries temporary failures. A rerun skips attachment records already inserted into the database. Partial failures are reported with state=failed and cause an exit status of 2. The script never includes the API token in its logs.
+O reprocessador respeita o limite de 10 chamadas por minuto do Movidesk e o cabeçalho `Retry-After`. Falhas temporárias são tentadas novamente. Arquivos já registrados são ignorados na próxima execução, permitindo retomada sem duplicação.
 
-Stored keys use the existing F10 convention under support/tickets/{ticketId}/{messageId}/. A small amount of duplicated MinIO storage may occur when a historical source attachment is referenced by different messages; this avoids schema changes and maintains the existing attachment viewer.
+Erros individuais são exibidos com `state=failed`; a execução termina com código 2 se restarem falhas ou ações ausentes. O token não aparece nos logs.
 
-There is a 100 MB per-file memory limit to prevent unbounded downloads. Larger files are reported as failures for subsequent manual handling. The script retains the existing F10 authorization checks when files are served to operators or customers.
+As chaves seguem o padrão atual `support/tickets/{ticketId}/{messageId}/`. Uma mesma origem referenciada em mensagens diferentes pode ocupar mais espaço no MinIO, evitando catálogo adicional e migrações.
+
+O limite é de 100 MB por arquivo para evitar consumo ilimitado de memória. Arquivos maiores serão relatados para tratamento posterior. As rotas existentes continuam controlando acesso aos anexos.
