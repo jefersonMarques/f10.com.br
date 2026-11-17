@@ -64,7 +64,10 @@
     <div class="flex items-start justify-between gap-2">
       <span class="application-text-caption flex items-center gap-1.5 font-bold text-[#EA6D0B]">
         #{ticket.ticketNumber}
-        {#if ticket.channel === "email"}<Mail size={11} aria-label="Recebido por e-mail"/>{/if}
+        {#if ticket.movideskSourceId && ticket.movideskSourceId !== String(ticket.ticketNumber)}
+          <span class="font-medium text-[#737989]">MD #{ticket.movideskSourceId}</span>
+        {/if}
+        {#if ticket.channel === "email"<Mail size={11} aria-label="Recebido por e-mail"/>{/if}
       </span>
       <span class="application-text-caption text-[#7C8290]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
     </div>
