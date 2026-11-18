@@ -609,6 +609,24 @@ async function saveTicketCustomerContext(
     });
 }
 
+async function ensureActiveTicketContracts(
+  tx: SupportTransaction,
+  contractIds: number[],
+): Promise<void> {
+  const unitId = getConfiguredF10UnitId();
+  const values = sql.join(contractIds.map((id) => sql`${id}`), sql`, `);
+  const [result] = await tx.execute(sql`
+    SELECT count(*)::int AS total
+    FROM f10_customer_contracts
+    WHERE unit_id = ${unitId} AND contract_id IN (${values})
+      AND status = 1 AND data_cancelamento IS NULL
+  `) as unknown as Array<{ total: number }>;
+
+  if (Number(result?.total ?? 0) !== contractIds.length) {
+    throw new Error("SUPPORT_CONTRACT_NOT_ACTIVE");
+  }
+}
+
 export async function createManualTicket(
   actorUserId: string,
   permissions: SupportPermissionMap,
@@ -643,6 +661,7 @@ export async function createManualTicket(
   }
 
   const created = await db.transaction(async (tx) => {
+    await ensureActiveTicketContracts(tx, input.contractIds ?? []);
     const customer = await resolveTicketCustomer(tx, input, permissions, actorUserId);
 
     if (input.channel === "email") {
