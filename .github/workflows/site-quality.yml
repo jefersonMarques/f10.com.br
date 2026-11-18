@@ -75,6 +75,8 @@ jobs:
           node --test tests/supportIdentityRelationshipsAudit.test.mjs
           node --check scripts/audit-exact-school-identity-relationships.mjs
           node --test tests/exactSchoolIdentityAudit.test.mjs
+          node --check scripts/inspect-f10-live-identity-keys.mjs
+          node --test tests/f10LiveIdentityKeyInspection.test.mjs
           node --experimental-strip-types --test tests/ticketSchoolContractSelection.test.mjs
           node --test tests/ticketCreateDiagnostics.test.mjs
           node --test tests/ticketNumberMigration.test.mjs
