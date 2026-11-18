@@ -748,8 +748,7 @@ export async function createManualTicket(
 
     transactionStage = "save_workflow_state";
     if (start) {
-      await tx.insert(ticketWorkflowStates).values({
-        ticketId: ticket.id,
+      const workflowState = {
         globalWorkflowId: start.globalWorkflowId,
         globalStageId: start.globalStageId,
         areaId: start.areaId,
@@ -758,7 +757,14 @@ export async function createManualTicket(
         enteredAt: now,
         areaEnteredAt: now,
         updatedAt: now,
-      });
+      };
+
+      await tx.insert(ticketWorkflowStates)
+        .values({ ticketId: ticket.id, ...workflowState })
+        .onConflictDoUpdate({
+          target: ticketWorkflowStates.ticketId,
+          set: workflowState,
+        });
     }
 
     transactionStage = "insert_initial_message";
