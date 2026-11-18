@@ -1,5 +1,6 @@
 const S3_LINK_PATTERN = /https:\/\/s3\.amazonaws\.com\/movidesk-files\/([a-f0-9]{32})(?:\?[^\s<>"'()[\]{}*]*)?/gi;
 const HTML_IMAGE_PATTERN = /<img\b[^>]*>/gi;
+const HTML_LINK_PATTERN = /<a\b[^>]*>/gi;
 
 function sourceHash(url) {
   const match = String(url).match(/^https:\/\/s3\.amazonaws\.com\/movidesk-files\/([a-f0-9]{32})(?:[?#].*)?$/i);
@@ -45,6 +46,22 @@ export function htmlContentImages(html) {
     images.push({ hash, name: alt.slice(0, 180) || null });
   }
   return images;
+}
+
+export function htmlContentLinks(html) {
+  if (typeof html !== "string") return [];
+  const links = [];
+  const seen = new Set();
+
+  for (const [tag] of html.matchAll(HTML_LINK_PATTERN)) {
+    const href = tag.match(/\bhref\s*=\s*["']([^"']*)["']/i)?.[1];
+    const hash = href ? sourceHash(href.replaceAll("&amp;", "&")) : null;
+    if (!hash || seen.has(hash)) continue;
+    seen.add(hash);
+    const name = tag.match(/\btitle\s*=\s*["']([^"']*)["']/i)?.[1];
+    links.push({ hash, name: name?.slice(0, 180) || null });
+  }
+  return links;
 }
 
 export function rewriteStoredLinks(body, attachmentsByHash, ticketId) {
