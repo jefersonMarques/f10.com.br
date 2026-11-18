@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
+  import TicketContractAccessModal from "./TicketContractAccessModal.svelte";
   import {
     Building2, Check, Mail, Plus, Search, ShieldCheck, UserRound,
-    Users, X,
+    Users, X, Settings2,
   } from "lucide-svelte";
 
   export let enabled = false;
@@ -15,6 +16,7 @@
     contractNumber: string | null;
     displayName: string;
     status: string;
+    isActive: boolean;
   };
 
   let customerMode: "existing" | "new" = "existing";
@@ -29,6 +31,7 @@
   let attendeeResults: Contact[] = [];
   let attendees: Contact[] = [];
   let loading = false;
+  let managingContracts = false;
   let error = "";
   let requesterTimer: ReturnType<typeof setTimeout> | null = null;
   let contractTimer: ReturnType<typeof setTimeout> | null = null;
@@ -63,7 +66,7 @@
 
   function scheduleAttendeeSearch(query: string): void {
     if (attendeeTimer) clearTimeout(attendeeTimer);
-    if (query.trim().length < 2) {
+    if (query.trim().length < 2 || selectedContracts.length === 0) {
       attendeeSequence += 1;
       attendeeResults = [];
       return;
@@ -74,8 +77,15 @@
   async function searchContacts(query: string, purpose: "requester" | "attendee"): Promise<void> {
     const sequence = purpose === "requester" ? ++requesterSequence : ++attendeeSequence;
     try {
+      const parameters = new URLSearchParams({
+        purpose,
+        q: query.trim(),
+      });
+      if (purpose === "attendee") {
+        selectedContracts.forEach((contract) => parameters.append("contractId", contract.contractId));
+      }
       const response = await fetch(
-        "/api/app/customers/search?purpose=requester&q=" + encodeURIComponent(query.trim()),
+        "/api/app/customers/search?" + parameters.toString(),
         { cache: "no-store" },
       );
       if (!response.ok) throw new Error("CONTACT_SEARCH_FAILED");
@@ -102,6 +112,10 @@
     selectedContracts = [];
     availableContracts = [];
     attendees = attendees.filter((person) => person.id !== contact.id);
+    await loadContactContracts(contact);
+  }
+
+  async function loadContactContracts(contact: Contact): Promise<void> {
     loading = true;
     error = "";
     try {
@@ -111,15 +125,29 @@
       );
       if (!response.ok) throw new Error("CONTACT_ACCESS_FAILED");
       const data = await response.json() as { contracts: Array<{
-        contractId: string; contractNumber: string | null; name: string; status: string;
+        contractId: string;
+        contractNumber: string | null;
+        name: string;
+        status: string;
+        isActive: boolean;
       }> };
       if (selectedCustomer?.id !== contact.id) return;
+
       availableContracts = data.contracts.map((item) => ({
         contractId: item.contractId,
         contractNumber: item.contractNumber,
         displayName: item.name,
         status: item.status,
+        isActive: item.isActive,
       }));
+      const allowed = new Map(availableContracts.map((contract) => [contract.contractId, contract]));
+      const stillSelected = selectedContracts
+        .map((contract) => allowed.get(contract.contractId))
+        .filter((contract): contract is Contract => Boolean(contract?.isActive));
+      const active = availableContracts.filter((contract) => contract.isActive);
+      selectedContracts = stillSelected.length === 0 && active.length === 1
+        ? active
+        : stillSelected;
     } catch {
       error = "Não foi possível carregar os contratos autorizados.";
     } finally {
@@ -146,17 +174,23 @@
   }
 
   function selectContract(contract: Contract): void {
-    if (selectedContracts.some((item) => item.contractId === contract.contractId) ||
+    if (!contract.isActive || selectedContracts.some((item) => item.contractId === contract.contractId) ||
         selectedContracts.length >= 500) return;
     selectedContracts = [...selectedContracts, contract];
+    attendeeResults = [];
+    attendees = [];
+    attendeeSequence += 1;
   }
 
   function removeContract(id: string): void {
     selectedContracts = selectedContracts.filter((item) => item.contractId !== id);
+    attendeeResults = [];
+    attendees = [];
+    attendeeSequence += 1;
   }
 
   function selectAttendee(contact: Contact): void {
-    if (contact.id === customerContactId ||
+    if (selectedContracts.length === 0 || contact.id === customerContactId ||
         attendees.some((item) => item.id === contact.id) ||
         attendees.length >= 20) return;
     attendees = [...attendees, contact];
@@ -176,6 +210,7 @@
     requesterQuery = "";
     contractQuery = "";
     attendeeQuery = "";
+    managingContracts = false;
     error = "";
   }
 
