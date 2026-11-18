@@ -10,15 +10,15 @@ autorização contratual. A API comercial continua sendo a fonte de contratos.
 
 - O nome visível prioriza apelido da escola na API/perfil ou no cadastro
   comercial reconciliado. Número comercial acompanha o nome.
-- Contrato inativo permanece identificável, mas não pode ser selecionado
-  para **novos** chamados ou concedido pela janela de gerenciamento.
-- Um único contrato ativo já autorizado pode ser pré-selecionado. A
-  pré-seleção não insere permissões no banco.
+- Contrato inativo permanece identificado visualmente e pode ser selecionado
+  para abrir tickets, inclusive suporte pós-cancelamento e regularização.
+- Um único contrato já autorizado pode ser pré-selecionado, independentemente
+  do status. A pré-seleção não insere permissões no banco.
 - Em múltiplos contratos, a seleção é explícita.
 - Pessoas acompanhantes só aparecem na busca se têm acesso a **todos**
   os contratos selecionados. A gravação também valida novamente essa regra.
 - O operador com `customers.manage` no escopo `all` e `tickets.create`
-  pode conceder acesso a um contrato ativo a uma pessoa existente diretamente
+  pode conceder acesso a um contrato existente a uma pessoa diretamente
   no formulário. O POST exige uma confirmação explícita e registra evento
   em `customer_contract_access_events`. O histórico da concessão inclui
   pessoa, contrato, ator e data.
@@ -26,6 +26,12 @@ autorização contratual. A API comercial continua sendo a fonte de contratos.
   pessoa, para não retirar acesso inesperadamente durante a criação.
 - A criação de uma pessoa nova com contrato escolhido registra o mesmo
   evento de concessão.
+
+O status comercial do contrato não é uma regra de bloqueio de atendimento.
+A criação continua exigindo autorização em `customer_contract_access`,
+contrato existente na API e permissão do operador para criar o ticket.
+Apenas operadores administrativos podem conceder novos vínculos; não há
+concessão automática baseada no status do contrato.
 
 ## O que não é concedido automaticamente
 
@@ -57,12 +63,12 @@ node --env-file-if-exists=.env --env-file-if-exists=.env.production \
 ```
 
 Verificar manualmente:
-1. Pessoa com um contrato ativo: pré-seleção correta.
+1. Pessoa com um contrato ativo ou inativo: pré-seleção correta.
 2. Pessoa com dois ou mais: nenhum contrato selecionado sem escolha.
 3. Pessoa sem contrato: gerenciamento administrativo no formulário.
 4. Concessão manual: gravar uma única permissão e um evento.
 5. Acompanhante sem acesso aos contratos selecionados: não aparece na busca.
-6. Contrato inativo: sem concessão e com retorno claro.
+6. Contrato inativo: é selecionável e permite ticket, exibindo seu status.
 7. Usuário sem `customers.manage:all`: não consegue conceder vínculo.
 8. Login do cliente: nenhuma nova concessão automática e nenhum ticket
    histórico indevidamente liberado.
