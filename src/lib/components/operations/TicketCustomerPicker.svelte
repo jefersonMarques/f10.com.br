@@ -30,6 +30,7 @@
   let contractQuery = "";
   let attendeeQuery = "";
   let attendeeResults: Contact[] = [];
+  let attendeeError = "";
   let attendees: Contact[] = [];
   let loading = false;
   let managingContracts = false;
@@ -67,6 +68,7 @@
 
   function scheduleAttendeeSearch(query: string): void {
     if (attendeeTimer) clearTimeout(attendeeTimer);
+    attendeeError = "";
     if (query.trim().length < 2 || selectedContracts.length === 0) {
       attendeeSequence += 1;
       attendeeResults = [];
@@ -89,27 +91,55 @@
         "/api/app/customers/search?" + parameters.toString(),
         { cache: "no-store" },
       );
-      if (!response.ok) throw new Error("CONTACT_SEARCH_FAILED");
+      if (!response.ok) {
+        if (purpose === "attendee") {
+          const failure = await response.json().catch(() => null) as {
+            reference?: unknown;
+          } | null;
+          const reference = typeof failure?.reference === "string" &&
+            /^[A-F0-9]{8}$/.test(failure.reference)
+            ? failure.reference : null;
+          const message = response.status === 401
+            ? "Sessão expirada. Entre novamente para pesquisar acompanhantes."
+            : response.status === 403
+              ? "Sem permissão para pesquisar acompanhantes."
+              : reference
+                ? "Não foi possível pesquisar acompanhantes. Referência: " + reference
+                : "Não foi possível pesquisar acompanhantes.";
+          throw new Error(message);
+        }
+        throw new Error("CONTACT_SEARCH_FAILED");
+      }
       const data = await response.json() as { customers: Contact[] };
       if (purpose === "requester" && sequence === requesterSequence) {
         requesterResults = data.customers;
+        error = "";
       }
       if (purpose === "attendee" && sequence === attendeeSequence) {
         attendeeResults = data.customers;
+        attendeeError = "";
       }
-    } catch {
-      if ((purpose === "requester" && sequence === requesterSequence) ||
-          (purpose === "attendee" && sequence === attendeeSequence)) {
+    } catch (cause) {
+      if (purpose === "requester" && sequence === requesterSequence) {
         error = "Não foi possível pesquisar pessoas.";
+      }
+      if (purpose === "attendee" && sequence === attendeeSequence) {
+        attendeeError = cause instanceof Error
+          ? cause.message : "Não foi possível pesquisar acompanhantes.";
       }
     }
   }
 
   async function selectCustomer(contact: Contact): Promise<void> {
+    requesterSequence += 1;
+    if (requesterTimer) clearTimeout(requesterTimer);
+    error = "";
     selectedCustomer = contact;
     customerContactId = contact.id;
     requesterQuery = "";
     requesterResults = [];
+    attendeeQuery = "";
+    attendeeError = "";
     selectedContracts = [];
     availableContracts = [];
     attendees = attendees.filter((person) => person.id !== contact.id);
@@ -174,6 +204,8 @@
     if (selectedContracts.some((item) => item.contractId === contract.contractId) ||
         selectedContracts.length >= 500) return;
     selectedContracts = [...selectedContracts, contract];
+    attendeeQuery = "";
+    attendeeError = "";
     attendeeResults = [];
     attendees = [];
     attendeeSequence += 1;
@@ -181,6 +213,8 @@
 
   function removeContract(id: string): void {
     selectedContracts = selectedContracts.filter((item) => item.contractId !== id);
+    attendeeQuery = "";
+    attendeeError = "";
     attendeeResults = [];
     attendees = [];
     attendeeSequence += 1;
@@ -192,6 +226,7 @@
         attendees.length >= 20) return;
     attendees = [...attendees, contact];
     attendeeQuery = "";
+    attendeeError = "";
     attendeeResults = [];
   }
 
@@ -207,6 +242,7 @@
     requesterQuery = "";
     contractQuery = "";
     attendeeQuery = "";
+    attendeeError = "";
     managingContracts = false;
     error = "";
   }
@@ -373,6 +409,9 @@
           placeholder={selectedContracts.length === 0 ? "Selecione uma escola primeiro" : "Buscar pessoa autorizada"}
           class="application-text-caption h-10 w-full rounded-lg border border-app-border-control pl-9 pr-3"/>
       </label>
+      {#if attendeeError}
+        <p role="alert" class="application-text-caption text-app-danger-text">{attendeeError}</p>
+      {/if}
       {#if attendeeResults.length > 0}
         <div class="max-h-40 divide-y divide-app-border-soft overflow-y-auto rounded-lg border border-app-border">
           {#each attendeeResults as contact (contact.id)}
