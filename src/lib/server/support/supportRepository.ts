@@ -621,7 +621,7 @@ async function ensureExistingTicketContracts(
   `) as unknown as Array<{ total: number }>;
 
   if (Number(result?.total ?? 0) !== contractIds.length) {
-    throw new Error("SUPPORT_CONTRACT_NOT_ACTIVE");
+    throw new Error("SUPPORT_CONTRACT_NOT_FOUND");
   }
 }
 
