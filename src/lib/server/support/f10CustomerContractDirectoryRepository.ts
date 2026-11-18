@@ -16,17 +16,32 @@ function sourceSystem(unitId: number): string {
   return unitId === 1 ? "f10_sheet" : "f10_sheet_unit_" + unitId;
 }
 
-export async function refreshMissingF10Contracts(unitId: number) {
-  // Concluir toda a paginação da API antes de escrever no banco.
+export async function refreshF10CustomerContracts(unitId: number) {
+  // A paginação deve terminar antes de qualquer alteração no banco.
   const snapshot = await listF10CustomerContractOwners(unitId);
   const db = getDatabase();
-  let created = 0;
+  let imported = 0;
+  let synchronized = 0;
+  let statusChanged = 0;
 
   await db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('f10_customer_contract_refresh'), ${unitId}::integer)`);
+    await tx.execute(sql`
+      SELECT pg_advisory_xact_lock(hashtext('f10_customer_contract_refresh'), ${unitId}::integer)
+    `);
 
     for (let offset = 0; offset < snapshot.contracts.length; offset += IMPORT_CHUNK_SIZE) {
       const batch = snapshot.contracts.slice(offset, offset + IMPORT_CHUNK_SIZE);
+      const previousRows = rowsOf(await tx.execute(sql`
+        SELECT contract_id::text AS "contractId", status,
+          x_status AS "statusLabel", data_cancelamento AS "cancellationDate"
+        FROM f10_customer_contracts
+        WHERE unit_id = ${unitId}
+          AND contract_id IN (${sql.join(batch.map((contract) =>
+            sql`${contract.contractId}`), sql`, `)})
+      `));
+      const previousById = new Map(previousRows.map((row) =>
+        [String(row.contractId), row]));
+
       const values = batch.map((contract) => sql`(
         ${unitId}, ${contract.contractId}, ${contract.contractNumber},
         ${contract.personId}, ${contract.holderId}, ${contract.status},
@@ -36,21 +51,57 @@ export async function refreshMissingF10Contracts(unitId: number) {
         ${contract.cancellationDate}, ${JSON.stringify(contract.sourceRecord)}::jsonb
       )`);
 
-      const inserted = rowsOf(await tx.execute(sql`
+      const saved = rowsOf(await tx.execute(sql`
         INSERT INTO f10_customer_contracts (
           unit_id, contract_id, numero_contrato, pessoa_id, titular_id,
           status, x_status, curso_id, fonte_id, vendedor_id, telemarketing_id,
           matricula, conclusao, data_cancelamento, source_record
         )
         VALUES ${sql.join(values, sql`, `)}
-        ON CONFLICT (unit_id, contract_id) DO NOTHING
-        RETURNING contract_id
+        ON CONFLICT (unit_id, contract_id) DO UPDATE SET
+          numero_contrato = excluded.numero_contrato,
+          pessoa_id = excluded.pessoa_id,
+          titular_id = excluded.titular_id,
+          status = excluded.status,
+          x_status = excluded.x_status,
+          curso_id = excluded.curso_id,
+          fonte_id = excluded.fonte_id,
+          vendedor_id = excluded.vendedor_id,
+          telemarketing_id = excluded.telemarketing_id,
+          matricula = excluded.matricula,
+          conclusao = excluded.conclusao,
+          data_cancelamento = excluded.data_cancelamento,
+          source_record = excluded.source_record,
+          last_seen_at = now()
+        RETURNING contract_id::text AS "contractId"
       `));
-      created += inserted.length;
+
+      if (saved.length !== batch.length) {
+        throw new Error("F10_REFRESH_INCOMPLETE");
+      }
+
+      for (const contract of batch) {
+        const previous = previousById.get(String(contract.contractId));
+        if (!previous) {
+          imported += 1;
+          continue;
+        }
+        synchronized += 1;
+        if (previous.status !== contract.status ||
+            previous.statusLabel !== contract.statusLabel ||
+            previous.cancellationDate !== contract.cancellationDate) {
+          statusChanged += 1;
+        }
+      }
     }
   });
 
-  return { imported: created, foundInApi: snapshot.contractsCount };
+  return {
+    imported,
+    synchronized,
+    statusChanged,
+    foundInApi: snapshot.contractsCount,
+  };
 }
 
 export async function listF10CustomerContractUnits(options: {

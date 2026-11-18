@@ -59,7 +59,7 @@
             <input type="hidden" name="grupo" value={data.groupId}/>
             <input type="hidden" name="situacao" value={data.status}/>
             <button type="submit" disabled={refreshing || !data.apiConfigured}
-              title={!data.apiConfigured ? "Integração F10 não configurada" : "Buscar novos contratos na API F10"}
+              title={!data.apiConfigured ? "Integração F10 não configurada" : "Sincronizar os dados dos contratos com a API F10"}
               class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-app-border-control px-4 font-semibold text-app-text disabled:opacity-40">
               <RefreshCw size={16} class={refreshing ? "animate-spin" : ""}/>
               {refreshing ? "Atualizando..." : "Atualizar"}
@@ -73,9 +73,12 @@
   {#if form && "refreshError" in form && form.refreshError}
     <div role="alert" class="application-text-caption mb-4 rounded-xl border border-app-border bg-app-warning-bg p-3 text-app-warning-text">{form.refreshError}</div>
   {/if}
-  {#if data.refreshedCount !== null}
+  {#if data.refreshedSummary}
     <div role="status" class="application-text-caption mb-4 rounded-xl border border-app-border bg-app-success-bg p-3 text-app-success-text">
-      {data.refreshedCount > 0 ? data.refreshedCount + " novo(s) contrato(s) importado(s) da API." : "Consulta concluída: nenhum novo contrato encontrado na API."}
+      Sincronizados: {data.refreshedSummary.total} contratos ·
+      {data.refreshedSummary.imported} novos ·
+      {data.refreshedSummary.synchronized} existentes ·
+      {data.refreshedSummary.statusChanged} situações alteradas.
     </div>
   {/if}
   {#if data.unitUnavailable}
@@ -188,11 +191,16 @@
                     {/if}
                   </td>
                                     <td class="application-text-caption px-4 py-3 align-top">
-                    <span class={String(unit.commercial_status).toLowerCase() === "ativo"
+                    <span class={unit.is_active
                       ? "application-text-meta inline-flex rounded-full bg-app-success-bg px-2.5 py-1 font-semibold text-app-success-text"
                       : "application-text-meta inline-flex rounded-full bg-app-subtle px-2.5 py-1 text-app-text-muted"}>
-                      {String(unit.commercial_status)}
+                      {unit.is_active ? "Ativo" : "Não ativo"}
                     </span>
+                    {#if unit.commercial_status && String(unit.commercial_status).toLowerCase() !== "ativo"}
+                      <span class="application-text-meta mt-1 block text-app-text-muted">
+                        {String(unit.commercial_status)}
+                      </span>
+                    {/if}
                   </td>
                   <td class="px-4 py-3 text-right align-top">
                     <a href={"/app/customers/contracts/" + String(unit.contract_id)}
