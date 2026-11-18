@@ -48,8 +48,8 @@ export const POST: RequestHandler = async ({ cookies, params, request, url }) =>
     );
     return json({ state }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (cause) {
-    if (cause instanceof Error && cause.message === "SUPPORT_CONTRACT_NOT_ACTIVE") {
-      throw error(409, "Selecione um contrato ativo.");
+    if (cause instanceof Error && cause.message === "SUPPORT_CONTRACT_NOT_FOUND") {
+      throw error(404, "Contrato não encontrado.");
     }
     if (cause instanceof Error && cause.message === "SUPPORT_CONTACT_NOT_FOUND") {
       throw error(404, "Pessoa não encontrada.");
