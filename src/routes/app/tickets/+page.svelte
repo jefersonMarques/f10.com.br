@@ -42,7 +42,7 @@
   let workflowId = areaId
     ? data.workflowBoard.areaWorkflows.find((workflow) => workflow.areaId === areaId)?.id ?? "global"
     : "global";
-  let createOpen = false;
+  let createOpen = form?.action === "create" && form?.success === false;
   let draggingTicketId: string | null = null;
   let moving = false;
   let ticketDetails: TicketDetailsData | null = null;
@@ -547,7 +547,15 @@
 </ApplicationContent>
 
 {#if createOpen}
-  <TicketCreateDialog queues={data.queues} entryPoints={data.entryPoints} canSearchCustomers={data.canSearchCustomers} canSearchF10Contracts={data.canSearchF10Contracts} canManageCustomers={data.canManageCustomers} onClose={() => (createOpen = false)}/>
+  <TicketCreateDialog
+    queues={data.queues}
+    entryPoints={data.entryPoints}
+    canSearchCustomers={data.canSearchCustomers}
+    canSearchF10Contracts={data.canSearchF10Contracts}
+    canManageCustomers={data.canManageCustomers}
+    errorMessage={form?.action === "create" && form?.success === false ? form.message : ""}
+    onClose={() => (createOpen = false)}
+  />
 {/if}
 
 {#if modalOpen && detailsLoading && view !== "split"}

@@ -69,6 +69,8 @@ jobs:
           node --experimental-strip-types --test tests/emailTemplateDesign.test.mjs
           node --experimental-strip-types --test tests/ticketEmailReceipt.test.mjs
           node --check scripts/reconcile-ticket-numbers.mjs
+          node --check scripts/diagnose-ticket-creation.mjs
+          node --test tests/ticketCreateDiagnostics.test.mjs
           node --test tests/ticketNumberMigration.test.mjs
           node --test tests/ticketNumberReconciliationPlan.test.mjs
           node --check scripts/recover-movidesk-ticket-attachments.mjs

@@ -4,6 +4,7 @@ import {
   redirect,
   type Actions,
 } from "@sveltejs/kit";
+import { randomUUID } from "node:crypto";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { parseTicketNumberSearch } from "$lib/support/ticketNumberSearch";
@@ -163,6 +164,62 @@ function actionErrorMessage(cause: unknown): string {
     return messages.TICKET_WORKFLOW_AREA_NOT_COMPLETE;
   }
   return messages[cause.message] ?? "Não foi possível concluir a operação.";
+}
+
+function ticketCreationErrorMessage(cause: unknown, reference: string): string {
+  const code = cause instanceof Error ? cause.message : "";
+  const messages: Record<string, string> = {
+    F10_TICKET_CONTRACT_FORBIDDEN: "O contrato selecionado não está autorizado para esse solicitante.",
+    SUPPORT_TICKET_CONTRACT_REQUIRED: "Selecione ao menos um contrato antes de criar o ticket.",
+    SUPPORT_TICKET_CONTRACT_FORBIDDEN: "O solicitante não tem acesso a todos os contratos escolhidos.",
+    SUPPORT_CONTRACT_NOT_FOUND: "Um dos contratos selecionados não está mais disponível.",
+    SUPPORT_REQUESTER_NOT_FOUND: "O solicitante não está mais disponível. Selecione novamente.",
+    SUPPORT_REQUESTER_ALREADY_EXISTS: "Já existe uma pessoa cadastrada com este e-mail.",
+    SUPPORT_PARTICIPANT_CONTRACT_FORBIDDEN: "Um acompanhante não tem acesso aos contratos selecionados.",
+    QUEUE_NOT_FOUND: "A fila selecionada não está disponível.",
+    TICKET_WORKFLOW_ENTRY_POINT_INVALID: "O processo inicial não está mais disponível. Selecione novamente.",
+    TICKET_WORKFLOW_AREA_ACCESS_DENIED: "Você não tem autorização para iniciar tickets nesse processo.",
+    TICKET_WORKFLOW_AREA_NOT_CONFIGURED: "O processo selecionado não possui fluxo ativo.",
+    TICKET_WORKFLOW_AREA_EMPTY: "O processo selecionado não possui etapa inicial ativa.",
+    CUSTOMER_F10_CONTEXT_REQUIRED: "Selecione um cliente com contexto F10 válido.",
+    CUSTOMER_REQUIRED: "Informe um cliente válido para o atendimento.",
+  };
+  if (messages[code]) return messages[code];
+
+  const errorCode = cause && typeof cause === "object" && "code" in cause
+    ? String(cause.code) : "";
+  const constraint = cause && typeof cause === "object" && "constraint_name" in cause
+    ? String(cause.constraint_name) : "";
+  if (errorCode === "23505" && /tickets.*(number|ticket_number)/i.test(constraint)) {
+    return "Não foi possível criar o ticket devido a um conflito de numeração. Referência: " + reference;
+  }
+  return "Não foi possível criar o ticket. Referência: " + reference;
+}
+
+function logTicketCreationError(cause: unknown, reference: string, input: {
+  customerMode: string;
+  contractCount: number;
+  hasStartStage: boolean;
+  channel: string;
+}): void {
+  const value = cause && typeof cause === "object"
+    ? cause as Record<string, unknown> : {};
+  const message = cause instanceof Error ? cause.message : "";
+  const errorCode = typeof value.code === "string" && /^[0-9A-Z_]{2,20}$/.test(value.code)
+    ? value.code : null;
+  const constraint = typeof value.constraint_name === "string" &&
+    /^[a-zA-Z][a-zA-Z0-9_]{0,100}$/.test(value.constraint_name)
+    ? value.constraint_name : null;
+  const domainCode = /^[A-Z][A-Z0-9_]{2,90}$/.test(message) ? message : null;
+
+  console.error("[ticket.create.failed]", {
+    reference,
+    errorType: cause instanceof Error ? cause.name : typeof cause,
+    errorCode,
+    constraint,
+    domainCode,
+    ...input,
+  });
 }
 
 export const load: PageServerLoad = async ({ parent, url, depends }) => {
@@ -362,14 +419,6 @@ export const actions: Actions = {
       throw redirect(303, `/app/tickets/${ticket.id}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      if (cause instanceof Error && (cause.message.startsWith("F10_TICKET_CONTRACT_") ||
-          cause.message.startsWith("SUPPORT_"))) {
-        return fail(400, {
-          success: false,
-          action: "create",
-          message: "Contrato F10 indisponível ou sem autorização. Selecione novamente.",
-        });
-      }
       if (cause instanceof Error && cause.message === "TICKET_EMAIL_CUSTOMER_EMAIL_REQUIRED") {
         return fail(400, {
           success: false,
@@ -377,7 +426,27 @@ export const actions: Actions = {
           message: "Para usar o canal E-mail, o cliente precisa ter um e-mail válido cadastrado.",
         });
       }
-      return fail(409, { success: false, action: "create", message: actionErrorMessage(cause) });
+
+      const reference = randomUUID().slice(0, 8).toUpperCase();
+      const userMessage = ticketCreationErrorMessage(cause, reference);
+      if (userMessage.includes(reference)) {
+        logTicketCreationError(cause, reference, {
+          customerMode: customer.customerMode,
+          contractCount: customer.contractIds?.length ?? 0,
+          hasStartStage: Boolean(startStageId),
+          channel,
+        });
+      }
+
+      const invalidSelection = cause instanceof Error &&
+        (cause.message.startsWith("F10_TICKET_CONTRACT_") ||
+          cause.message.startsWith("SUPPORT_") ||
+          cause.message.startsWith("CUSTOMER_"));
+      return fail(invalidSelection ? 400 : 409, {
+        success: false,
+        action: "create",
+        message: userMessage,
+      });
     }
   },
 
