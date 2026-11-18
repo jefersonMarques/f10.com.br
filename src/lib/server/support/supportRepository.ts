@@ -382,11 +382,18 @@ async function resolveTicketCustomer(
         SELECT ${createdContact.id}::uuid, c.unit_id, c.contract_id, ${actorUserId}::uuid
         FROM f10_customer_contracts c
         WHERE c.unit_id = ${apiUnitId} AND c.contract_id = ${contractId}
+          AND c.status = 1 AND c.data_cancelamento IS NULL
         RETURNING contract_id
       `);
       if ((inserted as unknown as Array<unknown>).length !== 1) {
-        throw new Error("SUPPORT_CONTRACT_NOT_FOUND");
+        throw new Error("SUPPORT_CONTRACT_NOT_ACTIVE");
       }
+      await tx.execute(sql`
+        INSERT INTO customer_contract_access_events
+          (customer_contact_id, unit_id, contract_id, actor_user_id, event_type, source)
+        VALUES (${createdContact.id}::uuid, ${apiUnitId}, ${contractId},
+          ${actorUserId}::uuid, 'granted', 'ticket_creation')
+      `);
     }
 
     return {
