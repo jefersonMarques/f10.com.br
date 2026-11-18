@@ -31,6 +31,8 @@ export const POST: RequestHandler = async ({ cookies, params, request, url }) =>
     throw error(403, "Gerenciamento de contratos não autorizado.");
   }
   if (!UUID.test(params.customerId ?? "")) throw error(400, "Pessoa inválida.");
+  const origin = request.headers.get("origin");
+  if (origin && origin !== url.origin) throw error(403, "Origem não autorizada.");
 
   const payload: unknown = await request.json().catch(() => null);
   const contractId = payload && typeof payload === "object" &&
