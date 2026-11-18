@@ -36,5 +36,9 @@ test("logs stage and nested database codes but no raw messages", () => {
   assert.match(action, /\[ticket\.create\.failed\]/);
   assert.match(action, /nestedType,/);
   assert.match(action, /nestedCode,/);
-  assert.doesNotMatch(action, /console\.error\(\s*"\[ticket\.create\.failed\]"[\s\S]*?message\s*[,}:]/);
+  const logStart = action.indexOf('console.error("[ticket.create.failed]"');
+  const logEnd = action.indexOf("\n  });", logStart);
+  assert.ok(logStart >= 0 && logEnd > logStart);
+  const loggedFields = action.slice(logStart, logEnd);
+  assert.doesNotMatch(loggedFields, /\b(?:message|stack|sql|customerEmail|subject|body)\b\s*[:,]/);
 });
