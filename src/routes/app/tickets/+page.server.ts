@@ -173,7 +173,6 @@ function ticketCreationErrorMessage(cause: unknown, reference: string): string {
     SUPPORT_TICKET_CONTRACT_REQUIRED: "Selecione ao menos um contrato antes de criar o ticket.",
     SUPPORT_TICKET_CONTRACT_FORBIDDEN: "O solicitante não tem acesso a todos os contratos escolhidos.",
     SUPPORT_CONTRACT_NOT_FOUND: "Um dos contratos selecionados não está mais disponível.",
-    SUPPORT_CONTRACT_NOT_ACTIVE: "A escola selecionada não possui contrato ativo. Escolha outro contrato ou revise o cadastro.",
     SUPPORT_REQUESTER_NOT_FOUND: "O solicitante não está mais disponível. Selecione novamente.",
     SUPPORT_REQUESTER_ALREADY_EXISTS: "Já existe uma pessoa cadastrada com este e-mail.",
     SUPPORT_PARTICIPANT_CONTRACT_FORBIDDEN: "Um acompanhante não tem acesso aos contratos selecionados.",
