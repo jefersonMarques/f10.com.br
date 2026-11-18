@@ -54,7 +54,7 @@
   }
 
   async function grant(contract: Contract): Promise<void> {
-    if (savingId || !contract.isActive || existingIds.includes(contract.contractId)) return;
+    if (savingId || existingIds.includes(contract.contractId)) return;
     savingId = contract.contractId;
     error = "";
     try {
@@ -70,7 +70,7 @@
       await onSaved();
       onClose();
     } catch {
-      error = "Não foi possível vincular. Confirme suas permissões e se o contrato está ativo.";
+      error = "Não foi possível vincular. Confirme suas permissões e tente novamente.";
     } finally {
       savingId = "";
     }
@@ -119,7 +119,7 @@
               {#if !contract.isActive} · Inativo{/if}
             </span>
           </div>
-          <button type="button" disabled={!contract.isActive || savingId !== "" ||
+          <button type="button" disabled={savingId !== "" ||
             existingIds.includes(contract.contractId)}
             aria-label={"Vincular " + contract.displayName}
             on:click={() => void grant(contract)}
