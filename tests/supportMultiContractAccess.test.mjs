@@ -113,3 +113,35 @@ test("manual merges reassign operational tickets and revoke old sessions", () =>
   assert.match(merge, /UPDATE ticket_participants/);
   assert.match(merge, /UPDATE customer_portal_sessions SET revoked_at/);
 });
+
+test("authorized contracts resolve legal-entity names from the F10 holder", () => {
+  const repository = source("src/lib/server/support/customerContractAccessRepository.ts");
+  const accessQuery = repository
+    .split("export async function getContactContractAccess(")[1]
+    ?.split("export async function grantContactContractAccess(")[0];
+
+  assert.ok(accessQuery);
+  assert.match(accessQuery, /LEFT JOIN f10_customer_holder_profiles holder/);
+  assert.match(accessQuery, /holder\.holder_id = c\.titular_id/);
+  assert.match(accessQuery, /regexp_replace\(coalesce\(holder\.document/);
+  assert.match(accessQuery, /THEN nullif\(holder\.name, ''\) END/);
+  assert.match(accessQuery, /profile\.apelido/);
+  assert.match(accessQuery, /school\.school_name/);
+  assert.match(accessQuery, /access\.customer_contact_id/);
+  assert.match(accessQuery, /access\.unit_id/);
+  assert.doesNotMatch(accessQuery, /\bINSERT\b|\bUPDATE\b|\bDELETE\b/);
+});
+
+test("school contract search uses the same corporate-holder fallback", () => {
+  const repository = source("src/lib/server/support/f10TicketContractRepository.ts");
+  const searchQuery = repository
+    .split("export async function searchF10TicketContracts(")[1]
+    ?.split("export type ResolvedF10TicketContract")[0];
+
+  assert.ok(searchQuery);
+  assert.match(searchQuery, /LEFT JOIN f10_customer_holder_profiles api_holder/);
+  assert.match(searchQuery, /api_holder\.holder_id = c\.titular_id/);
+  assert.match(searchQuery, /regexp_replace\(coalesce\(api_holder\.document/);
+  assert.match(searchQuery, /THEN nullif\(api_holder\.name, ''\) END/);
+  assert.match(searchQuery, /Escola não identificada/);
+});

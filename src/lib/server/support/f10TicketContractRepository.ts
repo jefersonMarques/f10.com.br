@@ -27,6 +27,8 @@ export async function searchF10TicketContracts(unitId: number, search: string) {
         nullif(sheet.nickname, ''),
         nullif(c.source_record ->> 'nome_fantasia', ''),
         nullif(sheet.account_name, ''),
+        CASE WHEN length(regexp_replace(coalesce(api_holder.document, ''),
+          '[^0-9]', '', 'g')) = 14 THEN nullif(api_holder.name, '') END,
         nullif(c.source_record ->> 'razao_social', ''),
         'Escola não identificada') AS "displayName",
       coalesce(nullif(person.customer_name, ''), nullif(c.source_record ->> 'nome', '')) AS "personName",

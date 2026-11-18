@@ -76,8 +76,11 @@ export async function getContactContractAccess(contactId: string) {
       c.numero_contrato AS "contractNumber",
       coalesce(nullif(profile.apelido, ''),
         nullif(school.school_name, ''),
+        CASE WHEN length(regexp_replace(coalesce(holder.document, ''),
+          '[^0-9]', '', 'g')) = 14 THEN nullif(holder.name, '') END,
         nullif(c.source_record ->> 'nome_fantasia', ''),
         nullif(c.source_record ->> 'razao_social', ''),
+        nullif(profile.spreadsheet_student_name, ''),
         'Escola não identificada') AS name,
       coalesce(nullif(c.x_status, ''), c.status::text, 'Não informado') AS status,
       (c.status = 1 AND c.data_cancelamento IS NULL) AS "isActive"
@@ -86,6 +89,8 @@ export async function getContactContractAccess(contactId: string) {
       ON c.unit_id = access.unit_id AND c.contract_id = access.contract_id
     LEFT JOIN f10_customer_contract_profiles profile
       ON profile.unit_id = c.unit_id AND profile.contract_id = c.contract_id
+    LEFT JOIN f10_customer_holder_profiles holder
+      ON holder.unit_id = c.unit_id AND holder.holder_id = c.titular_id
     LEFT JOIN LATERAL (
       SELECT coalesce(nullif(u.apelido, ''), nullif(u.name, ''),
         nullif(o.name, '')) AS school_name
