@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import TicketContractAccessModal from "./TicketContractAccessModal.svelte";
+  import { selectAuthorizedSchoolContracts } from "$lib/support/ticketSchoolContractSelection";
   import {
     Building2, Check, Mail, Plus, Search, ShieldCheck, UserRound,
     Users, X, Settings2,
@@ -140,14 +141,10 @@
         status: item.status,
         isActive: item.isActive,
       }));
-      const allowed = new Map(availableContracts.map((contract) => [contract.contractId, contract]));
-      const stillSelected = selectedContracts
-        .map((contract) => allowed.get(contract.contractId))
-        .filter((contract): contract is Contract => Boolean(contract?.isActive));
-      const active = availableContracts.filter((contract) => contract.isActive);
-      selectedContracts = stillSelected.length === 0 && active.length === 1
-        ? active
-        : stillSelected;
+      selectedContracts = selectAuthorizedSchoolContracts(
+        availableContracts,
+        selectedContracts.map((contract) => contract.contractId),
+      );
     } catch {
       error = "Não foi possível carregar os contratos autorizados.";
     } finally {
