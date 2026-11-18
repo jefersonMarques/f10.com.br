@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getSessionUser, SESSION_COOKIE_NAME } from "$lib/server/auth/session";
 import { listCustomerDirectory } from "$lib/server/support/customerDirectoryRepository";
+import { searchAuthorizedTicketAttendees } from "$lib/server/support/ticketAttendeeSearchRepository";
 
 export const GET: RequestHandler = async ({ cookies, url }) => {
   const token = cookies.get(SESSION_COOKIE_NAME);
@@ -31,12 +33,40 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     return json({ customers: [] }, { headers: { "Cache-Control": "no-store" } });
   }
 
+  if (attendeeSearch) {
+    if (!hasPermission(permissions, "customers.view", "all") ||
+        !hasPermission(permissions, "tickets.create")) {
+      return json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+
+    try {
+      const customers = await searchAuthorizedTicketAttendees(query, contractIds);
+      return json(
+        { customers },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    } catch (cause) {
+      const reference = randomUUID().slice(0, 8).toUpperCase();
+      const errorCode = cause && typeof cause === "object" && "code" in cause &&
+        typeof cause.code === "string" && /^[A-Z0-9_]{2,20}$/.test(cause.code)
+        ? cause.code : null;
+      console.error("[ticket.attendees.search.failed]", {
+        reference,
+        errorType: cause instanceof Error ? cause.name : typeof cause,
+        errorCode,
+      });
+      return json(
+        { error: "ATTENDEE_SEARCH_FAILED", reference },
+        { status: 500, headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+  }
+
   const result = await listCustomerDirectory(session.user.id, permissions, {
     query,
     page: 1,
     pageSize: 20,
-    requireF10Context: !attendeeSearch && url.searchParams.get("purpose") !== "requester",
-    contractIds,
+    requireF10Context: url.searchParams.get("purpose") !== "requester",
   });
 
   return json(
