@@ -178,6 +178,14 @@ function inspectLoginUnits(snapshot, unitId, commercialLinks) {
     snapshot.assignments,
     snapshot.access,
   );
+  const contractsByOrganization = new Map();
+  for (const [key, commercialUnits] of commercialLinks.linkedByContract) {
+    for (const unit of commercialUnits) {
+      const keys = contractsByOrganization.get(unit.organization_id) ?? new Set();
+      keys.add(key);
+      contractsByOrganization.set(unit.organization_id, keys);
+    }
+  }
   const counts = {
     loginAccounts: snapshot.logins.length,
     accountsWithoutSessionSnapshot: 0,
@@ -247,16 +255,11 @@ function inspectLoginUnits(snapshot, unitId, commercialLinks) {
             entry.uniqueSchoolNameCandidates += 1;
             increment(counts, "contextsWithUniqueSchoolNameCandidate");
             const relevantOrganization = candidates[0].organizationId;
-            const linkedUnits = snapshot.units.filter((unit) =>
-              unit.organization_id === relevantOrganization);
-            const contracts = new Set();
+            const contracts = contractsByOrganization.get(relevantOrganization) ?? new Set();
             let hasActiveContract = false;
-            for (const unit of linkedUnits) {
-              if (unit.f10_unit_id !== unitId || !unit.f10_contract_id) continue;
-              const key = contractKey(unitId, unit.f10_contract_id);
+            for (const key of contracts) {
               const contract = commercialLinks.contractsByKey.get(key);
               if (!contract) continue;
-              contracts.add(key);
               candidateContractKeys.add(key);
               if (contract.status === 1 && contract.data_cancelamento === null) {
                 hasActiveContract = true;
