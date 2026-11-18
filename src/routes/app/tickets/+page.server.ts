@@ -169,6 +169,7 @@ function actionErrorMessage(cause: unknown): string {
 function ticketCreationErrorMessage(cause: unknown, reference: string): string {
   const code = cause instanceof Error ? cause.message : "";
   const messages: Record<string, string> = {
+    F10_TICKET_CONTRACT_FORBIDDEN: "O contrato selecionado não está autorizado para esse solicitante.",
     SUPPORT_TICKET_CONTRACT_REQUIRED: "Selecione ao menos um contrato antes de criar o ticket.",
     SUPPORT_TICKET_CONTRACT_FORBIDDEN: "O solicitante não tem acesso a todos os contratos escolhidos.",
     SUPPORT_CONTRACT_NOT_FOUND: "Um dos contratos selecionados não está mais disponível.",
@@ -418,14 +419,6 @@ export const actions: Actions = {
       throw redirect(303, `/app/tickets/${ticket.id}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      if (cause instanceof Error && (cause.message.startsWith("F10_TICKET_CONTRACT_") ||
-          cause.message.startsWith("SUPPORT_"))) {
-        return fail(400, {
-          success: false,
-          action: "create",
-          message: ticketCreationErrorMessage(cause, ""),
-        });
-      }
       if (cause instanceof Error && cause.message === "TICKET_EMAIL_CUSTOMER_EMAIL_REQUIRED") {
         return fail(400, {
           success: false,
@@ -433,17 +426,26 @@ export const actions: Actions = {
           message: "Para usar o canal E-mail, o cliente precisa ter um e-mail válido cadastrado.",
         });
       }
+
       const reference = randomUUID().slice(0, 8).toUpperCase();
-      logTicketCreationError(cause, reference, {
-        customerMode: customer.customerMode,
-        contractCount: customer.contractIds?.length ?? 0,
-        hasStartStage: Boolean(startStageId),
-        channel,
-      });
-      return fail(409, {
+      const userMessage = ticketCreationErrorMessage(cause, reference);
+      if (userMessage.includes(reference)) {
+        logTicketCreationError(cause, reference, {
+          customerMode: customer.customerMode,
+          contractCount: customer.contractIds?.length ?? 0,
+          hasStartStage: Boolean(startStageId),
+          channel,
+        });
+      }
+
+      const invalidSelection = cause instanceof Error &&
+        (cause.message.startsWith("F10_TICKET_CONTRACT_") ||
+          cause.message.startsWith("SUPPORT_") ||
+          cause.message.startsWith("CUSTOMER_"));
+      return fail(invalidSelection ? 400 : 409, {
         success: false,
         action: "create",
-        message: ticketCreationErrorMessage(cause, reference),
+        message: userMessage,
       });
     }
   },
