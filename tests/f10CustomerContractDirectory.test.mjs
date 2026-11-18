@@ -22,19 +22,35 @@ test("the customer directory uses the F10 API contract table as the primary sour
   assert.match(repository, /count\(\*\)::int AS total/);
 });
 
-test("refresh adds missing API contracts without overwriting existing data", () => {
+test("refresh updates existing API contracts without overwriting commercial data", () => {
   const repository = source("src/lib/server/support/f10CustomerContractDirectoryRepository.ts");
   const serverRoute = source("src/routes/app/customers/+page.server.ts");
 
-  assert.match(repository, /await listF10CustomerContractOwners\(unitId\)/);
-  assert.match(repository, /pg_advisory_xact_lock/);
-  assert.match(repository, /ON CONFLICT \(unit_id, contract_id\) DO NOTHING/);
-  assert.match(repository, /RETURNING contract_id/);
-  assert.doesNotMatch(repository, /DELETE FROM f10_customer_contracts/);
+  const refresh = repository.split("export async function refreshF10CustomerContracts(")[1]
+    ?.split("export async function listF10CustomerContractUnits(")[0];
+  assert.ok(refresh);
+  assert.match(refresh, /await listF10CustomerContractOwners\(unitId\)/);
+  assert.match(refresh, /pg_advisory_xact_lock/);
+  assert.match(refresh, /ON CONFLICT \(unit_id, contract_id\) DO UPDATE SET/);
+  assert.match(refresh, /status = excluded.status/);
+  assert.match(refresh, /x_status = excluded.x_status/);
+  assert.match(refresh, /pessoa_id = excluded.pessoa_id/);
+  assert.match(refresh, /titular_id = excluded.titular_id/);
+  assert.match(refresh, /data_cancelamento = excluded.data_cancelamento/);
+  assert.match(refresh, /source_record = excluded.source_record/);
+  assert.match(refresh, /last_seen_at = now\(\)/);
+  assert.match(refresh, /statusChanged \+= 1/);
+  assert.match(refresh, /previousById/);
+  assert.match(refresh, /RETURNING contract_id::text/);
+  assert.doesNotMatch(refresh, /DELETE FROM f10_customer_contracts/);
+  assert.doesNotMatch(refresh, /(?:UPDATE|INSERT INTO|DELETE FROM) customer_units/);
+  assert.doesNotMatch(refresh, /(?:UPDATE|INSERT INTO|DELETE FROM) customer_contract_access/);
+  assert.doesNotMatch(refresh, /(?:UPDATE|INSERT INTO|DELETE FROM) f10_customer_contract_profiles/);
 
   assert.match(serverRoute, /requireAppPermission/);
-  assert.match(serverRoute, /hasPermission\(permissions, "customers\.manage", "all"\)/);
-  assert.match(serverRoute, /refreshMissingF10Contracts/);
+  assert.match(serverRoute, /hasPermission\(permissions, "customers.manage", "all"\)/);
+  assert.match(serverRoute, /refreshF10CustomerContracts/);
+  assert.match(serverRoute, /statusChanged/);
   assert.match(serverRoute, /redirect\(303/);
 });
 
@@ -49,4 +65,12 @@ test("the customers list offers refresh and keeps commercial information seconda
   assert.match(route, /"__active__"/);
   assert.match(route, /listF10CustomerContractUnits/);
   assert.doesNotMatch(route, /listImportedCustomerUnits/);
+});
+
+test("the contract status badge follows the canonical numeric status", () => {
+  const page = source("src/routes/app/customers/+page.svelte");
+  assert.match(page, /unit.is_active \? "Ativo" : "Não ativo"/);
+  assert.match(page, /data.refreshedSummary.statusChanged/);
+  assert.match(page, /data.refreshedSummary.synchronized/);
+  assert.doesNotMatch(page, /String\(unit.commercial_status\).toLowerCase\(\) === "ativo"/);
 });
