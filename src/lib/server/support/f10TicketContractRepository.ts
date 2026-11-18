@@ -23,16 +23,18 @@ export async function searchF10TicketContracts(unitId: number, search: string) {
     SELECT
       c.contract_id::text AS "contractId",
       c.numero_contrato AS "contractNumber",
-      coalesce(nullif(api_holder.name, ''),
+      coalesce(nullif(p.apelido, ''),
+        nullif(sheet.nickname, ''),
         nullif(c.source_record ->> 'nome_fantasia', ''),
-        nullif(p.spreadsheet_student_name, ''), nullif(sheet.account_name, ''),
-        nullif(person.customer_name, ''),
-        'Contrato F10 #' || c.contract_id::text) AS "displayName",
+        nullif(sheet.account_name, ''),
+        nullif(c.source_record ->> 'razao_social', ''),
+        'Escola não identificada') AS "displayName",
       coalesce(nullif(person.customer_name, ''), nullif(c.source_record ->> 'nome', '')) AS "personName",
       coalesce(nullif(api_holder.name, ''), nullif(p.spreadsheet_holder_name, ''), nullif(sheet.holder_name, '')) AS "holderName",
       coalesce(nullif(p.apelido, ''), nullif(sheet.nickname, '')) AS "nickname",
       g.name AS "groupName",
-      coalesce(nullif(c.x_status, ''), c.status::text, 'Não informado') AS "status"
+      coalesce(nullif(c.x_status, ''), c.status::text, 'Não informado') AS "status",
+      (c.status = 1 AND c.data_cancelamento IS NULL) AS "isActive"
     FROM f10_customer_contracts c
     LEFT JOIN f10_customer_contract_profiles p
       ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
