@@ -4,6 +4,7 @@ import postgres from "postgres";
 import { putStoredObject } from "./lib/s3-object-storage.mjs";
 import {
   htmlContentImages,
+  htmlContentLinks,
   inlineSourceLinks,
   isImageAttachment,
   rewriteStoredLinks,
@@ -93,7 +94,8 @@ function actionsWithMedia(ticket) {
     .filter((action) =>
       (Array.isArray(action.attachments) && action.attachments.length > 0) ||
       inlineSourceLinks(action.description).length > 0 ||
-      htmlContentImages(action.htmlDescription).length > 0);
+      htmlContentImages(action.htmlDescription).length > 0 ||
+      htmlContentLinks(action.htmlDescription).length > 0);
 }
 
 async function* snapshotRecords(filePath) {
@@ -327,8 +329,9 @@ function sourceFilesFor(action, messages) {
     ...messages.flatMap((message) => inlineSourceLinks(message.body)),
   ];
   const images = htmlContentImages(action.htmlDescription);
+  const htmlLinks = htmlContentLinks(action.htmlDescription);
 
-  for (const source of [...links, ...images]) {
+  for (const source of [...links, ...images, ...htmlLinks]) {
     if (known.has(source.hash)) continue;
     known.add(source.hash);
     files.push({
@@ -337,7 +340,7 @@ function sourceFilesFor(action, messages) {
     });
   }
 
-  return { files, images, links };
+  return { files, images, links, htmlLinks };
 }
 
 async function replaceMessageLinks(db, sourceTicketId, ticketId, actionId,
@@ -447,6 +450,7 @@ async function recoverTicket(db, downloader, record, options, totals) {
         attachments: candidates.files.length,
         inlineLinks: candidates.links.length,
         htmlImages: candidates.images.length,
+        htmlLinks: candidates.htmlLinks.length,
       });
       continue;
     }
