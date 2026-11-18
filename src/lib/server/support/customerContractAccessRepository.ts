@@ -74,20 +74,75 @@ export async function getContactContractAccess(contactId: string) {
   return rows(await getDatabase().execute(sql`
     SELECT access.contract_id::text AS "contractId",
       c.numero_contrato AS "contractNumber",
-      coalesce(nullif(holder.name, ''),
+      coalesce(nullif(profile.apelido, ''),
+        nullif(school.school_name, ''),
         nullif(c.source_record ->> 'nome_fantasia', ''),
         nullif(c.source_record ->> 'razao_social', ''),
-        'Contrato F10 #' || c.contract_id::text) AS name,
-      coalesce(nullif(c.x_status, ''), c.status::text) AS status
+        'Escola não identificada') AS name,
+      coalesce(nullif(c.x_status, ''), c.status::text, 'Não informado') AS status,
+      (c.status = 1 AND c.data_cancelamento IS NULL) AS "isActive"
     FROM customer_contract_access access
     JOIN f10_customer_contracts c
       ON c.unit_id = access.unit_id AND c.contract_id = access.contract_id
-    LEFT JOIN f10_customer_holder_profiles holder
-      ON holder.unit_id = c.unit_id AND holder.holder_id = c.titular_id
+    LEFT JOIN f10_customer_contract_profiles profile
+      ON profile.unit_id = c.unit_id AND profile.contract_id = c.contract_id
+    LEFT JOIN LATERAL (
+      SELECT coalesce(nullif(u.apelido, ''), nullif(u.name, ''),
+        nullif(o.name, '')) AS school_name
+      FROM customer_units u
+      JOIN customer_organizations o ON o.id = u.organization_id
+      WHERE u.source_system = ${unitId === 1 ? "f10_sheet" : "f10_sheet_unit_" + unitId}
+        AND ((u.f10_unit_id = c.unit_id AND u.f10_contract_id = c.contract_id)
+          OR (u.source_id = c.numero_contrato AND c.numero_contrato IS NOT NULL
+            AND (SELECT count(*) FROM f10_customer_contracts matching
+              WHERE matching.unit_id = c.unit_id
+                AND matching.numero_contrato = c.numero_contrato) = 1))
+      ORDER BY CASE WHEN u.f10_unit_id = c.unit_id
+        AND u.f10_contract_id = c.contract_id THEN 0 ELSE 1 END, u.id
+      LIMIT 1
+    ) school ON true
     WHERE access.customer_contact_id = ${contactId}::uuid
       AND access.unit_id = ${unitId}
     ORDER BY name, access.contract_id
   `));
+}
+
+export async function grantContactContractAccess(
+  actorUserId: string,
+  contactId: string,
+  contractId: number,
+): Promise<"granted" | "existing"> {
+  if (!validId(actorUserId) || !validId(contactId) ||
+      !Number.isSafeInteger(contractId) || contractId <= 0) {
+    throw new Error("SUPPORT_CONTRACT_SELECTION_INVALID");
+  }
+
+  const unitId = getConfiguredF10UnitId();
+  return getDatabase().transaction(async (tx) => {
+    await assertContact(tx, contactId);
+    const matches = rows(await tx.execute(sql`SELECT contract_id
+      FROM f10_customer_contracts
+      WHERE unit_id = ${unitId} AND contract_id = ${contractId}
+        AND status = 1 AND data_cancelamento IS NULL`));
+    if (matches.length !== 1) throw new Error("SUPPORT_CONTRACT_NOT_ACTIVE");
+
+    const inserted = rows(await tx.execute(sql`
+      INSERT INTO customer_contract_access
+        (customer_contact_id, unit_id, contract_id, granted_by)
+      VALUES (${contactId}::uuid, ${unitId}, ${contractId}, ${actorUserId}::uuid)
+      ON CONFLICT (customer_contact_id, unit_id, contract_id) DO NOTHING
+      RETURNING contract_id
+    `));
+    if (inserted.length === 0) return "existing";
+
+    await tx.execute(sql`
+      INSERT INTO customer_contract_access_events
+        (customer_contact_id, unit_id, contract_id, actor_user_id, event_type, source)
+      VALUES (${contactId}::uuid, ${unitId}, ${contractId},
+        ${actorUserId}::uuid, 'granted', 'ticket_creation')
+    `);
+    return "granted";
+  });
 }
 
 export async function replaceContactContractAccess(

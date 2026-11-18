@@ -21,7 +21,7 @@
   <div class="relative z-10 max-h-[92vh] w-full max-w-[760px] overflow-y-auto rounded-[22px] bg-white p-5" role="dialog" aria-modal="true" aria-label="Novo ticket">
     <form method="POST" action="?/create" use:enhance={({ formData, cancel }) => {
       if (formData.getAll("contractIds").length === 0) {
-        clientError = "Selecione pelo menos um contrato antes de criar o ticket.";
+        clientError = "Selecione uma escola/contrato. Se não houver opções, use Gerenciar vínculos na seção Escola / contrato.";
         cancel();
         return;
       }
@@ -42,7 +42,7 @@
           {clientError || errorMessage}
         </div>
       {/if}
-      <input name="subject" required maxlength="180" placeholder="Assunto" class="application-text-caption h-10 rounded-xl border border-[#DDE1EA] px-3 sm:col-span-2"/>
+      <label class="sm:col-span-2 space-y-1"><span class="application-text-caption font-semibold text-app-text">Título *</span><input name="subject" required maxlength="180" placeholder="Título do atendimento" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/></label>
       <TicketCustomerPicker enabled={canSearchCustomers} {canSearchF10Contracts} {canManageCustomers}/>
       {#if entryPoints.length > 0}
         <label class="sm:col-span-2">

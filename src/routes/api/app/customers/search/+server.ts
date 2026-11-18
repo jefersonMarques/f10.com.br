@@ -15,6 +15,17 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     return json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
+  const attendeeSearch = url.searchParams.get("purpose") === "attendee";
+  const requestedContractIds = url.searchParams.getAll("contractId");
+  if (attendeeSearch && (requestedContractIds.length === 0 ||
+      requestedContractIds.length > 500 ||
+      requestedContractIds.some((id) => !/^[1-9][0-9]*$/.test(id) ||
+        !Number.isSafeInteger(Number(id))))) {
+    return json({ customers: [] }, { status: 400 });
+  }
+  const contractIds = attendeeSearch
+    ? [...new Set(requestedContractIds.map(Number))]
+    : [];
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
   if (query.length < 2) {
     return json({ customers: [] }, { headers: { "Cache-Control": "no-store" } });
@@ -24,7 +35,8 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     query,
     page: 1,
     pageSize: 20,
-    requireF10Context: url.searchParams.get("purpose") !== "requester",
+    requireF10Context: !attendeeSearch && url.searchParams.get("purpose") !== "requester",
+    contractIds,
   });
 
   return json(

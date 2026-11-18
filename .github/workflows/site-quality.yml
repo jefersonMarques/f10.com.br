@@ -70,6 +70,8 @@ jobs:
           node --experimental-strip-types --test tests/ticketEmailReceipt.test.mjs
           node --check scripts/reconcile-ticket-numbers.mjs
           node --check scripts/diagnose-ticket-creation.mjs
+          node --check scripts/audit-support-school-contract-access.mjs
+          node --experimental-strip-types --test tests/ticketSchoolContractSelection.test.mjs
           node --test tests/ticketCreateDiagnostics.test.mjs
           node --test tests/ticketNumberMigration.test.mjs
           node --test tests/ticketNumberReconciliationPlan.test.mjs
