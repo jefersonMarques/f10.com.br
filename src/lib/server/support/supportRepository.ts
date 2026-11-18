@@ -382,11 +382,10 @@ async function resolveTicketCustomer(
         SELECT ${createdContact.id}::uuid, c.unit_id, c.contract_id, ${actorUserId}::uuid
         FROM f10_customer_contracts c
         WHERE c.unit_id = ${apiUnitId} AND c.contract_id = ${contractId}
-          AND c.status = 1 AND c.data_cancelamento IS NULL
         RETURNING contract_id
       `);
       if ((inserted as unknown as Array<unknown>).length !== 1) {
-        throw new Error("SUPPORT_CONTRACT_NOT_ACTIVE");
+        throw new Error("SUPPORT_CONTRACT_NOT_FOUND");
       }
       await tx.execute(sql`
         INSERT INTO customer_contract_access_events
@@ -609,7 +608,7 @@ async function saveTicketCustomerContext(
     });
 }
 
-async function ensureActiveTicketContracts(
+async function ensureExistingTicketContracts(
   tx: SupportTransaction,
   contractIds: number[],
 ): Promise<void> {
@@ -619,7 +618,6 @@ async function ensureActiveTicketContracts(
     SELECT count(*)::int AS total
     FROM f10_customer_contracts
     WHERE unit_id = ${unitId} AND contract_id IN (${values})
-      AND status = 1 AND data_cancelamento IS NULL
   `) as unknown as Array<{ total: number }>;
 
   if (Number(result?.total ?? 0) !== contractIds.length) {
@@ -686,7 +684,7 @@ export async function createManualTicket(
 
   let transactionStage = "validate_contracts";
   const created = await db.transaction(async (tx) => {
-    await ensureActiveTicketContracts(tx, input.contractIds ?? []);
+    await ensureExistingTicketContracts(tx, input.contractIds ?? []);
     transactionStage = "resolve_customer";
     const customer = await resolveTicketCustomer(tx, input, permissions, actorUserId);
 
