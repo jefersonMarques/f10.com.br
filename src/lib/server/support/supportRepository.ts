@@ -638,7 +638,7 @@ function tagTicketCreationError(cause: unknown, stage: string): void {
 
 async function traceTicketCreationStage<T>(
   stage: string,
-  operation: () => Promise<T>,
+  operation: () => PromiseLike<T>,
 ): Promise<T> {
   try {
     return await operation();
