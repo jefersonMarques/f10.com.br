@@ -171,7 +171,7 @@
   }
 
   function selectContract(contract: Contract): void {
-    if (!contract.isActive || selectedContracts.some((item) => item.contractId === contract.contractId) ||
+    if (selectedContracts.some((item) => item.contractId === contract.contractId) ||
         selectedContracts.length >= 500) return;
     selectedContracts = [...selectedContracts, contract];
     attendeeResults = [];
@@ -320,7 +320,7 @@
         <div class="max-h-44 divide-y divide-app-border-soft overflow-y-auto rounded-lg border border-app-border">
           {#each availableContracts as contract (contract.contractId)}
             <button type="button" on:click={() => selectContract(contract)}
-              disabled={!contract.isActive || selectedContracts.some((item) => item.contractId === contract.contractId)}
+              disabled={selectedContracts.some((item) => item.contractId === contract.contractId)}
               class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-app-subtle disabled:opacity-50">
               <span class="min-w-0">
                 <strong class="application-text-caption block truncate">{contract.displayName}</strong>
@@ -342,7 +342,7 @@
           <p class="application-text-caption font-medium text-app-text">Nenhuma escola autorizada.</p>
           <p class="application-text-meta text-app-text-muted">
             {#if canManageCustomers && canSearchF10Contracts}
-              Use Gerenciar vínculos acima para associar um contrato ativo e continuar.
+              Use Gerenciar vínculos acima para associar um contrato e continuar.
             {:else}
               Solicite a um administrador a vinculação da pessoa a uma escola em Clientes → Pessoas e contatos.
             {/if}

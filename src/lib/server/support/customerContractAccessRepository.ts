@@ -122,9 +122,8 @@ export async function grantContactContractAccess(
     await assertContact(tx, contactId);
     const matches = rows(await tx.execute(sql`SELECT contract_id
       FROM f10_customer_contracts
-      WHERE unit_id = ${unitId} AND contract_id = ${contractId}
-        AND status = 1 AND data_cancelamento IS NULL`));
-    if (matches.length !== 1) throw new Error("SUPPORT_CONTRACT_NOT_ACTIVE");
+      WHERE unit_id = ${unitId} AND contract_id = ${contractId}`));
+    if (matches.length !== 1) throw new Error("SUPPORT_CONTRACT_NOT_FOUND");
 
     const inserted = rows(await tx.execute(sql`
       INSERT INTO customer_contract_access

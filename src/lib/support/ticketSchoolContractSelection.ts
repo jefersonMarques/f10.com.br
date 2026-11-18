@@ -7,10 +7,9 @@ export function selectAuthorizedSchoolContracts<T extends SchoolContractSelectio
   available: T[],
   selectedIds: readonly string[],
 ): T[] {
-  const active = available.filter((contract) => contract.isActive);
   const selected = new Set(selectedIds);
-  const retained = active.filter((contract) => selected.has(contract.contractId));
+  const retained = available.filter((contract) => selected.has(contract.contractId));
 
   if (retained.length > 0) return retained;
-  return active.length === 1 ? active : [];
+  return available.length === 1 ? available : [];
 }
