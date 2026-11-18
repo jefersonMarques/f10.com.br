@@ -42,3 +42,33 @@ test("logs stage and nested database codes but no raw messages", () => {
   const loggedFields = action.slice(logStart, logEnd);
   assert.doesNotMatch(loggedFields, /\b(?:message|stack|sql|customerEmail|subject|body)\b\s*[:,]/);
 });
+
+test("manual ticket workflow state updates the row initialized by the database trigger", () => {
+  const workflowMigration = readFileSync(
+    "migrations/0035_ticket_workflows.sql", "utf8",
+  );
+  const portalMigration = readFileSync(
+    "migrations/0058_portal_workflow_state_trigger.sql", "utf8",
+  );
+
+  assert.match(workflowMigration, /ticket_id uuid PRIMARY KEY/);
+  assert.match(workflowMigration, /AFTER INSERT ON tickets/);
+  assert.match(workflowMigration, /EXECUTE FUNCTION initialize_ticket_workflow_state_after_insert/);
+  assert.match(portalMigration, /IF NEW.channel = 'portal' THEN/);
+
+  const creation = support.split("export async function createManualTicket(")[1]
+    ?.split("export async function linkTicketCustomer(")[0];
+  assert.ok(creation);
+
+  const stateWrite = creation.split('transactionStage = "save_workflow_state"')[1]
+    ?.split('transactionStage = "insert_initial_message"')[0];
+  assert.ok(stateWrite);
+  assert.match(stateWrite, /\.insert\(ticketWorkflowStates\)/);
+  assert.match(stateWrite, /\.onConflictDoUpdate\(/);
+  assert.match(stateWrite, /target: ticketWorkflowStates\.ticketId/);
+  assert.match(stateWrite, /set: workflowState/);
+  assert.match(stateWrite, /globalStageId: start\.globalStageId/);
+  assert.match(stateWrite, /areaId: start\.areaId/);
+  assert.match(stateWrite, /areaWorkflowId: start\.areaWorkflowId/);
+  assert.match(stateWrite, /areaStageId: start\.areaStageId/);
+});
