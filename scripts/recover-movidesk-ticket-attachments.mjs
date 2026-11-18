@@ -210,7 +210,14 @@ class MovideskDownloader {
         }
       } catch (cause) {
         await response.body?.cancel().catch(() => undefined);
-        throw cause;
+        if (cause instanceof Error && cause.message === "ATTACHMENT_TOO_LARGE") {
+          throw cause;
+        }
+        throw new Error(
+          "MOVIDESK_NETWORK_ERROR_" + networkErrorCode(cause) +
+          ":" + networkErrorDetails(cause, this.token),
+          { cause },
+        );
       }
       if (total === 0) throw new Error("ATTACHMENT_INVALID_SIZE");
       const bytes = new Uint8Array(total);
@@ -233,7 +240,9 @@ async function findMessage(db, ticketId, actionId) {
     "m.ticket_id::text AS message_ticket_id, " +
     "m.external_metadata->>'source' AS source_system, " +
     "m.external_metadata->>'sourceTicketId' AS source_ticket_id, " +
-    "m.external_metadata->>'sourceActionId' AS source_action_id " +
+    "m.external_metadata->>'sourceActionId' AS source_action_id, " +
+    "m.external_metadata->>'sourceVisibility' AS source_visibility, " +
+    "m.external_message_id, a.source_visibility AS mapped_visibility " +
     "FROM movidesk_ticket_imports i " +
     "JOIN movidesk_ticket_action_imports a ON a.source_ticket_id = i.source_ticket_id " +
     "JOIN ticket_messages m ON m.id = a.message_id " +
@@ -262,8 +271,8 @@ async function recoverAttachment(db, downloader, message, sourceFile, index) {
 
   const source = await downloader.download(hash);
   const receivedType = source.contentType.split(";")[0].trim().toLowerCase();
-  if (receivedType === "text/html" && extension !== "html") {
-    throw new Error("MOVIDESK_UNEXPECTED_HTML_RESPONSE");
+  if (receivedType === "text/html" || receivedType === "application/json") {
+    throw new Error("MOVIDESK_UNEXPECTED_DOCUMENT_RESPONSE");
   }
   const mimeType = detectedMime(source.bytes) ??
     (receivedType && receivedType !== "application/octet-stream"
@@ -448,9 +457,13 @@ async function recoverTicket(db, downloader, record, options, totals) {
       report({ state: "missing_action", ticketId, actionId });
       continue;
     }
+    const expectedVisibility = Number(action.type) === 2 ? "public" : "internal";
     if (message.source_system !== "movidesk" ||
         message.source_ticket_id !== ticketId ||
-        message.source_action_id !== String(actionId)) {
+        message.source_action_id !== String(actionId) ||
+        message.source_visibility !== expectedVisibility ||
+        message.mapped_visibility !== expectedVisibility ||
+        message.external_message_id !== "movidesk:" + ticketId + ":" + actionId) {
       totals.failed += 1;
       report({
         state: "failed",
@@ -487,6 +500,9 @@ async function recoverTicket(db, downloader, record, options, totals) {
         });
         if (cause instanceof Error && cause.message.startsWith("MOVIDESK_NETWORK_ERROR_")) {
           throw new Error("MOVIDESK_CONNECTION_INTERRUPTED");
+        }
+        if (cause instanceof Error && cause.message.startsWith("ASSET_STORAGE_PUT_")) {
+          throw new Error("MINIO_STORAGE_INTERRUPTED");
         }
       }
     }
