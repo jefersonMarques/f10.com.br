@@ -113,9 +113,11 @@
       const data = await response.json() as { customers: Contact[] };
       if (purpose === "requester" && sequence === requesterSequence) {
         requesterResults = data.customers;
+        error = "";
       }
       if (purpose === "attendee" && sequence === attendeeSequence) {
         attendeeResults = data.customers;
+        attendeeError = "";
       }
     } catch (cause) {
       if (purpose === "requester" && sequence === requesterSequence) {
@@ -129,6 +131,9 @@
   }
 
   async function selectCustomer(contact: Contact): Promise<void> {
+    requesterSequence += 1;
+    if (requesterTimer) clearTimeout(requesterTimer);
+    error = "";
     selectedCustomer = contact;
     customerContactId = contact.id;
     requesterQuery = "";
