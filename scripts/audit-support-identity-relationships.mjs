@@ -28,10 +28,6 @@ function safeReference(contactId) {
     .slice(0, 12);
 }
 
-function isActive(contract) {
-  return Number(contract?.status) === 1 && contract.data_cancelamento === null;
-}
-
 function commercialSource(unitId) {
   return unitId === 1 ? "f10_sheet" : "f10_sheet_unit_" + unitId;
 }
