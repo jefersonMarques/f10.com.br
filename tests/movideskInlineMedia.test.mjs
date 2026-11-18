@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   htmlContentImages,
+  htmlContentLinks,
   inlineSourceLinks,
   rewriteStoredLinks,
   isImageAttachment,
@@ -39,6 +40,11 @@ test("ignores photo avatars but finds embedded images in HTML", () => {
   assert.deepEqual(images, [{ hash: secondHash, name: "exemplo.png" }]);
   assert.equal(isImageAttachment({ mimeType: "image/jpeg" }), true);
   assert.equal(isImageAttachment({ mimeType: "application/pdf" }), false);
+});
+
+test("discovers HTML-only anchored media without exposing signed URLs", () => {
+  const html = '<p><a href="' + link + '" title="relatorio.pdf">Abrir</a></p>';
+  assert.deepEqual(htmlContentLinks(html), [{ hash: firstHash, name: "relatorio.pdf" }]);
 });
 
 test("does not treat untrusted URLs as Movidesk files", () => {
