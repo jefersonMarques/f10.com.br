@@ -9,7 +9,7 @@ import {
 import { listCustomerDirectory } from "$lib/server/support/customerDirectoryRepository";
 import {
   listF10CustomerContractUnits,
-  refreshMissingF10Contracts,
+  refreshF10CustomerContracts,
 } from "$lib/server/support/f10CustomerContractDirectoryRepository";
 
 function parsePage(value: string | null): number {
@@ -74,9 +74,18 @@ export const load: PageServerLoad = async ({ parent, url, setHeaders }) => {
     : null;
 
   const refreshSucceeded = url.searchParams.get("refresh") === "done";
-  const refreshedCount = Number(url.searchParams.get("imported") ?? "");
-  const importedCount = refreshSucceeded && Number.isSafeInteger(refreshedCount) &&
-    refreshedCount >= 0 && refreshedCount <= 50000 ? refreshedCount : null;
+  function refreshCount(name: string): number | null {
+    const value = Number(url.searchParams.get(name));
+    return url.searchParams.has(name) && Number.isSafeInteger(value) &&
+      value >= 0 && value <= 50000 ? value : null;
+  }
+  const imported = refreshCount("imported");
+  const synchronized = refreshCount("synchronized");
+  const statusChanged = refreshCount("statusChanged");
+  const refreshedSummary = refreshSucceeded &&
+    imported !== null && synchronized !== null && statusChanged !== null
+    ? { imported, synchronized, statusChanged, total: imported + synchronized }
+    : null;
 
   return {
     ...directory,
@@ -91,7 +100,7 @@ export const load: PageServerLoad = async ({ parent, url, setHeaders }) => {
     canRefresh: hasPermission(permissions, "customers.manage", "all"),
     apiConfigured: isF10CustomerApiConfigured(),
     unitUnavailable: view === "units" && unitId === null,
-    refreshedCount: importedCount,
+    refreshedSummary,
   };
 };
 
@@ -115,7 +124,7 @@ export const actions: Actions = {
 
     let refreshed;
     try {
-      refreshed = await refreshMissingF10Contracts(getConfiguredF10UnitId());
+      refreshed = await refreshF10CustomerContracts(getConfiguredF10UnitId());
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "";
       const code = /^F10_[A-Z_]+$/.test(message) ? message : "F10_REFRESH_FAILED";
@@ -127,6 +136,8 @@ export const actions: Actions = {
 
     const params = new URLSearchParams({ view: "units", refresh: "done" });
     params.set("imported", String(refreshed.imported));
+    params.set("synchronized", String(refreshed.synchronized));
+    params.set("statusChanged", String(refreshed.statusChanged));
     if (query) params.set("q", query);
     if (groupId) params.set("grupo", groupId);
     if (status) params.set("situacao", status);
