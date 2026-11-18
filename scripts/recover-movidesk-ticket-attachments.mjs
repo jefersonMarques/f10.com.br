@@ -166,7 +166,10 @@ class MovideskDownloader {
 async function findMessage(db, ticketId, actionId) {
   const [row] = await db.unsafe(
     "SELECT i.ticket_id::text AS ticket_id, a.message_id::text AS message_id, " +
-    "m.ticket_id::text AS message_ticket_id " +
+    "m.ticket_id::text AS message_ticket_id, " +
+    "m.external_metadata->>'source' AS source_system, " +
+    "m.external_metadata->>'sourceTicketId' AS source_ticket_id, " +
+    "m.external_metadata->>'sourceActionId' AS source_action_id " +
     "FROM movidesk_ticket_imports i " +
     "JOIN movidesk_ticket_action_imports a ON a.source_ticket_id = i.source_ticket_id " +
     "JOIN ticket_messages m ON m.id = a.message_id " +
@@ -231,28 +234,145 @@ function report(payload) {
   console.log(JSON.stringify(payload));
 }
 
+async function historicalActionMessages(db, sourceTicketId, ticketId, actionId) {
+  return db.unsafe(
+    "SELECT id::text, body, external_metadata FROM ticket_messages " +
+    "WHERE ticket_id = $1::uuid " +
+    "AND external_metadata->>'source' = 'movidesk' " +
+    "AND external_metadata->>'sourceTicketId' = $2 " +
+    "AND external_metadata->>'sourceActionId' = $3",
+    [ticketId, sourceTicketId, String(actionId)],
+  );
+}
+
+function sourceFilesFor(action, messages) {
+  const files = [...(Array.isArray(action.attachments) ? action.attachments : [])];
+  const known = new Set(files.map((file) => String(file?.path ?? "").toUpperCase()));
+  const links = [
+    ...inlineSourceLinks(action.description),
+    ...messages.flatMap((message) => inlineSourceLinks(message.body)),
+  ];
+  const images = htmlContentImages(action.htmlDescription);
+
+  for (const source of [...links, ...images]) {
+    if (known.has(source.hash)) continue;
+    known.add(source.hash);
+    files.push({
+      path: source.hash,
+      fileName: source.name || "movidesk-" + source.hash + ".bin",
+    });
+  }
+
+  return { files, images, links };
+}
+
+async function replaceMessageLinks(db, sourceTicketId, ticketId, actionId,
+  originalMessageId, messages, images, attachmentsByHash) {
+  let rewrittenLinks = 0;
+  let embeddedImages = 0;
+
+  for (const message of messages) {
+    const rewritten = rewriteStoredLinks(message.body, attachmentsByHash, ticketId);
+    const existingImages = Array.isArray(message.external_metadata?.inlineImages)
+      ? message.external_metadata.inlineImages
+      : [];
+    const inlineImages = [...existingImages];
+    const seen = new Set(inlineImages.map((image) => image?.src));
+
+    const links = inlineSourceLinks(message.body);
+    const candidates = [
+      ...links,
+      ...(message.id === originalMessageId ? images : []),
+    ];
+
+    for (const candidate of candidates) {
+      const attachment = attachmentsByHash.get(candidate.hash);
+      if (!attachment || !isImageAttachment(attachment)) continue;
+      const src = "/api/app/tickets/" + ticketId + "/attachments/" + attachment.id;
+      if (seen.has(src)) continue;
+      seen.add(src);
+      inlineImages.push({
+        src,
+        alt: (candidate.name || "Imagem histórica Movidesk").slice(0, 160),
+        external: false,
+      });
+      embeddedImages += 1;
+    }
+
+    if (!rewritten.replaced && inlineImages.length === existingImages.length) continue;
+    const updated = await db.unsafe(
+      "UPDATE ticket_messages SET body = $2, " +
+      "external_metadata = jsonb_set(external_metadata, '{inlineImages}', $3::jsonb, true) " +
+      "WHERE id = $1::uuid AND body = $4 " +
+      "AND external_metadata->>'sourceTicketId' = $5 " +
+      "AND external_metadata->>'sourceActionId' = $6 RETURNING id",
+      [
+        message.id, rewritten.body, JSON.stringify(inlineImages), message.body,
+        sourceTicketId, String(actionId),
+      ],
+    );
+    if (updated.length !== 1) throw new Error("HISTORICAL_MESSAGE_CHANGED_DURING_MEDIA_RECOVERY");
+    rewrittenLinks += rewritten.replaced;
+  }
+
+  return { rewrittenLinks, embeddedImages };
+}
+
+function repeatedActionIds(actions) {
+  const seen = new Set();
+  const repeated = new Set();
+  for (const action of actions) {
+    const id = Number(action.id);
+    if (seen.has(id)) repeated.add(id);
+    seen.add(id);
+  }
+  return repeated;
+}
+
 async function recoverTicket(db, downloader, record, options, totals) {
   const ticketId = String(record.sourceId ?? "");
-  if (ticketId !== String(record.ticket?.id ?? "")) throw new Error("SNAPSHOT_ID_MISMATCH");
+  if (ticketId !== String(record.ticket?.id ?? "")) {
+    throw new Error("SNAPSHOT_ID_MISMATCH");
+  }
 
-  const actions = actionsWithAttachments(record.ticket);
+  const allActions = Array.isArray(record.ticket?.actions)
+    ? record.ticket.actions.filter((action) => action && action.isDeleted !== true)
+    : [];
+  const actions = actionsWithMedia(record.ticket);
   if (!actions.length) return;
   totals.tickets += 1;
+  const duplicated = repeatedActionIds(allActions);
 
   for (const action of actions) {
     const actionId = Number(action.id);
-    if (!Number.isSafeInteger(actionId) || actionId < 1) throw new Error("INVALID_ACTION_ID");
+    if (!Number.isSafeInteger(actionId) || actionId < 1) {
+      totals.failed += 1;
+      report({ state: "failed", ticketId, actionId: null, reason: "INVALID_ACTION_ID" });
+      continue;
+    }
+
+    if (duplicated.has(actionId)) {
+      totals.failed += 1;
+      report({
+        state: "failed",
+        ticketId,
+        actionId,
+        reason: "DUPLICATED_SOURCE_ACTION_REQUIRES_REVIEW",
+      });
+      continue;
+    }
 
     if (!options.apply) {
-      totals.pending += action.attachments.length;
+      const candidates = sourceFilesFor(action, []);
+      totals.pending += candidates.files.length;
+      totals.inlineLinks += candidates.links.length;
       report({
         state: "preview",
         ticketId,
         actionId,
-        attachments: action.attachments.map((file) => ({
-          name: fileNameOf(file),
-          hash: file.path ?? null,
-        })),
+        attachments: candidates.files.length,
+        inlineLinks: candidates.links.length,
+        htmlImages: candidates.images.length,
       });
       continue;
     }
@@ -263,13 +383,33 @@ async function recoverTicket(db, downloader, record, options, totals) {
       report({ state: "missing_action", ticketId, actionId });
       continue;
     }
+    if (message.source_system !== "movidesk" ||
+        message.source_ticket_id !== ticketId ||
+        message.source_action_id !== String(actionId)) {
+      totals.failed += 1;
+      report({
+        state: "failed",
+        ticketId,
+        actionId,
+        reason: "IMPORTED_MESSAGE_METADATA_MISMATCH",
+      });
+      continue;
+    }
 
+    const messages = await historicalActionMessages(db, ticketId, message.ticket_id, actionId);
+    const candidates = sourceFilesFor(action, messages);
+    const attachmentsByHash = new Map();
     let complete = true;
-    for (const [index, file] of action.attachments.entries()) {
+
+    for (const [index, file] of candidates.files.entries()) {
       try {
-        const state = await recoverAttachment(db, downloader, message, file, index);
-        totals[state] += 1;
-        report({ state, ticketId, actionId, name: fileNameOf(file) });
+        const attachment = await recoverAttachment(db, downloader, message, file, index);
+        const hash = String(file?.path ?? "").toUpperCase();
+        if (!attachmentsByHash.has(hash)) {
+          attachmentsByHash.set(hash, attachment);
+        }
+        totals[attachment.state] += 1;
+        report({ state: attachment.state, ticketId, actionId, name: fileNameOf(file) });
       } catch (cause) {
         complete = false;
         totals.failed += 1;
@@ -285,7 +425,27 @@ async function recoverTicket(db, downloader, record, options, totals) {
         }
       }
     }
-    if (complete) await markActionComplete(db, message.message_id, ticketId, actionId);
+
+    try {
+      const converted = await replaceMessageLinks(
+        db, ticketId, message.ticket_id, actionId,
+        message.message_id, messages, candidates.images, attachmentsByHash,
+      );
+      totals.rewrittenLinks += converted.rewrittenLinks;
+      totals.embeddedImages += converted.embeddedImages;
+      if (converted.rewrittenLinks || converted.embeddedImages) {
+        report({ state: "links_updated", ticketId, actionId, ...converted });
+      }
+      if (complete) await markActionComplete(db, message.message_id, ticketId, actionId);
+    } catch (cause) {
+      totals.failed += 1;
+      report({
+        state: "failed",
+        ticketId,
+        actionId,
+        reason: cause instanceof Error ? cause.message : "UNKNOWN_ERROR",
+      });
+    }
   }
 }
 
