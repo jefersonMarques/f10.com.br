@@ -65,6 +65,26 @@ function extensionOf(name) {
   return name.match(/\.([a-z0-9]{1,12})$/i)?.[1].toLowerCase() ?? "bin";
 }
 
+function detectedMime(bytes) {
+  if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 &&
+      bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 &&
+      bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 6 && String.fromCharCode(...bytes.slice(0, 6)).startsWith("GIF8")) {
+    return "image/gif";
+  }
+  if (bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
+      String.fromCharCode(...bytes.slice(8, 12)) === "WEBP") return "image/webp";
+  if (bytes.length >= 5 && String.fromCharCode(...bytes.slice(0, 5)) === "%PDF-") {
+    return "application/pdf";
+  }
+  const beginning = new TextDecoder().decode(bytes.slice(0, 80)).trimStart().toLowerCase();
+  if (beginning.startsWith("<!doctype html") || beginning.startsWith("<html")) {
+    throw new Error("MOVIDESK_UNEXPECTED_HTML_RESPONSE");
+  }
+  return null;
+}
+
 function actionsWithMedia(ticket) {
   return (Array.isArray(ticket?.actions) ? ticket.actions : [])
     .filter((action) => action && action.isDeleted !== true)
@@ -155,8 +175,27 @@ class MovideskDownloader {
         await response.body?.cancel();
         throw new Error("ATTACHMENT_TOO_LARGE");
       }
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (!bytes.length || bytes.length > MAX_FILE_BYTES) throw new Error("ATTACHMENT_INVALID_SIZE");
+      const chunks = [];
+      let total = 0;
+      try {
+        for await (const chunk of response.body ?? []) {
+          total += chunk.byteLength;
+          if (total > MAX_FILE_BYTES) {
+            throw new Error("ATTACHMENT_TOO_LARGE");
+          }
+          chunks.push(chunk);
+        }
+      } catch (cause) {
+        await response.body?.cancel().catch(() => undefined);
+        throw cause;
+      }
+      if (total === 0) throw new Error("ATTACHMENT_INVALID_SIZE");
+      const bytes = new Uint8Array(total);
+      let position = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, position);
+        position += chunk.byteLength;
+      }
       return { bytes, contentType: response.headers.get("content-type") ?? "" };
     }
     throw new Error("MOVIDESK_RETRIES_EXHAUSTED");
@@ -201,9 +240,10 @@ async function recoverAttachment(db, downloader, message, sourceFile, index) {
   if (receivedType === "text/html" && extension !== "html") {
     throw new Error("MOVIDESK_UNEXPECTED_HTML_RESPONSE");
   }
-  const mimeType = receivedType && receivedType !== "application/octet-stream"
-    ? receivedType
-    : MIME_BY_EXTENSION[extension] ?? "application/octet-stream";
+  const mimeType = detectedMime(source.bytes) ??
+    (receivedType && receivedType !== "application/octet-stream"
+      ? receivedType
+      : MIME_BY_EXTENSION[extension] ?? "application/octet-stream");
   const stored = await putStoredObject(key, source.bytes, mimeType);
 
   const [inserted] = await db.unsafe(
@@ -451,7 +491,17 @@ async function recoverTicket(db, downloader, record, options, totals) {
 
 async function main() {
   const options = parseOptions(process.argv.slice(2));
-  const totals = { tickets: 0, pending: 0, stored: 0, existing: 0, failed: 0, missingActions: 0 };
+  const totals = {
+    tickets: 0,
+    pending: 0,
+    stored: 0,
+    existing: 0,
+    failed: 0,
+    missingActions: 0,
+    inlineLinks: 0,
+    rewrittenLinks: 0,
+    embeddedImages: 0,
+  };
   const token = (process.env.MOVIDESK_KB_API_TOKEN || process.env.MOVIDESK_API_TOKEN || "")
     .trim().replace(/^Bearer\s+/i, "");
 
@@ -465,18 +515,30 @@ async function main() {
   const downloader = options.apply ? new MovideskDownloader(token) : null;
   let processed = 0;
   let matched = false;
+  let position = 0;
 
   try {
     for await (const record of snapshotRecords(options.directory + "/tickets.jsonl")) {
+      const snapshotIndex = position;
+      position += 1;
+      if (options.ticket === null && snapshotIndex < options.offset) continue;
       if (options.ticket !== null && String(record.sourceId) !== options.ticket) continue;
       matched = true;
       await recoverTicket(db, downloader, record, options, totals);
       processed += 1;
       if (options.ticket !== null || (options.limit !== null && processed >= options.limit)) break;
-      if (processed % 100 === 0) report({ state: "progress", processed, ...totals });
+      if (processed % 100 === 0) {
+        report({ state: "progress", processed, nextOffset: position, ...totals });
+      }
     }
     if (!matched) throw new Error("SOURCE_TICKET_NOT_FOUND");
-    report({ state: options.apply ? "completed" : "validated", processed, ...totals });
+    report({
+      state: options.apply ? "completed" : "validated",
+      offset: options.offset,
+      processed,
+      nextOffset: position,
+      ...totals,
+    });
     if (totals.failed || totals.missingActions) process.exitCode = 2;
   } finally {
     if (db) await db.end({ timeout: 5 });
