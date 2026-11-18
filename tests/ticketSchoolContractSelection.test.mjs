@@ -84,15 +84,38 @@ test("inactive contracts remain selectable in the operator form", () => {
   assert.doesNotMatch(modal, /disabled=\{!contract.isActive|if \(!contract.isActive/);
 });
 
-test("attendee lookup requires selected contract authorization", () => {
+test("attendee lookup checks every selected contract using a dedicated query", () => {
   const route = readFileSync("src/routes/api/app/customers/search/+server.ts", "utf8");
-  const directory = readFileSync("src/lib/server/support/customerDirectoryRepository.ts", "utf8");
-  assert.match(route, /attendeeSearch/);
+  const repository = readFileSync(
+    "src/lib/server/support/ticketAttendeeSearchRepository.ts", "utf8",
+  );
   assert.match(route, /getAll\("contractId"\)/);
-  assert.match(directory, /contractAccessCondition/);
-  assert.match(directory, /NOT EXISTS \(/);
+  assert.match(route, /searchAuthorizedTicketAttendees\(query, contractIds\)/);
+  assert.match(route, /hasPermission\(permissions, "customers.view", "all"\)/);
+  assert.match(route, /hasPermission\(permissions, "tickets.create"\)/);
+  assert.match(repository, /customer_contract_access access/);
+  assert.match(repository, /access.customer_contact_id/);
+  assert.match(repository, /access.unit_id/);
+  assert.match(repository, /access.contract_id IN/);
+  assert.match(repository, /uniqueIds.length/);
+  assert.match(repository, /customer_contact_merges/);
+  assert.match(repository, /eq\(customerContacts.active, true\)/);
+  assert.match(repository, /\.limit\(20\)/);
+  assert.doesNotMatch(repository, /unnest\(/);
 });
 
+test("attendee lookup failures have a safe reference and clear from the form", () => {
+  const route = readFileSync("src/routes/api/app/customers/search/+server.ts", "utf8");
+  const picker = readFileSync(
+    "src/lib/components/operations/TicketCustomerPicker.svelte", "utf8",
+  );
+  assert.match(route, /\[ticket.attendees.search.failed\]/);
+  assert.match(route, /randomUUID\(\).slice\(0, 8\).toUpperCase\(\)/);
+  assert.match(route, /ATTENDEE_SEARCH_FAILED/);
+  assert.match(picker, /let attendeeError = ""/);
+  assert.match(picker, /attendeeError = ""/);
+  assert.match(picker, /role="alert".*\{attendeeError\}/);
+});
 test("school audit is strictly read-only", () => {
   const script = readFileSync("scripts/audit-support-school-contract-access.mjs", "utf8");
   assert.match(script, /SET TRANSACTION READ ONLY/);
