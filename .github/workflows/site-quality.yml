@@ -71,6 +71,8 @@ jobs:
           node --check scripts/reconcile-ticket-numbers.mjs
           node --check scripts/diagnose-ticket-creation.mjs
           node --check scripts/audit-support-school-contract-access.mjs
+          node --check scripts/audit-support-identity-relationships.mjs
+          node --test tests/supportIdentityRelationshipsAudit.test.mjs
           node --experimental-strip-types --test tests/ticketSchoolContractSelection.test.mjs
           node --test tests/ticketCreateDiagnostics.test.mjs
           node --test tests/ticketNumberMigration.test.mjs
