@@ -627,6 +627,27 @@ async function ensureActiveTicketContracts(
   }
 }
 
+function tagTicketCreationError(cause: unknown, stage: string): void {
+  if (cause && typeof cause === "object" && Object.isExtensible(cause)) {
+    Object.defineProperty(cause, "ticketCreationStage", {
+      value: stage,
+      configurable: true,
+    });
+  }
+}
+
+async function traceTicketCreationStage<T>(
+  stage: string,
+  operation: () => PromiseLike<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (cause) {
+    tagTicketCreationError(cause, stage);
+    throw cause;
+  }
+}
+
 export async function createManualTicket(
   actorUserId: string,
   permissions: SupportPermissionMap,
@@ -641,29 +662,35 @@ export async function createManualTicket(
   }
 
   const db = getDatabase();
-  const [queue] = await db
+  const [queue] = await traceTicketCreationStage("validate_queue", () => db
     .select({ id: supportQueues.id })
     .from(supportQueues)
     .where(and(eq(supportQueues.id, input.queueId), eq(supportQueues.active, true)))
-    .limit(1);
+    .limit(1));
   if (!queue) throw new Error("QUEUE_NOT_FOUND");
 
   const now = new Date();
-  const sla = await calculateTicketSlaDeadlines(queue.id, now);
+  const sla = await traceTicketCreationStage("calculate_sla",
+    () => calculateTicketSlaDeadlines(queue.id, now));
   const start = input.startStageId
-    ? await resolveManualTicketStart(input.startStageId)
+    ? await traceTicketCreationStage("resolve_start_stage",
+      () => resolveManualTicketStart(input.startStageId!))
     : null;
   if (start) {
-    const areaRestriction = await getUserTicketAreaRestriction(actorUserId);
+    const areaRestriction = await traceTicketCreationStage("validate_area_access",
+      () => getUserTicketAreaRestriction(actorUserId));
     if (areaRestriction !== null && !areaRestriction.includes(start.areaId)) {
       throw new Error("TICKET_WORKFLOW_AREA_ACCESS_DENIED");
     }
   }
 
+  let transactionStage = "validate_contracts";
   const created = await db.transaction(async (tx) => {
     await ensureActiveTicketContracts(tx, input.contractIds ?? []);
+    transactionStage = "resolve_customer";
     const customer = await resolveTicketCustomer(tx, input, permissions, actorUserId);
 
+    transactionStage = "validate_email";
     if (input.channel === "email") {
       const [contact] = await tx
         .select({ email: customerContacts.email })
@@ -676,6 +703,7 @@ export async function createManualTicket(
       }
     }
 
+    transactionStage = "insert_ticket";
     const [ticket] = await tx
       .insert(tickets)
       .values({
@@ -696,18 +724,22 @@ export async function createManualTicket(
 
     if (!ticket) throw new Error("TICKET_NOT_CREATED");
 
+    transactionStage = "save_customer_context";
     await saveTicketCustomerContext(tx, ticket.id, customer);
 
     if (input.contractIds?.length) {
+      transactionStage = "save_contract_links";
       await saveTicketContracts(
         tx, ticket.id, customer.contactId, actorUserId, input.contractIds,
       );
+      transactionStage = "save_participants";
       await addInitialTicketParticipants(
         tx, ticket.id, customer.contactId, actorUserId,
         input.participantIds ?? [], input.contractIds,
       );
     }
 
+    transactionStage = "save_f10_link";
     if (customer.f10Contract && !input.contractIds?.length) {
       await tx.execute(sql`
         INSERT INTO ticket_f10_contract_links (ticket_id, unit_id, contract_id)
@@ -716,6 +748,7 @@ export async function createManualTicket(
       `);
     }
 
+    transactionStage = "save_workflow_state";
     if (start) {
       await tx.insert(ticketWorkflowStates).values({
         ticketId: ticket.id,
@@ -730,6 +763,7 @@ export async function createManualTicket(
       });
     }
 
+    transactionStage = "insert_initial_message";
     await tx.insert(ticketMessages).values({
       ticketId: ticket.id,
       authorType: "user",
@@ -740,6 +774,7 @@ export async function createManualTicket(
       body: input.message.trim(),
     });
 
+    transactionStage = "insert_ticket_event";
     await tx.insert(ticketEvents).values({
       ticketId: ticket.id,
       actorUserId,
@@ -760,6 +795,9 @@ export async function createManualTicket(
     });
 
     return { ...ticket, customerContactId: customer.contactId, unitName: customer.unitName };
+  }).catch((cause: unknown) => {
+    tagTicketCreationError(cause, transactionStage);
+    throw cause;
   });
 
   const { customerContactId, unitName, ...ticket } = created;

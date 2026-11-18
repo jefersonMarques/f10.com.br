@@ -212,13 +212,25 @@ function logTicketCreationError(cause: unknown, reference: string, input: {
     /^[a-zA-Z][a-zA-Z0-9_]{0,100}$/.test(value.constraint_name)
     ? value.constraint_name : null;
   const domainCode = /^[A-Z][A-Z0-9_]{2,90}$/.test(message) ? message : null;
+  const rawStage = value.ticketCreationStage;
+  const stage = typeof rawStage === "string" && /^[a-z][a-z_]{1,40}$/.test(rawStage)
+    ? rawStage : "unknown";
+  const nestedCause = value.cause && typeof value.cause === "object"
+    ? value.cause as Record<string, unknown> : {};
+  const nestedCode = typeof nestedCause.code === "string" &&
+    /^[0-9A-Z_]{2,20}$/.test(nestedCause.code)
+    ? nestedCause.code : null;
+  const nestedType = nestedCause instanceof Error ? nestedCause.name : null;
 
   console.error("[ticket.create.failed]", {
     reference,
+    stage,
     errorType: cause instanceof Error ? cause.name : typeof cause,
     errorCode,
     constraint,
     domainCode,
+    nestedType,
+    nestedCode,
     ...input,
   });
 }

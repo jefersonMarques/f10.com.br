@@ -79,6 +79,7 @@ jobs:
           node --test tests/f10LiveIdentityKeyInspection.test.mjs
           node --experimental-strip-types --test tests/ticketSchoolContractSelection.test.mjs
           node --test tests/ticketCreateDiagnostics.test.mjs
+          node --test tests/ticketCreationStageDiagnostics.test.mjs
           node --test tests/ticketNumberMigration.test.mjs
           node --test tests/ticketNumberReconciliationPlan.test.mjs
           node --check scripts/recover-movidesk-ticket-attachments.mjs
