@@ -14,7 +14,6 @@ import {
   type PermissionScope,
 } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
-import { getConfiguredF10UnitId } from "$lib/server/integrations/f10/f10CustomerApi";
 import { customerActivityEvents, ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { users } from "$lib/server/db/schema";
@@ -104,7 +103,7 @@ function combineConditions(...conditions: Array<SQL | undefined>): SQL | undefin
 export async function listCustomerDirectory(
   actorUserId: string,
   permissions: CustomerDirectoryPermissionMap,
-  options: { query?: string; page?: number; pageSize?: number; requireF10Context?: boolean; contractIds?: number[] } = {},
+  options: { query?: string; page?: number; pageSize?: number; requireF10Context?: boolean } = {},
 ) {
   const scope = requireCustomerScope(permissions, "customers.view");
   const accessCondition = await buildCustomerAccessCondition(actorUserId, scope);
@@ -139,25 +138,12 @@ export async function listCustomerDirectory(
           ),
       )
     : undefined;
-  const contractIds = options.contractIds ?? [];
-  const unitId = contractIds.length > 0 ? getConfiguredF10UnitId() : null;
-  const contractAccessCondition = unitId !== null
-    ? sql`NOT EXISTS (
-        SELECT 1 FROM unnest(${contractIds}::bigint[]) contract(contract_id)
-        WHERE NOT EXISTS (
-          SELECT 1 FROM customer_contract_access access
-          WHERE access.customer_contact_id = ${customerContacts.id}
-            AND access.unit_id = ${unitId}
-            AND access.contract_id = contract.contract_id
-        )
-      )`
-    : undefined;
   const notMerged = sql`NOT EXISTS (
     SELECT 1 FROM customer_contact_merges merged
     WHERE merged.source_contact_id = ${customerContacts.id}
   )`;
   const whereCondition = combineConditions(
-    accessCondition, searchCondition, f10ContextCondition, contractAccessCondition, notMerged,
+    accessCondition, searchCondition, f10ContextCondition, notMerged,
   );
   const db = getDatabase();
 
