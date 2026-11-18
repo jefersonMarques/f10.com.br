@@ -71,6 +71,8 @@ jobs:
           node --check scripts/reconcile-ticket-numbers.mjs
           node --test tests/ticketNumberMigration.test.mjs
           node --test tests/ticketNumberReconciliationPlan.test.mjs
+          node --check scripts/recover-movidesk-ticket-attachments.mjs
+          node --test tests/movideskInlineMedia.test.mjs
           node --test tests/movideskFinalSnapshot.test.mjs
           node --experimental-strip-types --test tests/supportChatRestore.test.mjs
           node --test tests/publicChatUnifiedExperience.test.mjs
