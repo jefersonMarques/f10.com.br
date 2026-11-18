@@ -13,6 +13,8 @@ const SNAPSHOT_DIRECTORY = "/var/lib/f10/movidesk-final-snapshot";
 const DOWNLOAD_ENDPOINT = "https://api.movidesk.com/public/v1/storage/download";
 const REQUEST_INTERVAL_MS = 6100;
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_CACHE_BYTES = 64 * 1024 * 1024;
+const MAX_CACHED_FILE_BYTES = 8 * 1024 * 1024;
 
 const MIME_BY_EXTENSION = {
   pdf: "application/pdf",
@@ -131,9 +133,30 @@ class MovideskDownloader {
   constructor(token) {
     this.token = token;
     this.nextRequestAt = 0;
+    this.cache = new Map();
+    this.cachedBytes = 0;
+  }
+
+  remember(hash, file) {
+    if (file.bytes.byteLength > MAX_CACHED_FILE_BYTES) return;
+    while (this.cachedBytes + file.bytes.byteLength > MAX_CACHE_BYTES) {
+      const oldest = this.cache.keys().next().value;
+      if (!oldest) break;
+      this.cachedBytes -= this.cache.get(oldest).bytes.byteLength;
+      this.cache.delete(oldest);
+    }
+    this.cache.set(hash, file);
+    this.cachedBytes += file.bytes.byteLength;
   }
 
   async download(hash) {
+    const cached = this.cache.get(hash);
+    if (cached) {
+      this.cache.delete(hash);
+      this.cache.set(hash, cached);
+      return cached;
+    }
+
     const url = new URL(DOWNLOAD_ENDPOINT);
     url.searchParams.set("token", this.token);
     url.searchParams.set("id", hash);
@@ -196,7 +219,9 @@ class MovideskDownloader {
         bytes.set(chunk, position);
         position += chunk.byteLength;
       }
-      return { bytes, contentType: response.headers.get("content-type") ?? "" };
+      const file = { bytes, contentType: response.headers.get("content-type") ?? "" };
+      this.remember(hash, file);
+      return file;
     }
     throw new Error("MOVIDESK_RETRIES_EXHAUSTED");
   }
