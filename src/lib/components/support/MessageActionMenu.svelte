@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { Ellipsis, ListTodo } from "lucide-svelte";
 
   type MessageReactionCode = "like" | "heart" | "check" | "eyes";
@@ -92,7 +92,9 @@
     if (!menuOpen) removeMenuListeners();
   }
 
-  onDestroy(() => closeMenu());
+  onMount(() => {
+    return () => closeMenu();
+  });
 </script>
 
 <div class="pointer-events-none absolute -top-3 right-1.5 z-30 flex max-w-full items-start gap-1">
