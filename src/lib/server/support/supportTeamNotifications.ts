@@ -5,7 +5,6 @@ import { webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { sendDevicePushAlerts } from "$lib/server/notifications/devicePush";
 import { teamMembers, users } from "$lib/server/db/schema";
-import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { canAccessTicket } from "$lib/server/support/supportAccess";
 import { autoAssignChatIfConfigured } from "$lib/server/support/supportChatRoutingRepository";
@@ -117,13 +116,9 @@ export async function notifySupportTicketNeedsAttention(
       subject: tickets.subject,
       channel: tickets.channel,
       assignedUserId: tickets.assignedUserId,
-      queueTeamId: supportQueues.teamId,
-      areaTeamId: ticketAreas.teamId,
     })
     .from(tickets)
     .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
-    .leftJoin(ticketWorkflowStates, eq(ticketWorkflowStates.ticketId, tickets.id))
-    .leftJoin(ticketAreas, eq(ticketAreas.id, ticketWorkflowStates.areaId))
     .where(eq(tickets.id, ticketId))
     .limit(1);
 
@@ -146,21 +141,9 @@ export async function notifySupportTicketNeedsAttention(
     }
   }
 
-  const teamId = ticket.areaTeamId ?? ticket.queueTeamId;
-  let recipientIds: string[] = [];
-  if (ticket.assignedUserId) {
-    recipientIds = [ticket.assignedUserId];
-  } else if (teamId) {
-    const members = await db
-      .select({ userId: teamMembers.userId })
-      .from(teamMembers)
-      .innerJoin(users, eq(users.id, teamMembers.userId))
-      .where(and(eq(teamMembers.teamId, teamId), eq(users.status, "active")));
-    recipientIds = Array.from(new Set(members.map((member) => member.userId)));
-  } else if (ticket.channel === "email") {
-    const responders = await listEligibleTicketResponders();
-    recipientIds = responders.map((responder) => responder.id);
-  }
+  const recipientIds = ticket.assignedUserId
+    ? [ticket.assignedUserId]
+    : (await listEligibleTicketResponders()).map((responder) => responder.id);
 
   if (recipientIds.length === 0) return;
 
@@ -177,8 +160,12 @@ export async function notifySupportTicketNeedsAttention(
     const accessResults = await Promise.all(
       recipientIds.map(async (userId) => {
         const permissions = await resolveUserPermissions(userId);
-        const scope = getPermissionScope(permissions, "tickets.view");
-        return scope ? canAccessTicket(userId, scope, ticketId) : false;
+        const viewScope = getPermissionScope(permissions, "tickets.view");
+        if (!viewScope || !await canAccessTicket(userId, viewScope, ticketId)) return false;
+
+        if (ticket.assignedUserId) return true;
+        const replyScope = getPermissionScope(permissions, "tickets.reply");
+        return replyScope ? canAccessTicket(userId, replyScope, ticketId) : false;
       }),
     );
     recipientIds = recipientIds.filter((userId, index) => accessResults[index]);

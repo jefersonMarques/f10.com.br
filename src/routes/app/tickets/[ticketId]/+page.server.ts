@@ -30,6 +30,7 @@ import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
   addTicketMessage,
   assignTicket,
+  claimTicket,
   getSupportTicket,
   linkTicketCustomer,
   listSupportAgents,
@@ -736,6 +737,41 @@ export const actions: Actions = {
         success: false,
         action: "dueOn",
         message: "Não foi possível alterar a conclusão planejada deste ticket.",
+      });
+    }
+  },
+
+
+  claimTicket: async ({ cookies, params }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "claimTicket", message: "Ticket não encontrado." });
+    }
+
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+
+    try {
+      await claimTicket(session.user.id, permissions, params.ticketId);
+      await markTicketChatHumanTakeover(
+        params.ticketId,
+        session.user.id,
+        "Ticket assumido por um atendente humano.",
+      );
+      return { success: true, action: "claimTicket", message: "Ticket atribuído a você." };
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      const conflictMessages: Record<string, string> = {
+        TICKET_ALREADY_ASSIGNED: "Este ticket já foi assumido por outro operador.",
+        TICKET_CLAIM_NOT_AVAILABLE: "Este ticket não está disponível para atendimento.",
+      };
+      const message = conflictMessages[code];
+      return fail(message ? 409 : 403, {
+        success: false,
+        action: "claimTicket",
+        message: message ?? "Não foi possível assumir este ticket.",
       });
     }
   },

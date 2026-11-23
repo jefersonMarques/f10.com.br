@@ -6,6 +6,8 @@ import {
   eq,
   inArray,
   isNotNull,
+  isNull,
+  notInArray,
   or,
   sql,
 } from "drizzle-orm";
@@ -707,7 +709,7 @@ export async function createManualTicket(
       .values({
         customerContactId: customer.contactId,
         queueId: queue.id,
-        assignedUserId: start ? null : actorUserId,
+        assignedUserId: null,
         subject: input.subject.trim(),
         status: start?.lifecycleStatus,
         priority: input.priority,
@@ -1347,6 +1349,52 @@ export async function updateTicketDueOn(
       actorUserId,
       eventType: "ticket.due_date.changed",
       metadata: { previousDueOn: ticket.dueOn, dueOn },
+    });
+  });
+}
+
+
+export async function claimTicket(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  ticketId: string,
+): Promise<void> {
+  const replyScope = requireSupportScope(permissions, "tickets.reply");
+  const viewScope = requireSupportScope(permissions, "tickets.view");
+  await Promise.all([
+    requireTicketAccess(actorUserId, replyScope, ticketId),
+    requireTicketAccess(actorUserId, viewScope, ticketId),
+  ]);
+
+  const db = getDatabase();
+  await db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .update(tickets)
+      .set({ assignedUserId: actorUserId, updatedAt: new Date() })
+      .where(and(
+        eq(tickets.id, ticketId),
+        isNull(tickets.assignedUserId),
+        notInArray(tickets.status, ["resolved", "closed"]),
+      ))
+      .returning({ id: tickets.id });
+
+    if (!claimed) {
+      const [current] = await tx
+        .select({ assignedUserId: tickets.assignedUserId })
+        .from(tickets)
+        .where(eq(tickets.id, ticketId))
+        .limit(1);
+
+      if (!current) throw new Error("TICKET_NOT_FOUND");
+      if (current.assignedUserId) throw new Error("TICKET_ALREADY_ASSIGNED");
+      throw new Error("TICKET_CLAIM_NOT_AVAILABLE");
+    }
+
+    await tx.insert(ticketEvents).values({
+      ticketId,
+      actorUserId,
+      eventType: "ticket.assignee.changed",
+      metadata: { assignedUserId: actorUserId, source: "self_claim" },
     });
   });
 }

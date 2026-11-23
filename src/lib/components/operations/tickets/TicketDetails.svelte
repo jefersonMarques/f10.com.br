@@ -10,6 +10,7 @@
     FileText,
     GitMerge,
     Ellipsis,
+    Hand,
     Headphones,
     History,
     MessageSquare,
@@ -331,6 +332,7 @@
           success: false,
           message: payload?.message ?? "Não foi possível concluir a operação.",
         };
+        if (action === "claimTicket") await refreshDetails();
         return false;
       }
 
@@ -477,6 +479,15 @@
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
+          {#if ticketData.canReply && !ticketData.details.ticket.assignedUserId
+            && !["resolved", "closed"].includes(ticketData.details.ticket.status)}
+            <button type="button"
+              on:click={() => void postAction("claimTicket", new FormData())}
+              disabled={Boolean(actionLoading)}
+              class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-[var(--app-primary)] px-3 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
+              <Hand size={15}/>{actionLoading === "claimTicket" ? "Assumindo..." : "Pegar ticket"}
+            </button>
+          {/if}
           {#if ticketData.mergeContext.canMerge}
             <details bind:open={ticketMenuOpen} class="relative">
               <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-[var(--app-border-control)] text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]" aria-label="Mais opções do ticket" role="button">
@@ -865,7 +876,7 @@
               <input name="dueOn" type="date" required value={ticketData.details.ticket.dueOn} disabled={!ticketData.canReply || Boolean(actionLoading)} on:change={(event) => void updateField("dueOn", "dueOn", event)} class="h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption disabled:bg-[var(--app-surface-muted)]"/>
             </label>
 
-            <label>
+            <div>
               <span class="mb-1 block application-text-caption font-medium text-[var(--app-text-muted)]">Responsável</span>
               {#if ticketData.details.ticket.assignedUserId}
                 <div class="mb-2 flex items-center gap-2">
@@ -879,13 +890,14 @@
                 </div>
               {/if}
               {#if ticketData.canAssign}
-                <select name="assignedUserId" disabled={Boolean(actionLoading)} on:change={(event) => void updateField("assign", "assignedUserId", event)} class="h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption">
+                <select name="assignedUserId" aria-label="Responsável" disabled={Boolean(actionLoading)} on:change={(event) => void updateField("assign", "assignedUserId", event)} class="h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption">
+                  <option value="" disabled selected={!ticketData.details.ticket.assignedUserId}>Sem responsável</option>
                   {#each ticketData.agents as agent}<option value={agent.id} selected={agent.id === ticketData.details.ticket.assignedUserId}>{agent.name}</option>{/each}
                 </select>
               {:else}
                 <div class="rounded-xl bg-[var(--app-surface-subtle)] px-3 py-2.5 application-text-caption font-semibold text-[var(--app-text)]">{ticketData.details.ticket.assignedUserName ?? "Não atribuído"}</div>
               {/if}
-            </label>
+            </div>
           </div>
 
         </section>
