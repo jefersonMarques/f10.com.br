@@ -5,6 +5,7 @@ import { webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { sendDevicePushAlerts } from "$lib/server/notifications/devicePush";
 import { teamMembers, users } from "$lib/server/db/schema";
+import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { canAccessTicket } from "$lib/server/support/supportAccess";
 import { autoAssignChatIfConfigured } from "$lib/server/support/supportChatRoutingRepository";
@@ -116,9 +117,13 @@ export async function notifySupportTicketNeedsAttention(
       subject: tickets.subject,
       channel: tickets.channel,
       assignedUserId: tickets.assignedUserId,
+      queueTeamId: supportQueues.teamId,
+      areaTeamId: ticketAreas.teamId,
     })
     .from(tickets)
     .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .leftJoin(ticketWorkflowStates, eq(ticketWorkflowStates.ticketId, tickets.id))
+    .leftJoin(ticketAreas, eq(ticketAreas.id, ticketWorkflowStates.areaId))
     .where(eq(tickets.id, ticketId))
     .limit(1);
 
@@ -141,12 +146,6 @@ export async function notifySupportTicketNeedsAttention(
     }
   }
 
-  const recipientIds = ticket.assignedUserId
-    ? [ticket.assignedUserId]
-    : (await listEligibleTicketResponders()).map((responder) => responder.id);
-
-  if (recipientIds.length === 0) return;
-
   const [chatSession] = ticket.channel === "web_chat"
     ? await db
         .select({ id: webChatSessions.id })
@@ -155,6 +154,25 @@ export async function notifySupportTicketNeedsAttention(
         .limit(1)
     : [];
   const isChatNotification = Boolean(chatSession?.id);
+
+  let recipientIds: string[] = [];
+  if (ticket.assignedUserId) {
+    recipientIds = [ticket.assignedUserId];
+  } else if (isChatNotification) {
+    const teamId = ticket.areaTeamId ?? ticket.queueTeamId;
+    if (teamId) {
+      const members = await db
+        .select({ userId: teamMembers.userId })
+        .from(teamMembers)
+        .innerJoin(users, eq(users.id, teamMembers.userId))
+        .where(and(eq(teamMembers.teamId, teamId), eq(users.status, "active")));
+      recipientIds = Array.from(new Set(members.map((member) => member.userId)));
+    }
+  } else {
+    recipientIds = (await listEligibleTicketResponders()).map((responder) => responder.id);
+  }
+
+  if (recipientIds.length === 0) return;
 
   if (!isChatNotification) {
     const accessResults = await Promise.all(
