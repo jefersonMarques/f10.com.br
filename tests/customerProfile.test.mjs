@@ -27,3 +27,11 @@ test("contact details are optional and separate from login", () => {
   assert.throws(() => normalizeCustomerContactPhone("abc"));
   assert.throws(() => normalizeCustomerContactPhone("123"));
 });
+
+test("avatar validation rejects active content and accepts supported signatures", async () => {
+  const { detectAvatar } = await import("../src/lib/server/storage/avatarImage.ts");
+  assert.equal(detectAvatar(new TextEncoder().encode("<svg/>")), null);
+  assert.deepEqual(detectAvatar(Uint8Array.of(255, 216, 255)), { contentType: "image/jpeg", extension: "jpg" });
+  assert.deepEqual(detectAvatar(Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10)), { contentType: "image/png", extension: "png" });
+  assert.deepEqual(detectAvatar(new TextEncoder().encode("RIFF0000WEBP")), { contentType: "image/webp", extension: "webp" });
+});
