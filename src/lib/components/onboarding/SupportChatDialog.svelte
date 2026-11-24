@@ -163,6 +163,10 @@
   let finishingChat = false;
   let fileInputElement: HTMLInputElement;
   let restored = false;
+  let resumeLoading = false;
+  let resumeCheckedForOpen = false;
+  let resumeOnly = false;
+  let storedSessionHint = "";
   let authInitialized = false;
   let pollingSessionId = "";
   let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -235,16 +239,21 @@
   $: if (browser && isOpen && !entryOptionsLoaded && !entryOptionsLoading) void refreshEntryOptions();
   $: if (browser && isOpen && restored && initializedDepartment !== activeDepartment) {
     initializedDepartment = activeDepartment;
-    if (activeDepartment === "finance") {
+    if (activeDepartment === "finance" && !resumeOnly) {
       handoffRequested = false;
-    } else if (activeDepartment === "support" && !session) {
+    } else if (activeDepartment === "support" && !session && !resumeOnly) {
       handoffRequested = false;
       authStep = "login";
       selectedEntryOptionId = "";
       selectedEntryOptionLabel = "";
     }
   }
+  $: if (browser && isOpen && restored && !resumeCheckedForOpen) {
+    resumeCheckedForOpen = true;
+    if (!session && !convertedTicket && !starting) void checkRestorableChat();
+  }
   $: if (!isOpen) {
+    resumeCheckedForOpen = false;
     initializedDepartment = null;
     financeAction = null;
   }
@@ -322,30 +331,125 @@
     updateUnresolvedCount(guestMessages.length > 0 ? Number(window.sessionStorage.getItem(UNRESOLVED_KEY)) : 0);
     ensureGuestGreeting();
 
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-
+    // O navegador guarda apenas a referência utilizada para preservar o rascunho.
     try {
-      const stored = JSON.parse(raw) as ChatSession;
-      if (
-        typeof stored.sessionId !== "string" ||
-        typeof stored.token !== "string" ||
-        !stored.expiresAt ||
-        new Date(stored.expiresAt).getTime() <= Date.now()
-      ) {
-        clearStoredSession();
-        return;
-      }
-      session = stored;
-      void refreshMessages(true);
+      const raw = window.sessionStorage.getItem(STORAGE_KEY);
+      const stored = raw ? JSON.parse(raw) as Partial<ChatSession> : null;
+      storedSessionHint = typeof stored?.sessionId === "string" ? stored.sessionId : "";
     } catch {
-      clearStoredSession();
+      storedSessionHint = "";
+    }
+  }
+
+  function requireChatLogin(message = "Entre na sua conta F10 para retomar o atendimento."): void {
+    storedSessionHint = session?.sessionId ?? storedSessionHint;
+    clearStoredSession();
+    resumeOnly = true;
+    authState = { ...authState, authenticated: false, requiresUnitSelection: false, groups: [] };
+    authStep = "login";
+    handoffRequested = true;
+    errorMessage = message;
+  }
+
+  async function checkRestorableChat(): Promise<void> {
+    if (authState.authenticated && !authState.requiresUnitSelection) {
+      await recoverActiveChat();
+    } else if (storedSessionHint) {
+      await requestResumeChat();
+    }
+  }
+
+  async function requestResumeChat(): Promise<void> {
+    resumeOnly = true;
+    handoffRequested = true;
+    errorMessage = "";
+    if (!authState.authenticated) {
+      requireChatLogin();
+      await scrollToLatest();
+      return;
+    }
+    await continueAfterAuthentication();
+  }
+
+  async function recoverActiveChat(): Promise<"resumed" | "none" | "error"> {
+    if (resumeLoading) return "error";
+    resumeLoading = true;
+    try {
+      const response = await fetch("/api/support/chat/resume", {
+        method: "POST",
+        cache: "no-store",
+      });
+      const payload = await response.json() as { session?: ChatSession | null; error?: string };
+
+      if (response.status === 401) {
+        requireChatLogin();
+        return "error";
+      }
+      if (response.status === 409 && payload.error === "CUSTOMER_CONTEXT_REQUIRED") {
+        storedSessionHint = session?.sessionId ?? storedSessionHint;
+        clearStoredSession();
+        authState = { ...authState, requiresUnitSelection: true };
+        authStep = "unit";
+        handoffRequested = true;
+        prepareUnitSelection();
+        return "error";
+      }
+      if (!response.ok) {
+        errorMessage = "Não foi possível recuperar seu atendimento. Tente novamente.";
+        return "error";
+      }
+
+      const recovered = payload.session;
+      const priorSessionId = session?.sessionId ?? storedSessionHint;
+      if (!recovered) {
+        if (priorSessionId) {
+          clearStoredSession();
+          storedSessionHint = "";
+          reply = "";
+          revokeImages(pendingImages);
+          pendingImages = [];
+          persistDraft("");
+        }
+        return "none";
+      }
+      if (!recovered.sessionId || !recovered.token || !recovered.expiresAt) {
+        errorMessage = "Não foi possível recuperar seu atendimento.";
+        return "error";
+      }
+
+      if (priorSessionId !== recovered.sessionId) {
+        messages = [];
+        reply = "";
+        revokeImages(pendingImages);
+        pendingImages = [];
+        persistDraft("");
+      }
+
+      session = recovered;
+      storedSessionHint = recovered.sessionId;
+      persistSession(recovered);
+      resumeOnly = false;
+      handoffRequested = false;
+      authRequiredForSession = false;
+      authStep = "ready";
+      errorMessage = "";
+      await refreshMessages(true);
+      return "resumed";
+    } catch {
+      errorMessage = "Não foi possível recuperar seu atendimento. Tente novamente.";
+      return "error";
+    } finally {
+      resumeLoading = false;
     }
   }
 
   function persistSession(value: ChatSession): void {
     if (!browser) return;
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    try {
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    } catch {
+      // A sessão continua disponível no servidor.
+    }
   }
 
   function persistDraft(value: string): void {
@@ -364,7 +468,9 @@
   }
 
   function clearStoredSession(): void {
-    if (browser) window.sessionStorage.removeItem(STORAGE_KEY);
+    if (browser) {
+      try { window.sessionStorage.removeItem(STORAGE_KEY); } catch {}
+    }
     session = null;
     waitingStatus = { waitingSinceMs: null, offerTicket: false };
     messages = [];
@@ -691,6 +797,7 @@
   }
 
   async function requestHumanSupport(): Promise<void> {
+    resumeOnly = false;
     handoffRequested = true;
     errorMessage = "";
 
@@ -800,28 +907,31 @@
       await scrollToLatest();
       return;
     }
-    if (authState.requiresUnitSelection && !session) {
+    if (authState.requiresUnitSelection) {
       authStep = "unit";
       prepareUnitSelection();
       await scrollToLatest();
       return;
     }
     authStep = "ready";
-    if (session) {
+    const result = await recoverActiveChat();
+    if (result !== "none") return;
+    if (resumeOnly) {
+      resumeOnly = false;
       handoffRequested = false;
-      await refreshMessages(true);
+      errorMessage = "Não há atendimento em andamento nesta unidade.";
       return;
     }
     if (activeDepartment === "finance") {
       handoffRequested = false;
-      if (financeAction === "human") await startHumanChat();
+      if (financeAction === "human") await startHumanChat(true);
       return;
     }
-    await startHumanChat();
+    await startHumanChat(true);
   }
 
-  async function startHumanChat(): Promise<void> {
-    if (session || starting || !authState.authenticated) return;
+  async function startHumanChat(checkedActiveChat = false): Promise<void> {
+    if (session || starting || resumeLoading || !authState.authenticated) return;
     if (authState.requiresNameConfirmation) {
       authStep = "profile";
       await scrollToLatest();
@@ -830,6 +940,10 @@
     starting = true;
     authStep = "ready";
     errorMessage = "";
+    if (!checkedActiveChat && await recoverActiveChat() !== "none") {
+      starting = false;
+      return;
+    }
 
     const lastCustomerMessage = [...guestMessages].reverse().find((message) => message.role === "customer")?.body;
     const message = activeDepartment === "finance"
@@ -892,6 +1006,7 @@
       }
 
       session = nextSession;
+      storedSessionHint = nextSession.sessionId;
       persistSession(nextSession);
       handoffRequested = false;
       authRequiredForSession = false;
@@ -930,15 +1045,13 @@
       if (conversionSubmitting || session?.sessionId !== requestedSessionId) return;
       if (response.status === 401) {
         if (payload.error === "CUSTOMER_AUTH_REQUIRED") {
-          authRequiredForSession = true;
-          authState = { ...authState, authenticated: false, requiresUnitSelection: false, groups: [] };
-          handoffRequested = true;
-          authStep = "login";
-          errorMessage = "Sua sessão F10 expirou. Entre novamente aqui para continuar o mesmo atendimento.";
+          requireChatLogin("Sua sessão F10 expirou. Entre novamente para retomar o atendimento.");
           return;
         }
-        clearStoredSession();
-        errorMessage = "Este atendimento expirou. Inicie uma nova conversa.";
+        if (!resumeLoading) {
+          const result = await recoverActiveChat();
+          if (result === "none") errorMessage = "Este atendimento foi finalizado.";
+        }
         return;
       }
 
@@ -1065,7 +1178,7 @@
   }
 
   async function sendReply(): Promise<void> {
-    if (!session || sending || conversionSubmitting) return;
+    if (!session || sending || conversionSubmitting || resumeLoading) return;
     const body = reply.trim();
     const images = [...pendingImages];
     if (!body && images.length === 0) return;
@@ -1115,11 +1228,14 @@
         pendingImages = images;
         const error = typeof payload.error === "string" ? payload.error : "";
         errorMessage = apiErrorMessage(error);
-        if (response.status === 401 && error === "CUSTOMER_AUTH_REQUIRED") {
-          authRequiredForSession = true;
-          authState = { ...authState, authenticated: false, requiresUnitSelection: false, groups: [] };
-          handoffRequested = true;
-          authStep = "login";
+        if (response.status === 401) {
+          if (error === "CUSTOMER_AUTH_REQUIRED") {
+            requireChatLogin("Entre novamente para continuar o atendimento.");
+          } else {
+            const result = await recoverActiveChat();
+            if (result === "resumed") errorMessage = "Conversa recuperada. Confira a mensagem e envie novamente.";
+            else if (result === "none") errorMessage = "Este atendimento foi finalizado.";
+          }
         }
         return;
       }
@@ -1198,6 +1314,8 @@
 
   async function handleConvertedTicket(ticket: { ticketId: string; ticketNumber: number }): Promise<void> {
     clearStoredSession();
+    storedSessionHint = "";
+    resumeOnly = false;
     revokeImages(pendingImages);
     pendingImages = [];
     reply = "";
@@ -1219,6 +1337,7 @@
 
   function startNewConversation(): void {
     convertedTicket = null;
+    resumeOnly = false;
     resetFinanceChoice();
     ensureGuestGreeting();
   }
@@ -1251,6 +1370,8 @@
       }
 
       clearStoredSession();
+      storedSessionHint = "";
+      resumeOnly = false;
       revokeImages(pendingImages);
       pendingImages = [];
       guestMessages = [];
@@ -1335,13 +1456,15 @@
           <a href="/cliente/chamados" target="_blank" rel="noopener noreferrer" class="flex min-h-11 items-center justify-center rounded-xl border border-[#DDE2EB] text-[14px] font-semibold text-[#000A57]">Meus chamados</a>
           <button type="button" on:click={startNewConversation} class="w-full py-2 text-[13px] font-medium text-[#596171]">Iniciar outra conversa</button>
         </div>
+      {:else if resumeLoading}
+        <div class="flex items-center justify-center gap-2 py-8 text-[13px] text-[#697184]"><LoaderCircle size={18} class="animate-spin"/> Recuperando atendimento...</div>
       {:else if authStep === "profile" && authState.authenticated}
         <div class="space-y-4 rounded-2xl border border-[#DDE2EB] bg-white p-5 shadow-sm">
           <h3 class="text-[15px] font-semibold text-[#18233D]">Complete seu perfil</h3>
           <CustomerProfileForm onSaved={handleProfileSaved} />
         </div>
       {:else}
-      {#if activeDepartment === "finance" && !session && financeAction === null}
+      {#if activeDepartment === "finance" && !session && financeAction === null && !handoffRequested}
         <div class="space-y-3 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm">
           <h3 class="text-[14px] font-semibold text-[#18233D]">Como podemos ajudar?</h3>
           {#if entryOptionsLoading}
@@ -1553,6 +1676,7 @@
                   {/each}
                 {/if}
               {/if}
+              <button type="button" on:click={() => void requestResumeChat()} class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#DDE1E9] bg-white px-3 text-[12px] font-semibold text-[#000A57]"><MessageCircleMore size={15}/> Retomar atendimento</button>
               <button type="button" on:click={() => void requestHumanSupport()}
                 class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#E8BD9D] bg-[#FFF6EC] px-3 text-[12px] font-semibold text-[#A64B08] transition hover:bg-[#FFEBD9]">
                 <UserRound size={15} aria-hidden="true"/> Falar com a equipe
@@ -1596,7 +1720,7 @@
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><CheckCircle2 size={16}/></span>
                   <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Acesso confirmado</h3><p class="mt-1 text-[12px] leading-4 text-[#7B8292]">Seu grupo e unidade foram identificados. Tente conectar ao atendimento novamente.</p></div>
                 </div>
-                <button type="button" on:click={() => void startHumanChat()} disabled={starting} class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Tentar conectar ao atendimento</button>
+                <button type="button" on:click={() => resumeOnly ? void requestResumeChat() : void startHumanChat()} disabled={starting || resumeLoading} class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Tentar conectar ao atendimento</button>
               {/if}
               {#if errorMessage}<p class="mt-3 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[11px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
               {#if activeDepartment === "support" && !starting}
@@ -1617,7 +1741,7 @@
 
     {#if convertedTicket}
       <div class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-2 text-center text-[12px] text-[#697184]">Continue o atendimento pelo chamado.</div>
-    {:else if authStep === "profile" && authState.authenticated}
+    {:else if resumeLoading || (authStep === "profile" && authState.authenticated)}
       <div class="shrink-0 border-t border-[#E6E8EF] bg-white py-2"></div>
     {:else if session && (activeDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>
@@ -1633,7 +1757,7 @@
         <div class="flex items-end gap-2">
           <button type="button" on:click={() => fileInputElement?.click()} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDE1E9] text-[#667080] hover:text-[#000A57]" aria-label="Anexar arquivo"><Paperclip size={16}/></button>
           <textarea bind:value={reply} maxlength="4000" rows="1" placeholder="Escreva sua mensagem..." class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[14px] leading-6 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" on:input={handleCustomerDraftInput} on:keydown={handleReplyKeydown} on:paste={handleReplyPaste}></textarea>
-          <button type="submit" disabled={sending || conversionSubmitting || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
+          <button type="submit" disabled={sending || conversionSubmitting || resumeLoading || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>
       </form>
     {:else if activeDepartment === "support" && !handoffRequested}
