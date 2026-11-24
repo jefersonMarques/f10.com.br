@@ -42,10 +42,8 @@ export async function finishInternalChat(
       ticketId: webChatSessions.ticketId,
       queueId: webChatSessions.queueId,
       assignedUserId: webChatSessions.assignedUserId,
-      ticketResolvedAt: tickets.resolvedAt,
     })
     .from(webChatSessions)
-    .leftJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
     .where(
       and(
         eq(webChatSessions.id, sessionId),
@@ -88,14 +86,9 @@ export async function finishInternalChat(
     });
 
     if (chat.ticketId) {
-      await tx
-        .update(tickets)
-        .set({
-          status: "closed",
-          resolvedAt: chat.ticketResolvedAt ?? now,
-          closedAt: now,
-          updatedAt: now,
-        })
+      // O encerramento da conversa não altera o workflow do chamado.
+      await tx.update(tickets)
+        .set({ updatedAt: now })
         .where(eq(tickets.id, chat.ticketId));
 
       await tx.insert(ticketMessages).values({
@@ -111,7 +104,7 @@ export async function finishInternalChat(
         ticketId: chat.ticketId,
         actorUserId,
         eventType: "chat.closed",
-        metadata: { sessionId },
+        metadata: { sessionId, closedBy: "agent" },
       });
     } else {
       await tx.insert(webChatMessages).values({
@@ -122,4 +115,12 @@ export async function finishInternalChat(
       });
     }
   });
+}
+
+export async function hasOpenChatForTicket(ticketId: string): Promise<boolean> {
+  const [chat] = await getDatabase().select({ id: webChatSessions.id })
+    .from(webChatSessions)
+    .where(and(eq(webChatSessions.ticketId, ticketId), isNull(webChatSessions.closedAt)))
+    .limit(1);
+  return Boolean(chat);
 }

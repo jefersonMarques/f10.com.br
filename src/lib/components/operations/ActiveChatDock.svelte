@@ -217,7 +217,7 @@
 
   async function finishChat(sessionId: string): Promise<void> {
     if (finishing) return;
-    if (!window.confirm("Finalizar este atendimento? O chat será fechado para novas respostas.")) {
+    if (!window.confirm("Finalizar somente o chat? O chamado vinculado permanecerá com seu status atual.")) {
       return;
     }
 

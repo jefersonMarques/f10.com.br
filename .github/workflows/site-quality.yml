@@ -61,7 +61,7 @@ jobs:
           node --experimental-strip-types --test tests/chatMessageGrouping.test.mjs
           node --experimental-strip-types --test tests/chatLiveDrafts.test.mjs
           node --experimental-strip-types --test tests/chatInboxClassification.test.mjs
-          node --experimental-strip-types --test tests/chatWaitingClassification.test.mjs tests/customerProfile.test.mjs
+          node --experimental-strip-types --test tests/chatWaitingClassification.test.mjs tests/customerProfile.test.mjs tests/chatOperationalPolicy.test.mjs
           node --experimental-strip-types --test tests/chatInboxScope.test.mjs
           node --experimental-strip-types --test tests/ticketCustomerOverview.test.mjs
           node --experimental-strip-types --test tests/ticketMergeRules.test.mjs

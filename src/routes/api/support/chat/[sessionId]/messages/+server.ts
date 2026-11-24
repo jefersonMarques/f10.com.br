@@ -11,6 +11,7 @@ import {
 } from "$lib/server/support/publicChatRepository";
 import { SUPPORT_ATTACHMENT_MAX_FILES } from "$lib/server/support/supportMessageAttachmentRepository";
 import { updateLiveChatDraft } from "$lib/server/support/liveChatDrafts";
+import { touchCustomerChatPresence } from "$lib/server/support/customerChatPresenceRepository";
 import { getPublicChatWaitingStatus } from "$lib/server/support/chatWaitingService";
 
 const MAX_BODY_BYTES = 36 * 1024 * 1024;
@@ -81,6 +82,9 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
   }
 
   try {
+    if (request.headers.get("x-f10-chat-presence") === "active") {
+      await touchCustomerChatPresence(sessionId).catch(() => undefined);
+    }
     const [messages, waiting] = await Promise.all([
       listPublicChatMessages(sessionId, token),
       getPublicChatWaitingStatus(sessionId).catch(() => ({ waitingSinceMs: null, offerTicket: false })),

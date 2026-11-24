@@ -9,10 +9,14 @@ import { sendDevicePushAlerts } from "$lib/server/notifications/devicePush";
 import { getChatWaitingSettings, type ChatWaitingSettings } from "$lib/server/settings/chatWaitingSettingsRepository";
 import { chatWaitingSinceMs } from "$lib/server/support/chatWaitingQuery";
 import { canAccessTicket, getUserSupportQueueIds } from "$lib/server/support/supportAccess";
+import { listSupportAgentPresence } from "$lib/server/support/supportAgentPresence";
+import { getChatEscalationLevel, type ChatEscalationLevel } from "$lib/support/chatOperationalPolicy";
 import { getSupportAvailabilityStatus } from "$lib/server/support/publicSupportStatus";
 
 const REMINDER_EVENT = "wait_reminder";
 const NO_RECIPIENT_EVENT = "wait_reminder_no_recipient";
+const TEAM_EVENT = "wait_escalation_team";
+const SUPERVISOR_EVENT = "wait_escalation_supervisor";
 const MAX_REMINDERS_PER_CYCLE = 5;
 const BATCH_SIZE = 25;
 
@@ -42,42 +46,57 @@ type ReminderChat = {
   subject: string;
 };
 
-async function getReminderRecipients(chat: ReminderChat): Promise<string[]> {
+async function getReminderRecipients(
+  chat: ReminderChat,
+  level: ChatEscalationLevel,
+): Promise<string[]> {
   const db = getDatabase();
   const [queue] = await db.select({ teamId: supportQueues.teamId })
     .from(supportQueues).where(eq(supportQueues.id, chat.queueId)).limit(1);
 
-  const candidates = chat.assignedUserId
+  const candidates = level === "owner" && chat.assignedUserId
     ? await db.select({ id: users.id }).from(users)
         .where(and(eq(users.id, chat.assignedUserId), eq(users.status, "active")))
-    : queue?.teamId
+    : queue?.teamId && level !== "supervisor"
       ? await db.select({ id: users.id }).from(teamMembers)
           .innerJoin(users, eq(teamMembers.userId, users.id))
           .where(and(eq(teamMembers.teamId, queue.teamId), eq(users.status, "active")))
       : await db.select({ id: users.id }).from(users).where(eq(users.status, "active"));
 
-  const eligible = await Promise.all(candidates.map(async ({ id }) => {
+  const candidateIds = [...new Set(candidates.map(({ id }) => id))];
+  const presence = level === "team" ? await listSupportAgentPresence(candidateIds) : null;
+  const eligible = await Promise.all(candidateIds.map(async (id) => {
     const permissions = await resolveUserPermissions(id);
     const view = getPermissionScope(permissions, "chat.view");
-    const respond = getPermissionScope(permissions, "chat.respond");
-    if (!view || !respond) return null;
+    const action = getPermissionScope(permissions, level === "supervisor" ? "chat.manage" : "chat.respond");
+    if (!view || !action) return null;
+    if (presence && id !== chat.assignedUserId && presence.get(id)?.effectiveStatus !== "online") return null;
     if (chat.ticketId) {
       return await canAccessTicket(id, view, chat.ticketId)
-        && await canAccessTicket(id, respond, chat.ticketId) ? id : null;
+        && await canAccessTicket(id, action, chat.ticketId) ? id : null;
     }
     if (chat.assignedUserId === id) return id;
-    if (view === "own" || respond === "own") return null;
-    if (view === "team" || respond === "team") {
+    if (view === "own" || action === "own") return null;
+    if (view === "team" || action === "team") {
       const queues = await getUserSupportQueueIds(id);
       if (!queues.includes(chat.queueId)) return null;
     }
     return id;
   }));
-  return [...new Set(eligible.filter((id): id is string => Boolean(id)))];
+  return eligible.filter((id): id is string => Boolean(id));
 }
 
-async function sendReminder(chat: ReminderChat, settings: ChatWaitingSettings): Promise<void> {
-  const recipientIds = await getReminderRecipients(chat);
+async function sendReminder(
+  chat: ReminderChat & { waitingSinceMs: number | null },
+  settings: ChatWaitingSettings,
+): Promise<void> {
+  if (chat.waitingSinceMs === null) return;
+  const level = getChatEscalationLevel(
+    (Date.now() - chat.waitingSinceMs) / 1000,
+    settings.teamEscalationSeconds,
+    settings.supervisorEscalationSeconds,
+  );
+  const recipientIds = await getReminderRecipients(chat, level);
   const notifications = await getDatabase().transaction(async (tx) => {
     const [locked] = await tx.select({
       ticketId: webChatSessions.ticketId,
@@ -92,7 +111,22 @@ async function sendReminder(chat: ReminderChat, settings: ChatWaitingSettings): 
       .from(webChatSessions).where(eq(webChatSessions.id, chat.id)).limit(1);
     const waitingSinceMs = state?.waitingSinceMs;
     const now = new Date();
-    if (waitingSinceMs == null || now.getTime() - waitingSinceMs < settings.delaySeconds * 1000) return [];
+    if (waitingSinceMs == null || waitingSinceMs !== chat.waitingSinceMs
+      || now.getTime() - waitingSinceMs < settings.delaySeconds * 1000) return [];
+    const currentLevel = getChatEscalationLevel(
+      (now.getTime() - waitingSinceMs) / 1000,
+      settings.teamEscalationSeconds,
+      settings.supervisorEscalationSeconds,
+    );
+    if (currentLevel !== level) return [];
+    const escalationEvent = level === "supervisor" ? SUPERVISOR_EVENT : level === "team" ? TEAM_EVENT : null;
+    const [previousEscalation] = escalationEvent ? await tx.select({ id: supportChatEvents.id })
+      .from(supportChatEvents).where(and(
+        eq(supportChatEvents.sessionId, chat.id),
+        eq(supportChatEvents.eventType, escalationEvent),
+        gt(supportChatEvents.occurredAt, new Date(waitingSinceMs - 1)),
+      )).limit(1) : [];
+    const firstEscalation = Boolean(escalationEvent && !previousEscalation);
 
     const previous = await tx.select({ occurredAt: supportChatEvents.occurredAt })
       .from(supportChatEvents).where(and(
@@ -101,7 +135,11 @@ async function sendReminder(chat: ReminderChat, settings: ChatWaitingSettings): 
         gt(supportChatEvents.occurredAt, new Date(waitingSinceMs - 1)),
       )).orderBy(desc(supportChatEvents.occurredAt)).limit(MAX_REMINDERS_PER_CYCLE);
     if (previous.length >= MAX_REMINDERS_PER_CYCLE
-      || (previous[0] && now.getTime() - previous[0].occurredAt.getTime() < settings.repeatSeconds * 1000)) return [];
+      || (!firstEscalation && previous[0] && now.getTime() - previous[0].occurredAt.getTime() < settings.repeatSeconds * 1000)) return [];
+
+    if (firstEscalation && escalationEvent) {
+      await tx.insert(supportChatEvents).values({ sessionId: chat.id, eventType: escalationEvent, occurredAt: now });
+    }
 
     if (recipientIds.length === 0) {
       const [lastAttempt] = await tx.select({ occurredAt: supportChatEvents.occurredAt })
@@ -121,7 +159,7 @@ async function sendReminder(chat: ReminderChat, settings: ChatWaitingSettings): 
     const added = await tx.insert(internalNotifications).values(recipientIds.map((userId) => ({
       userId,
       kind: "chat.wait_reminder",
-      title: "Cliente aguardando atendimento",
+      title: level === "supervisor" ? "Atendimento crítico" : level === "team" ? "Equipe: cliente aguardando" : "Cliente aguardando atendimento",
       body: `${chat.subject} — sem resposta há ${duration}.`.slice(0, 500),
       href: `/app/chat/${chat.id}`,
       entityType: "chat",
@@ -158,16 +196,27 @@ export async function processChatWaitingReminders(): Promise<void> {
     queueId: webChatSessions.queueId,
     assignedUserId: webChatSessions.assignedUserId,
     subject: webChatSessions.subject,
+    waitingSinceMs: waiting,
   }).from(webChatSessions).where(and(
     isNull(webChatSessions.closedAt),
     sql`${waiting} <= ${now - settings.delaySeconds * 1000}`,
-    sql`not exists (
+    sql`(not exists (
       select 1 from support_chat_events e
       where e.session_id = ${webChatSessions.id} and e.event_type in (${REMINDER_EVENT}, ${NO_RECIPIENT_EVENT})
         and extract(epoch from e.occurred_at) * 1000 >= greatest(
           ${waiting}, ${now - settings.repeatSeconds * 1000}
         )
-    )`,
+    ) or (
+      ${waiting} <= ${now - settings.teamEscalationSeconds * 1000}
+      and not exists (
+        select 1 from support_chat_events e
+        where e.session_id = ${webChatSessions.id}
+          and e.event_type = case
+            when ${waiting} <= ${now - settings.supervisorEscalationSeconds * 1000}
+            then ${SUPERVISOR_EVENT} else ${TEAM_EVENT} end
+          and extract(epoch from e.occurred_at) * 1000 >= ${waiting}
+      )
+    ))`,
     sql`(
       select count(*) from support_chat_events e
       where e.session_id = ${webChatSessions.id} and e.event_type = ${REMINDER_EVENT}

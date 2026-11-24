@@ -102,8 +102,12 @@ export const actions: Actions = {
     const formData = await request.formData();
     const delaySeconds = Number(readString(formData, "delaySeconds"));
     const repeatSeconds = Number(readString(formData, "repeatSeconds"));
+    const teamEscalationSeconds = Number(readString(formData, "teamEscalationSeconds"));
+    const supervisorEscalationSeconds = Number(readString(formData, "supervisorEscalationSeconds"));
     if (!Number.isInteger(delaySeconds) || delaySeconds < 10 || delaySeconds > 3600
-      || !Number.isInteger(repeatSeconds) || repeatSeconds < 60 || repeatSeconds > 3600) {
+      || !Number.isInteger(repeatSeconds) || repeatSeconds < 60 || repeatSeconds > 3600
+      || !Number.isInteger(teamEscalationSeconds) || teamEscalationSeconds < delaySeconds || teamEscalationSeconds > 7200
+      || !Number.isInteger(supervisorEscalationSeconds) || supervisorEscalationSeconds < teamEscalationSeconds || supervisorEscalationSeconds > 14400) {
       return fail(400, { success: false, action: "saveChatWaiting", message: "Revise os tempos de espera e reforço." });
     }
     await updateChatWaitingSettings(session.user.id, {
@@ -111,6 +115,8 @@ export const actions: Actions = {
       delaySeconds,
       notifyTeam: formData.has("notifyTeam"),
       repeatSeconds,
+      teamEscalationSeconds,
+      supervisorEscalationSeconds,
       offerTicket: formData.has("offerTicket"),
     });
     return { success: true, action: "saveChatWaiting", message: "Monitoramento de espera atualizado." };

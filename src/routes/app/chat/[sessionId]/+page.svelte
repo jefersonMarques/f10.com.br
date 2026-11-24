@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { getCustomerChatPresence, CUSTOMER_CHAT_PRESENCE_LABELS } from "$lib/support/chatOperationalPolicy";
   import { browser } from "$app/environment";
   import {
     ArrowDown,
@@ -518,6 +519,10 @@
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <h1 class="truncate text-[14px] font-semibold text-[#202637]">{chat.customerName ?? "Cliente"}</h1>
+                {#if !chat.closedAt}
+                  {@const presence = getCustomerChatPresence(chat.lastSeenAt, Date.now())}
+                  <span class="inline-flex items-center gap-1 text-[11px] text-[var(--app-text-muted)]" title={chat.lastSeenAt ? new Date(chat.lastSeenAt).toLocaleString("pt-BR") : "Sem atividade registrada"}><span class={`h-2 w-2 rounded-full ${presence === "recent" ? "bg-emerald-600" : presence === "away" ? "bg-amber-500" : "bg-slate-400"}`}></span>{CUSTOMER_CHAT_PRESENCE_LABELS[presence]}</span>
+                {/if}
                 {#if chat.ticketNumber}
                   <span class="rounded-full bg-[#FFF0E4] px-2 py-1 text-[9px] font-bold text-[#B95B12]">Chamado #{chat.ticketNumber}</span>
                 {:else}
@@ -557,7 +562,7 @@
             {/if}
 
             {#if canWrite && chat.status !== "closed"}
-              <form method="POST" action="?/finish" on:submit={(event) => { if (!confirm(chat.ticketId ? "Finalizar este atendimento? A conversa e o chamado vinculado serão encerrados." : "Finalizar esta conversa? Nenhum chamado será criado.")) event.preventDefault(); }}>
+              <form method="POST" action="?/finish" on:submit={(event) => { if (!confirm(chat.ticketId ? "Finalizar somente o chat? O chamado vinculado permanecerá em andamento conforme seu status atual." : "Finalizar esta conversa? Nenhum chamado será criado.")) event.preventDefault(); }}>
                 <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#E5C6C6] bg-[#FFF8F8] px-2.5 text-[10px] font-semibold text-[#984343]"><CheckCircle2 size={13} /> <span class="hidden sm:inline">Finalizar</span></button>
               </form>
             {/if}

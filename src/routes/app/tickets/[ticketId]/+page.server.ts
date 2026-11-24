@@ -17,6 +17,7 @@ import {
   removeTicketLabel,
   uploadTicketAttachment,
 } from "$lib/server/support/ticketCardRepository";
+import { hasOpenChatForTicket } from "$lib/server/support/chatLifecycleRepository";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import { createTaskFromTicket } from "$lib/server/support/ticketTaskBridge";
 import {
@@ -655,11 +656,11 @@ export const actions: Actions = {
 
     try {
       const details = await getSupportTicket(session.user.id, permissions, params.ticketId);
-      if (details.ticket.channel === "web_chat" && status === "closed") {
+      if (details.ticket.channel === "web_chat" && status === "closed" && await hasOpenChatForTicket(params.ticketId)) {
         return fail(409, {
           success: false,
           action: "status",
-          message: "Finalize o atendimento pela tela do Chat para encerrar sessão e automação juntas.",
+          message: "Finalize primeiro a conversa ativa na área de Chat. Depois, conclua o chamado.",
         });
       }
       await updateTicketStatus(session.user.id, permissions, params.ticketId, status);

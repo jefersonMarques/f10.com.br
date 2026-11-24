@@ -8,6 +8,8 @@ export type ChatWaitingSettings = {
   delaySeconds: number;
   notifyTeam: boolean;
   repeatSeconds: number;
+  teamEscalationSeconds: number;
+  supervisorEscalationSeconds: number;
   offerTicket: boolean;
 };
 
@@ -17,6 +19,8 @@ export const DEFAULT_CHAT_WAITING_SETTINGS: ChatWaitingSettings = {
   delaySeconds: 45,
   notifyTeam: true,
   repeatSeconds: 120,
+  teamEscalationSeconds: 120,
+  supervisorEscalationSeconds: 300,
   offerTicket: true,
 };
 
@@ -28,9 +32,14 @@ function boundedInteger(value: unknown, fallback: number, minimum: number, maxim
 
 function normalizeSettings(value: Record<string, unknown>): ChatWaitingSettings {
   const defaults = DEFAULT_CHAT_WAITING_SETTINGS;
+  const delaySeconds = boundedInteger(value.delaySeconds, defaults.delaySeconds, 10, 3600);
+  const teamEscalationSeconds = Math.max(delaySeconds, boundedInteger(value.teamEscalationSeconds, defaults.teamEscalationSeconds, 10, 7200));
+  const supervisorEscalationSeconds = Math.max(teamEscalationSeconds, boundedInteger(value.supervisorEscalationSeconds, defaults.supervisorEscalationSeconds, 10, 14400));
   return {
     enabled: typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
-    delaySeconds: boundedInteger(value.delaySeconds, defaults.delaySeconds, 10, 3600),
+    delaySeconds,
+    teamEscalationSeconds,
+    supervisorEscalationSeconds,
     notifyTeam: typeof value.notifyTeam === "boolean" ? value.notifyTeam : defaults.notifyTeam,
     repeatSeconds: boundedInteger(value.repeatSeconds, defaults.repeatSeconds, 60, 3600),
     offerTicket: typeof value.offerTicket === "boolean" ? value.offerTicket : defaults.offerTicket,

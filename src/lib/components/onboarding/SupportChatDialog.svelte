@@ -1038,7 +1038,10 @@
 
     try {
       const response = await fetch(`/api/support/chat/${encodeURIComponent(session.sessionId)}/messages`, {
-        headers: { Authorization: `Bearer ${session.token}` },
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+          ...(isOpen && document.visibilityState === "visible" ? { "X-F10-Chat-Presence": "active" } : {}),
+        },
         cache: "no-store",
       });
       const payload = await response.json() as Record<string, unknown>;
