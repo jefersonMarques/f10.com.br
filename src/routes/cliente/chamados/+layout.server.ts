@@ -10,7 +10,7 @@ export const load: LayoutServerLoad = async ({ cookies, url }) => {
     customer: {
       id: session.contactId,
       name: session.name,
-        requiresNameConfirmation: session.requiresNameConfirmation ?? false,
+      requiresNameConfirmation: session.requiresNameConfirmation ?? false,
       email: session.email,
       legacyUserId: session.legacyUserId,
       authProvider: session.authProvider,

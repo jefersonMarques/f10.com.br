@@ -28,7 +28,7 @@
   $: customerSupport = {
     authenticated: true,
     name: data.customer.name,
-        requiresNameConfirmation: data.customer.requiresNameConfirmation ?? false,
+    requiresNameConfirmation: data.customer.requiresNameConfirmation ?? false,
     email: data.customer.email,
     groupName: data.customer.groupName,
     unitName: data.customer.unitName,

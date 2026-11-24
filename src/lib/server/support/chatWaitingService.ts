@@ -12,6 +12,7 @@ import { canAccessTicket, getUserSupportQueueIds } from "$lib/server/support/sup
 import { getSupportAvailabilityStatus } from "$lib/server/support/publicSupportStatus";
 
 const REMINDER_EVENT = "wait_reminder";
+const NO_RECIPIENT_EVENT = "wait_reminder_no_recipient";
 const MAX_REMINDERS_PER_CYCLE = 5;
 const BATCH_SIZE = 25;
 
@@ -77,14 +78,13 @@ async function getReminderRecipients(chat: ReminderChat): Promise<string[]> {
 
 async function sendReminder(chat: ReminderChat, settings: ChatWaitingSettings): Promise<void> {
   const recipientIds = await getReminderRecipients(chat);
-  if (recipientIds.length === 0) return;
   const notifications = await getDatabase().transaction(async (tx) => {
     const [locked] = await tx.select({
       ticketId: webChatSessions.ticketId,
       queueId: webChatSessions.queueId,
       assignedUserId: webChatSessions.assignedUserId,
       closedAt: webChatSessions.closedAt,
-    }).from(webChatSessions).where(eq(webChatSessions.id, chat.id)).for("update").limit(1);
+    }).from(webChatSessions).where(eq(webChatSessions.id, chat.id)).limit(1).for("update");
     if (!locked || locked.closedAt || locked.assignedUserId !== chat.assignedUserId
       || locked.ticketId !== chat.ticketId || locked.queueId !== chat.queueId) return [];
 
@@ -102,6 +102,19 @@ async function sendReminder(chat: ReminderChat, settings: ChatWaitingSettings): 
       )).orderBy(desc(supportChatEvents.occurredAt)).limit(MAX_REMINDERS_PER_CYCLE);
     if (previous.length >= MAX_REMINDERS_PER_CYCLE
       || (previous[0] && now.getTime() - previous[0].occurredAt.getTime() < settings.repeatSeconds * 1000)) return [];
+
+    if (recipientIds.length === 0) {
+      const [lastAttempt] = await tx.select({ occurredAt: supportChatEvents.occurredAt })
+        .from(supportChatEvents).where(and(
+          eq(supportChatEvents.sessionId, chat.id),
+          eq(supportChatEvents.eventType, NO_RECIPIENT_EVENT),
+          gt(supportChatEvents.occurredAt, new Date(waitingSinceMs - 1)),
+        )).orderBy(desc(supportChatEvents.occurredAt)).limit(1);
+      if (!lastAttempt || now.getTime() - lastAttempt.occurredAt.getTime() >= settings.repeatSeconds * 1000) {
+        await tx.insert(supportChatEvents).values({ sessionId: chat.id, eventType: NO_RECIPIENT_EVENT, occurredAt: now });
+      }
+      return [];
+    }
 
     const elapsed = Math.floor((now.getTime() - waitingSinceMs) / 1000);
     const duration = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}min`;
@@ -151,7 +164,7 @@ export async function processChatWaitingReminders(): Promise<void> {
     sql`${waiting} <= ${now - settings.delaySeconds * 1000}`,
     sql`not exists (
       select 1 from support_chat_events e
-      where e.session_id = ${webChatSessions.id} and e.event_type = ${REMINDER_EVENT}
+      where e.session_id = ${webChatSessions.id} and e.event_type in (${REMINDER_EVENT}, ${NO_RECIPIENT_EVENT})
         and extract(epoch from e.occurred_at) * 1000 >= greatest(
           ${waiting}, ${now - settings.repeatSeconds * 1000}
         )
