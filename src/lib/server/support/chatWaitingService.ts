@@ -4,7 +4,7 @@ import { getDatabase } from "$lib/server/db";
 import { supportChatEvents, webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { teamMembers, users } from "$lib/server/db/schema";
-import { supportQueues } from "$lib/server/db/supportSchema";
+import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { sendDevicePushAlerts } from "$lib/server/notifications/devicePush";
 import { getChatWaitingSettings, type ChatWaitingSettings } from "$lib/server/settings/chatWaitingSettingsRepository";
 import { chatWaitingSinceMs } from "$lib/server/support/chatWaitingQuery";
@@ -23,19 +23,29 @@ const BATCH_SIZE = 25;
 export async function getPublicChatWaitingStatus(sessionId: string) {
   const [settings, rows] = await Promise.all([
     getChatWaitingSettings(),
-    getDatabase().select({ waitingSinceMs: chatWaitingSinceMs() })
-      .from(webChatSessions).where(eq(webChatSessions.id, sessionId)).limit(1),
+    getDatabase().select({
+      waitingSinceMs: chatWaitingSinceMs(),
+      closedAt: webChatSessions.closedAt,
+      aiState: webChatSessions.aiState,
+      ticketId: webChatSessions.ticketId,
+      ticketStatus: tickets.status,
+    }).from(webChatSessions)
+      .leftJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
+      .where(eq(webChatSessions.id, sessionId)).limit(1),
   ]);
-  const waitingSinceMs = rows[0]?.waitingSinceMs ?? null;
-  const elapsed = waitingSinceMs === null ? 0 : Date.now() - waitingSinceMs;
-  const outsideHours = waitingSinceMs !== null && settings.enabled && settings.offerTicket
-    && elapsed < settings.delaySeconds * 1000
-    && (await getSupportAvailabilityStatus()).isOpen === false;
-  return {
-    waitingSinceMs,
-    offerTicket: settings.enabled && settings.offerTicket && waitingSinceMs !== null
-      && (outsideHours || elapsed >= settings.delaySeconds * 1000),
-  };
+  const chat = rows[0];
+  const waitingSinceMs = chat?.waitingSinceMs ?? null;
+  const canConvert = Boolean(chat && !chat.closedAt && chat.aiState !== "active"
+    && (!chat.ticketId || (chat.ticketStatus && !["resolved", "closed"].includes(chat.ticketStatus))));
+  if (!canConvert) return { waitingSinceMs, offerTicket: false };
+
+  const delayedOffer = settings.enabled && settings.offerTicket && waitingSinceMs !== null
+    && Date.now() - waitingSinceMs >= settings.delaySeconds * 1000;
+  if (delayedOffer) return { waitingSinceMs, offerTicket: true };
+
+  // A opção fora do expediente independe dos reforços e do tempo de espera.
+  const availability = await getSupportAvailabilityStatus().catch(() => null);
+  return { waitingSinceMs, offerTicket: availability?.isOpen === false };
 }
 
 type ReminderChat = {

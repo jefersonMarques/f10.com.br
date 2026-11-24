@@ -17,6 +17,7 @@
   let chatOpen = false;
   let mounted = false;
   let chatActive = data.hasActiveChat;
+  let checkingActiveChat = false;
   $: chatActive = data.hasActiveChat;
 
   $: isArticlePage = /^\/ajuda-f10\/[^/]+\/?$/.test($page.url.pathname);
@@ -26,16 +27,20 @@
   }
 
   async function checkActiveChat(): Promise<void> {
+    if (checkingActiveChat) return;
+    checkingActiveChat = true;
     try {
       const response = await fetch("/api/support/chat/resume", { cache: "no-store" });
       if (response.ok) {
         const result = await response.json() as { active?: boolean };
         chatActive = result.active === true;
-      } else if (response.status === 401 || response.status === 409) {
+      } else {
         chatActive = false;
       }
     } catch {
-      // O estado da conversa permanece no servidor.
+      chatActive = false;
+    } finally {
+      checkingActiveChat = false;
     }
   }
 
@@ -53,7 +58,18 @@
     const handleOpenHelpAssistant = (): void => openChat();
     window.addEventListener("f10:open-help-assistant", handleOpenHelpAssistant);
 
-    return () => window.removeEventListener("f10:open-help-assistant", handleOpenHelpAssistant);
+    const refreshActiveChat = () => {
+      if (!chatOpen && document.visibilityState === "visible"
+        && (chatActive || data.customerSupport.authenticated)) void checkActiveChat();
+    };
+    refreshActiveChat();
+    const timer = window.setInterval(refreshActiveChat, 15_000);
+    document.addEventListener("visibilitychange", refreshActiveChat);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshActiveChat);
+      window.removeEventListener("f10:open-help-assistant", handleOpenHelpAssistant);
+    };
   });
 </script>
 

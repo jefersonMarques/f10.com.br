@@ -92,7 +92,7 @@ jobs:
           node --test tests/publicChatReactionPopover.test.mjs
           node --test tests/publicChatCompactActions.test.mjs
           node --test tests/publicChatCustomerClosure.test.mjs
-          node --test tests/customerChatResume.test.mjs
+          node --test tests/customerChatResume.test.mjs tests/customerChatAvailability.test.mjs
           node --test tests/publicHelpdeskBranding.test.mjs
           node --test tests/mentionSuggestionsVisibility.test.mjs
           node --experimental-strip-types --test tests/chatEntryRouting.test.mjs

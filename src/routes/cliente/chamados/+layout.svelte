@@ -93,6 +93,9 @@
         cache: "no-store",
       });
       if (!response.ok) {
+        chatActive = false;
+        chatUnread = false;
+        lastActiveCheckAt = 0;
         await checkActiveChat();
         return;
       }
@@ -127,11 +130,14 @@
       if (response.ok) {
         const payload = await response.json() as { active?: boolean };
         chatActive = payload.active === true;
-      } else if (response.status === 401 || response.status === 409) {
+        if (!chatActive) chatUnread = false;
+      } else {
         chatActive = false;
+        chatUnread = false;
       }
     } catch {
-      // A consulta de presença não interrompe o portal.
+      chatActive = false;
+      chatUnread = false;
     }
   }
 

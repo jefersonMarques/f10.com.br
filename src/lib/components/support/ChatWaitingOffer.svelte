@@ -6,6 +6,7 @@
   export let token: string;
   export let waitingSinceMs: number | null = null;
   export let available = false;
+  export let outsideSupportHours = false;
   export let unitName: string | null = null;
   export let groupName: string | null = null;
   export let suggestedDescription = "";
@@ -23,7 +24,7 @@
   let errorMessage = "";
   let fileInput: HTMLInputElement;
 
-  $: cycleKey = waitingSinceMs === null ? "" : `f10:chat-wait:${sessionId}:${waitingSinceMs}`;
+  $: cycleKey = outsideSupportHours ? `f10:chat-wait:${sessionId}:outside-hours` : waitingSinceMs === null ? "" : `f10:chat-wait:${sessionId}:${waitingSinceMs}`;
   $: dismissed = Boolean(cycleKey) && dismissedKey === cycleKey;
   $: if (browser && cycleKey) readDismissal(cycleKey);
 
@@ -137,10 +138,10 @@
     <button type="button" on:click={openForm} class="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-[#DDE2EB] bg-white px-3 py-2 text-[13px] font-medium text-[#000A57]"><Ticket size={15}/> Abrir chamado</button>
   {:else}
     <section class="mt-4 space-y-3 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm" aria-label="Aguardando atendimento">
-      <div class="flex items-center gap-2 text-[13px] font-semibold text-[#000A57]"><Clock3 size={18}/> Aguardando atendimento</div>
-      <p class="text-[14px] leading-6 text-[#384152]">Você está na nossa fila. Se preferir não aguardar, abra um chamado e nossa equipe dará continuidade por lá.</p>
+      <div class="flex items-center gap-2 text-[13px] font-semibold text-[#000A57]"><Clock3 size={18}/> {outsideSupportHours ? "Fora do horário de atendimento" : "Aguardando atendimento"}</div>
+      <p class="text-[14px] leading-6 text-[#384152]">{outsideSupportHours ? "Você pode abrir um chamado agora. Nossa equipe dará continuidade no próximo período de atendimento." : "Você está na nossa fila. Se preferir não aguardar, abra um chamado e nossa equipe dará continuidade por lá."}</p>
       <button type="button" on:click={openForm} class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] text-[14px] font-semibold text-white"><Ticket size={17}/> Abrir chamado</button>
-      <button type="button" on:click={dismissOffer} class="flex min-h-11 w-full items-center justify-center rounded-xl border border-[#DDE2EB] text-[14px] font-semibold text-[#000A57]">Aguardar atendimento</button>
+      <button type="button" on:click={dismissOffer} class="flex min-h-11 w-full items-center justify-center rounded-xl border border-[#DDE2EB] text-[14px] font-semibold text-[#000A57]">{outsideSupportHours ? "Continuar no chat" : "Aguardar atendimento"}</button>
     </section>
   {/if}
 {/if}

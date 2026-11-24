@@ -33,6 +33,7 @@
     EllipsisVertical,
     Paperclip,
     Send,
+    Ticket,
     UserRound,
     X,
   } from "lucide-svelte";
@@ -164,6 +165,8 @@
   let fileInputElement: HTMLInputElement;
   let restored = false;
   let resumeLoading = false;
+  let hasConfirmedActiveChat = false;
+  let checkingActiveChat = false;
   let resumeCheckedForOpen = false;
   let resumeOnly = false;
   let storedSessionHint = "";
@@ -351,11 +354,28 @@
     errorMessage = message;
   }
 
+  async function checkActiveChatAvailability(): Promise<void> {
+    if (checkingActiveChat || !authState.authenticated || authState.requiresUnitSelection
+      || session || handoffRequested || convertedTicket) return;
+    checkingActiveChat = true;
+    try {
+      const response = await fetch("/api/support/chat/resume", { cache: "no-store" });
+      const payload = response.ok ? await response.json() as { active?: boolean } : null;
+      hasConfirmedActiveChat = payload?.active === true;
+    } catch {
+      hasConfirmedActiveChat = false;
+    } finally {
+      checkingActiveChat = false;
+    }
+  }
+
   async function checkRestorableChat(): Promise<void> {
     if (authState.authenticated && !authState.requiresUnitSelection) {
-      await recoverActiveChat();
+      if (session || storedSessionHint) await recoverActiveChat();
+      else await checkActiveChatAvailability();
     } else if (session || storedSessionHint) {
-      await requestResumeChat();
+      requireChatLogin("Entre na sua conta F10 para verificar seus atendimentos.");
+      await scrollToLatest();
     }
   }
 
@@ -403,6 +423,7 @@
       const recovered = payload.session;
       const priorSessionId = session?.sessionId ?? storedSessionHint;
       if (!recovered) {
+        hasConfirmedActiveChat = false;
         if (priorSessionId) {
           clearStoredSession();
           storedSessionHint = "";
@@ -427,6 +448,7 @@
       }
 
       session = recovered;
+      hasConfirmedActiveChat = false;
       storedSessionHint = recovered.sessionId;
       persistSession(recovered);
       resumeOnly = false;
@@ -473,6 +495,7 @@
       try { window.sessionStorage.removeItem(STORAGE_KEY); } catch {}
     }
     session = null;
+    hasConfirmedActiveChat = false;
     waitingStatus = { waitingSinceMs: null, offerTicket: false };
     messages = [];
     newMessageCount = 0;
@@ -557,7 +580,10 @@
 
     if (!shouldPoll) return;
     void refreshStatus();
-    statusTimer = setInterval(() => void refreshStatus(), 60_000);
+    statusTimer = setInterval(() => {
+      void refreshStatus();
+      void checkActiveChatAvailability();
+    }, 60_000);
   }
 
   async function refreshStatus(): Promise<void> {
@@ -1007,6 +1033,7 @@
       }
 
       session = nextSession;
+      hasConfirmedActiveChat = false;
       storedSessionHint = nextSession.sessionId;
       persistSession(nextSession);
       handoffRequested = false;
@@ -1639,6 +1666,7 @@
               token={session.token}
               waitingSinceMs={waitingStatus.waitingSinceMs}
               available={waitingStatus.offerTicket}
+              outsideSupportHours={status?.isOpen === false}
               unitName={authState.unitName}
               groupName={authState.groupName}
               suggestedDescription={messages.filter((message) => message.authorType === "customer" && !message.optimistic).at(-1)?.body ?? ""}
@@ -1667,6 +1695,13 @@
           {/each}
 
           {#if activeDepartment === "support" && !handoffRequested}
+            {#if status?.isOpen === false}
+              <section class="ml-10 space-y-3 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm" aria-label="Atendimento fora do horário">
+                <h3 class="text-[14px] font-semibold text-[#18233D]">Estamos fora do horário de atendimento</h3>
+                <p class="text-[13px] leading-5 text-[#596171]">{status.nextOpenLabel ? "Nossa equipe retorna " + status.nextOpenLabel.toLowerCase() + "." : "Nossa equipe retorna no próximo expediente."} Você pode abrir um chamado agora.</p>
+                <a href="/cliente/chamados/novo" target="_blank" rel="noopener noreferrer" class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white"><Ticket size={17}/> Abrir chamado</a>
+              </section>
+            {/if}
             <div class="ml-10 flex flex-wrap gap-2 pt-1">
               {#if guestMessages.length <= 3}
                 {#if entryOptionsLoading}
@@ -1680,7 +1715,9 @@
                   {/each}
                 {/if}
               {/if}
-              <button type="button" on:click={() => void requestResumeChat()} class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#DDE1E9] bg-white px-3 text-[12px] font-semibold text-[#000A57]"><MessageCircleMore size={15}/> Retomar atendimento</button>
+              {#if authState.authenticated && !authState.requiresUnitSelection && hasConfirmedActiveChat}
+                <button type="button" on:click={() => void requestResumeChat()} class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#DDE1E9] bg-white px-3 text-[12px] font-semibold text-[#000A57]"><MessageCircleMore size={15}/> Retomar atendimento</button>
+              {/if}
               <button type="button" on:click={() => void requestHumanSupport()}
                 class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#E8BD9D] bg-[#FFF6EC] px-3 text-[12px] font-semibold text-[#A64B08] transition hover:bg-[#FFEBD9]">
                 <UserRound size={15} aria-hidden="true"/> Falar com a equipe
