@@ -6,7 +6,8 @@ const source = (path) => readFileSync(path, "utf8");
 const dialog = source("src/lib/components/onboarding/SupportChatDialog.svelte");
 const waiting = source("src/lib/server/support/chatWaitingService.ts");
 const offer = source("src/lib/components/support/ChatWaitingOffer.svelte");
-const portal = source("src/routes/cliente/chamados/novo/+page.server.ts");
+const portal = source("src/routes/api/support/chat/ticket/+server.ts");
+const start = source("src/routes/api/support/chat/start/+server.ts");
 
 test("resume choice requires a positive authenticated server lookup", () => {
   assert.match(dialog, /hasConfirmedActiveChat = payload\?\.active === true/);
@@ -15,10 +16,19 @@ test("resume choice requires a positive authenticated server lookup", () => {
   assert.match(dialog, /session = null;\s*hasConfirmedActiveChat = false/);
 });
 
-test("after-hours customers can open tickets without creating a chat", () => {
-  assert.match(dialog, /\{#if status\?\.isOpen === false\}[\s\S]*?href="\/cliente\/chamados\/novo"/);
-  assert.match(portal, /requireCustomerF10PortalSession/);
-  assert.match(portal, /createCustomerF10Ticket\(session,/);
+test("assistant starts naturally and offers inline tickets only after an unresolved request", () => {
+  assert.match(dialog, /guestOffer: "none" \| "handoff" \| "ticket" = "none"/);
+  assert.match(dialog, /\{#if guestOffer !== "none"\}/);
+  assert.match(dialog, /guestOffer === "handoff" && status\?\.isOpen !== false/);
+  assert.doesNotMatch(dialog, /href="\/cliente\/chamados\/novo"/);
+  assert.match(dialog, /on:click=\{\(\) => void requestTicket\(\)\}/);
+  assert.match(dialog, /bind:opened=\{ticketFormOpen\}/);
+  assert.match(offer, /"\/api\/support\/chat\/ticket"/);
+  assert.match(portal, /getOptionalCustomerF10PortalSession\(cookies\)/);
+  assert.match(portal, /isAuthorizedF10Context\(customer, groupId, unitId\)/);
+  assert.match(portal, /createCustomerF10Ticket\(customer,/);
+  assert.match(portal, /findActiveCustomerChat/);
+  assert.match(start, /error: "SUPPORT_OUTSIDE_HOURS"/);
 });
 
 test("eligible chats can convert outside hours independently of waiting rules", () => {

@@ -183,11 +183,13 @@
   let messages: ChatMessage[] = [];
   let waitingStatus: { waitingSinceMs: number | null; offerTicket: boolean } = { waitingSinceMs: null, offerTicket: false };
   let conversionSubmitting = false;
+  let ticketRequested = false;
+  let ticketFormOpen = false;
+  let guestOffer: "none" | "handoff" | "ticket" = "none";
   let convertedTicket: { ticketId: string; ticketNumber: number } | null = null;
   let guestMessages: GuestMessage[] = [];
   let status: SupportStatus | null = null;
   let entryOptions: EntryOption[] = [];
-  $: supportEntryOptions = filterChatOptionsByDepartment(entryOptions, "support");
   $: financeEntryOptions = filterChatOptionsByDepartment(entryOptions, "finance")
     .filter((option) => getFinanceEntryAction(option) !== null);
   let entryOptionsLoaded = false;
@@ -218,6 +220,8 @@
   let configuredDepartment = entryDepartment;
   $: if (entryDepartment !== configuredDepartment) {
     configuredDepartment = entryDepartment;
+    ticketRequested = false;
+    ticketFormOpen = false;
     financeAction = null;
     handoffRequested = false;
     selectedEntryOptionId = "";
@@ -242,9 +246,9 @@
   $: if (browser && isOpen && !entryOptionsLoaded && !entryOptionsLoading) void refreshEntryOptions();
   $: if (browser && isOpen && restored && initializedDepartment !== activeDepartment) {
     initializedDepartment = activeDepartment;
-    if (activeDepartment === "finance" && !resumeOnly) {
+    if (activeDepartment === "finance" && !resumeOnly && !ticketRequested) {
       handoffRequested = false;
-    } else if (activeDepartment === "support" && !session && !resumeOnly) {
+    } else if (activeDepartment === "support" && !session && !resumeOnly && !ticketRequested) {
       handoffRequested = false;
       authStep = "login";
       selectedEntryOptionId = "";
@@ -266,6 +270,13 @@
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
   $: departmentSessionMismatch = session !== null
     && (session.department ?? "support") !== activeDepartment;
+  $: ticketDescription = (session
+    ? messages.filter((message) => message.authorType === "customer" && !message.optimistic).map((message) => message.body)
+    : guestMessages.filter((message) => message.role === "customer").map((message) => message.body))
+      .filter((body) => body.trim() && !/^(?:solicito atendimento|quero (?:abrir|criar) (?:um )?chamado|falar com a equipe)/i.test(body.trim()))
+      .slice(-6).join("\n\n").slice(0, 10000);
+  $: ticketFormReady = authState.authenticated && !authState.requiresNameConfirmation
+    && !authState.requiresUnitSelection && authStep === "ready" && !handoffRequested && !resumeLoading;
 
   function initializeAuthState(): void {
     authState = {
@@ -738,36 +749,47 @@
     }
   }
 
-  async function selectEntryOption(option: EntryOption): Promise<void> {
-    selectedEntryOptionId = option.id;
-    selectedEntryOptionLabel = option.label;
+  function cancelTicketRequest(): void {
+    ticketRequested = false;
+    ticketFormOpen = false;
+    handoffRequested = false;
+    resumeOnly = false;
     errorMessage = "";
-    guestMessages = [...guestMessages, createGuestMessage("customer", option.label)];
+    if (authStep === "profile") authStep = "login";
+  }
 
-    if (option.initialHandling === "human") {
-      const message = authState.authenticated
-        ? authState.requiresUnitSelection
-          ? "Certo. Sua conta já está identificada. Selecione o grupo e a unidade para eu encaminhar este atendimento."
-          : "Certo. Sua conta já está identificada. Vou encaminhar este atendimento para a equipe F10."
-        : "Certo. Para falar com a equipe, preciso identificar sua conta F10. O login acontece aqui mesmo e sua senha não fica armazenada.";
-      guestMessages = [...guestMessages, createGuestMessage("assistant", message)];
-      await requestHumanSupport();
+  async function requestTicket(): Promise<void> {
+    if (conversionSubmitting || resumeLoading) return;
+    ticketRequested = true;
+    ticketFormOpen = true;
+    resumeOnly = false;
+    handoffRequested = true;
+    errorMessage = "";
+    if (!authState.authenticated) {
+      authStep = "login";
+      await scrollToLatest();
       return;
     }
+    await continueAfterAuthentication();
+    await scrollToLatest();
+  }
 
-    guestMessages = [
-      ...guestMessages,
-      createGuestMessage("assistant", option.description
-        ? `${option.description}. Conte um pouco mais sobre o que está acontecendo.`
-        : "Certo. Conte um pouco mais sobre o que está acontecendo."),
-    ];
+  function handleTicketFormOpen(): void {
+    ticketRequested = true;
+    void scrollToLatest();
+  }
+
+  async function reauthenticateTicket(): Promise<void> {
+    ticketRequested = true;
+    requireChatLogin("Entre novamente na sua conta F10 para enviar o chamado.");
     await scrollToLatest();
   }
 
   async function sendGuestMessage(): Promise<void> {
     const body = guestReply.trim();
-    if (!body || assistantSending) return;
+    if (!body || assistantSending || ticketRequested || handoffRequested) return;
 
+    guestOffer = "none";
     errorMessage = "";
     guestReply = "";
     const previousContext = buildAssistantContext();
@@ -789,27 +811,35 @@
 
       if (!response.ok) {
         errorMessage = apiErrorMessage(typeof payload.error === "string" ? payload.error : "");
+        guestOffer = "ticket";
+        await scrollToLatest();
         return;
       }
 
       const answer = typeof payload.answer === "string" && payload.answer.trim()
         ? payload.answer.trim()
-        : "Não consegui responder com segurança. Você pode falar com a equipe F10.";
+        : "Essa situação precisa de uma análise da nossa equipe técnica.";
       updateUnresolvedCount(payload.unresolvedCount);
-      guestMessages = [...guestMessages, createGuestMessage("assistant", answer)];
-      await scrollToLatest();
-
-      if (payload.requiresHuman === true) {
-        await requestHumanSupport();
+      const needsHuman = payload.requiresHuman === true;
+      const offersTicket = payload.offerTicket === true || payload.action === "ticket_offer";
+      if (needsHuman || offersTicket) {
+        await refreshStatus();
+        guestOffer = needsHuman ? "handoff" : "ticket";
       }
+      const responseText = needsHuman && status?.isOpen === false
+        ? "Essa situação precisa de uma análise da nossa equipe técnica."
+        : offersTicket ? "Posso registrar um chamado para você aqui mesmo." : answer;
+      guestMessages = [...guestMessages, createGuestMessage("assistant", responseText)];
+      await scrollToLatest();
     } catch {
       guestMessages = [
         ...guestMessages,
         createGuestMessage(
           "assistant",
-          "Não consegui consultar o assistente agora. Tente novamente ou, se preferir, use “Falar com a equipe”.",
+          "Não consegui consultar o assistente agora. Tente novamente ou abra um chamado aqui mesmo.",
         ),
       ];
+      guestOffer = "ticket";
       await scrollToLatest();
     } finally {
       assistantSending = false;
@@ -825,6 +855,14 @@
   }
 
   async function requestHumanSupport(): Promise<void> {
+    if (activeDepartment === "support") {
+      await refreshStatus();
+      if (status?.isOpen === false) {
+        guestOffer = "handoff";
+        await scrollToLatest();
+        return;
+      }
+    }
     resumeOnly = false;
     handoffRequested = true;
     errorMessage = "";
@@ -943,6 +981,19 @@
     }
     authStep = "ready";
     const result = await recoverActiveChat();
+    if (ticketRequested) {
+      if (result === "error") return;
+      if (result === "resumed" && (session?.department ?? "support") !== activeDepartment) {
+        cancelTicketRequest();
+        errorMessage = "Existe um atendimento em outro setor. Continue por essa conversa.";
+        return;
+      }
+      handoffRequested = false;
+      resumeOnly = false;
+      ticketFormOpen = true;
+      await scrollToLatest();
+      return;
+    }
     if (result !== "none") return;
     if (resumeOnly) {
       resumeOnly = false;
@@ -959,7 +1010,16 @@
   }
 
   async function startHumanChat(checkedActiveChat = false): Promise<void> {
-    if (session || starting || resumeLoading || !authState.authenticated) return;
+    if (session || starting || resumeLoading || !authState.authenticated || ticketRequested) return;
+    if (activeDepartment === "support") {
+      await refreshStatus();
+      if (status?.isOpen === false) {
+        handoffRequested = false;
+        guestOffer = "handoff";
+        await scrollToLatest();
+        return;
+      }
+    }
     if (authState.requiresNameConfirmation) {
       authStep = "profile";
       await scrollToLatest();
@@ -997,6 +1057,18 @@
       const payload = await response.json() as Record<string, unknown>;
 
       if (!response.ok) {
+        if (payload.error === "SUPPORT_OUTSIDE_HOURS") {
+          await refreshStatus();
+          status = status ? { ...status, isOpen: false, nextOpenLabel: typeof payload.nextOpenLabel === "string" ? payload.nextOpenLabel : status.nextOpenLabel } : {
+            supportDisplayName: "F10", hoursConfigured: true, isOpen: false,
+            nextOpenLabel: typeof payload.nextOpenLabel === "string" ? payload.nextOpenLabel : null,
+            onlineAgents: null, averageWaitMinutes: null, waitSampleCount: 0,
+          };
+          guestOffer = "handoff";
+          handoffRequested = false;
+          await scrollToLatest();
+          return;
+        }
         if (response.status === 401) {
           authState = { ...authState, authenticated: false, requiresUnitSelection: false, groups: [] };
           authStep = "login";
@@ -1353,6 +1425,9 @@
     reply = "";
     guestReply = "";
     guestMessages = [];
+    guestOffer = "none";
+    ticketRequested = false;
+    ticketFormOpen = false;
     handoffRequested = false;
     conversionSubmitting = false;
     errorMessage = "";
@@ -1407,6 +1482,9 @@
       revokeImages(pendingImages);
       pendingImages = [];
       guestMessages = [];
+      guestOffer = "none";
+      ticketRequested = false;
+      ticketFormOpen = false;
       guestReply = "";
       reply = "";
       handoffRequested = false;
@@ -1660,22 +1738,7 @@
             {/each}
           </div>
         {/if}
-        {#if authState.authenticated && !authRequiredForSession && !departmentSessionMismatch}
-          {#key session.sessionId}
-            <ChatWaitingOffer
-              sessionId={session.sessionId}
-              token={session.token}
-              waitingSinceMs={waitingStatus.waitingSinceMs}
-              available={waitingStatus.offerTicket}
-              outsideSupportHours={status?.isOpen === false}
-              unitName={authState.unitName}
-              groupName={authState.groupName}
-              suggestedDescription={messages.filter((message) => message.authorType === "customer" && !message.optimistic).at(-1)?.body ?? ""}
-              bind:submitting={conversionSubmitting}
-              onConverted={handleConvertedTicket}
-            />
-          {/key}
-        {/if}
+
       {:else}
         <div class="space-y-3">
           {#each (activeDepartment === "support" ? guestMessages : []) as message (message.id)}
@@ -1695,41 +1758,22 @@
             {/if}
           {/each}
 
-          {#if activeDepartment === "support" && !handoffRequested}
-            {#if status?.isOpen === false}
-              <section class="ml-10 space-y-3 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm" aria-label="Atendimento fora do horário">
-                <h3 class="text-[14px] font-semibold text-[#18233D]">Estamos fora do horário de atendimento</h3>
-                <p class="text-[13px] leading-5 text-[#596171]">{status.nextOpenLabel ? "Nossa equipe retorna " + status.nextOpenLabel.toLowerCase() + "." : "Nossa equipe retorna no próximo expediente."} Você pode abrir um chamado agora.</p>
-                {#if hasConfirmedActiveChat}
-                  <button type="button" on:click={() => void requestResumeChat()} class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white"><Ticket size={17}/> Abrir chamado</button>
-                {:else if checkingActiveChat}
-                  <div class="flex min-h-11 items-center justify-center text-[13px] text-[#697184]"><LoaderCircle size={16} class="animate-spin"/></div>
-                {:else}
-                <a href="/cliente/chamados/novo" target="_blank" rel="noopener noreferrer" class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white"><Ticket size={17}/> Abrir chamado</a>
+          {#if activeDepartment === "support" && !handoffRequested && !ticketRequested && !assistantSending}
+            {#if guestOffer !== "none"}
+              <section class="ml-10 space-y-2 rounded-2xl border border-[#DDE2EB] bg-white p-3.5 shadow-sm" aria-label="Opções de atendimento">
+                {#if status?.isOpen === false}
+                  <p class="text-[13px] leading-5 text-[#596171]">{status.nextOpenLabel ? "Nossa equipe retorna " + status.nextOpenLabel.toLowerCase() + "." : "Nossa equipe retorna no próximo expediente."} Você pode abrir um chamado aqui mesmo.</p>
                 {/if}
+                <button type="button" on:click={() => void requestTicket()} class="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white"><Ticket size={16}/> Abrir chamado</button>
+                {#if guestOffer === "handoff" && status?.isOpen !== false}
+                  <button type="button" on:click={() => void requestHumanSupport()} class="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#DDE1E9] text-[13px] font-semibold text-[#000A57]"><UserRound size={15}/> Falar com a equipe</button>
+                {/if}
+                <button type="button" on:click={() => (guestOffer = "none")} class="min-h-9 w-full text-[13px] font-medium text-[#596171]">Continuar com o assistente</button>
               </section>
             {/if}
-            <div class="ml-10 flex flex-wrap gap-2 pt-1">
-              {#if guestMessages.length <= 3}
-                {#if entryOptionsLoading}
-                  <LoaderCircle class="animate-spin text-[#8A909E]" size={16}/>
-                {:else}
-                  {#each supportEntryOptions as option}
-                    <button type="button" on:click={() => void selectEntryOption(option)}
-                      class="min-h-9 rounded-xl border border-[#DDE1E9] bg-white px-3 text-[12px] font-semibold text-[#3D4556] transition hover:border-[#BFC5D2] hover:text-[#000A57]">
-                      {option.label}
-                    </button>
-                  {/each}
-                {/if}
-              {/if}
-              {#if authState.authenticated && !authState.requiresUnitSelection && hasConfirmedActiveChat}
-                <button type="button" on:click={() => void requestResumeChat()} class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#DDE1E9] bg-white px-3 text-[12px] font-semibold text-[#000A57]"><MessageCircleMore size={15}/> Retomar atendimento</button>
-              {/if}
-              <button type="button" on:click={() => void requestHumanSupport()}
-                class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#E8BD9D] bg-[#FFF6EC] px-3 text-[12px] font-semibold text-[#A64B08] transition hover:bg-[#FFEBD9]">
-                <UserRound size={15} aria-hidden="true"/> Falar com a equipe
-              </button>
-            </div>
+            {#if authState.authenticated && !authState.requiresUnitSelection && hasConfirmedActiveChat}
+              <button type="button" on:click={() => void requestResumeChat()} class="ml-10 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#DDE1E9] bg-white px-3 text-[12px] font-semibold text-[#000A57]"><MessageCircleMore size={15}/> Retomar atendimento</button>
+            {/if}
           {/if}
 
           {#if activeDepartment === "support" && assistantSending}
@@ -1746,7 +1790,7 @@
               {:else if authStep === "login" && !authState.authenticated}
                 <div class="flex items-start gap-2.5">
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><LockKeyhole size={16}/></span>
-                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">{activeDepartment === "finance" ? "Entre para acessar o Financeiro" : "Entre para falar com a equipe"}</h3><p class="mt-1 text-[12px] leading-5 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
+                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">{ticketRequested ? "Entre para abrir seu chamado" : activeDepartment === "finance" ? "Entre para acessar o Financeiro" : "Entre para falar com a equipe"}</h3><p class="mt-1 text-[12px] leading-5 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
                 </div>
                 <form class="mt-4 space-y-3" on:submit|preventDefault={submitLogin}>
                   <label class="block text-[11px] font-semibold text-[#596171]">E-mail F10<input bind:value={loginEmail} type="email" required maxlength="254" autocomplete="username" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
@@ -1768,11 +1812,11 @@
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><CheckCircle2 size={16}/></span>
                   <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Acesso confirmado</h3><p class="mt-1 text-[12px] leading-4 text-[#7B8292]">Seu grupo e unidade foram identificados. Tente conectar ao atendimento novamente.</p></div>
                 </div>
-                <button type="button" on:click={() => resumeOnly ? void requestResumeChat() : void startHumanChat()} disabled={starting || resumeLoading} class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Tentar conectar ao atendimento</button>
+                <button type="button" on:click={() => ticketRequested ? void requestTicket() : resumeOnly ? void requestResumeChat() : void startHumanChat()} disabled={starting || resumeLoading} class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Tentar conectar ao atendimento</button>
               {/if}
               {#if errorMessage}<p class="mt-3 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[11px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
               {#if activeDepartment === "support" && !starting}
-                <button type="button" on:click={() => (handoffRequested = false)} class="mt-3 text-[11px] font-semibold text-[#000A57] underline underline-offset-2">
+                <button type="button" on:click={cancelTicketRequest} class="mt-3 text-[11px] font-semibold text-[#000A57] underline underline-offset-2">
                   Voltar ao Assistente F10
                 </button>
               {/if}
@@ -1780,6 +1824,27 @@
           {/if}
         </div>
       {/if}
+      {/if}
+      {#if !convertedTicket && !departmentSessionMismatch && (session || ticketRequested)}
+        <ChatWaitingOffer
+          sessionId={session?.sessionId ?? ""}
+          token={session?.token ?? ""}
+          waitingSinceMs={waitingStatus.waitingSinceMs}
+          available={Boolean(session) && waitingStatus.offerTicket}
+          outsideSupportHours={status?.isOpen === false}
+          unitName={authState.unitName}
+          groupName={authState.groupName}
+          suggestedDescription={ticketDescription}
+          assistantTranscript={session ? "" : buildGuestTranscript()}
+          ready={ticketFormReady && !authRequiredForSession}
+          bind:opened={ticketFormOpen}
+          bind:submitting={conversionSubmitting}
+          onOpen={handleTicketFormOpen}
+          onCancel={cancelTicketRequest}
+          onAuthRequired={reauthenticateTicket}
+          onActiveChat={requestTicket}
+          onConverted={handleConvertedTicket}
+        />
       {/if}
     </div>
 
@@ -1789,7 +1854,7 @@
 
     {#if convertedTicket}
       <div class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-2 text-center text-[12px] text-[#697184]">Continue o atendimento pelo chamado.</div>
-    {:else if resumeLoading || (authStep === "profile" && authState.authenticated)}
+    {:else if ticketFormOpen || resumeLoading || (authStep === "profile" && authState.authenticated)}
       <div class="shrink-0 border-t border-[#E6E8EF] bg-white py-2"></div>
     {:else if session && (activeDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>

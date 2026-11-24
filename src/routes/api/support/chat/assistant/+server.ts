@@ -258,7 +258,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     if (result.resolution === "failed") {
       return json(assistantPayload({
         answer: ASSISTANT_RETRY_MESSAGE,
-        action: "answer",
+        action: "ticket_offer",
         aiAvailable: false,
         unresolvedCount,
         searchEventId: result.searchEventId,
@@ -289,7 +289,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     });
     return json(assistantPayload({
       answer: ASSISTANT_RETRY_MESSAGE,
-      action: "answer",
+      action: "ticket_offer",
       aiAvailable: false,
       unresolvedCount,
     }), { status: 200, headers: { "Cache-Control": "no-store" } });
