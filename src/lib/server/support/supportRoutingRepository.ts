@@ -378,7 +378,7 @@ export async function autoAssignTicketIfConfigured(
   const [chatSession] = await db
     .select({ id: webChatSessions.id })
     .from(webChatSessions)
-    .where(eq(webChatSessions.ticketId, ticketId))
+    .where(and(eq(webChatSessions.ticketId, ticketId), isNull(webChatSessions.closedAt)))
     .limit(1);
   const isChat = Boolean(chatSession?.id);
   const responders = isChat

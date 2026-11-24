@@ -1,3 +1,4 @@
+import { lockChatForWrite } from "$lib/server/support/chatWriteLock";
 import { and, eq, isNull } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
@@ -66,6 +67,7 @@ export async function finishInternalChat(
 
   const now = new Date();
   await db.transaction(async (tx) => {
+    await lockChatForWrite(tx, sessionId, chat);
     await tx
       .update(webChatSessions)
       .set({

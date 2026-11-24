@@ -1,3 +1,4 @@
+import { lockChatForWrite } from "$lib/server/support/chatWriteLock";
 import { randomUUID } from "node:crypto";
 import { chatWaitingSinceMs } from "$lib/server/support/chatWaitingQuery";
 import {
@@ -323,6 +324,7 @@ export async function claimInternalChat(
 
   const now = new Date();
   await db.transaction(async (tx) => {
+    await lockChatForWrite(tx, sessionId, chat);
     await tx
       .update(webChatSessions)
       .set({
@@ -420,6 +422,7 @@ export async function assignInternalChat(
 
   const now = new Date();
   await db.transaction(async (tx) => {
+    await lockChatForWrite(tx, sessionId, chat);
     await tx
       .update(webChatSessions)
       .set({
@@ -534,6 +537,7 @@ export async function respondToInternalChat(
   const now = new Date();
   try {
     await db.transaction(async (tx) => {
+    const lockedChat = await lockChatForWrite(tx, sessionId, chat);
     await tx
       .update(webChatSessions)
       .set({
@@ -542,7 +546,7 @@ export async function respondToInternalChat(
         aiHandoffReason: "Conversa assumida por um atendente humano.",
         aiHandoffAt: now,
         aiProcessingAt: null,
-        firstResponseAt: chat.firstResponseAt ?? now,
+        firstResponseAt: lockedChat.firstResponseAt ?? now,
         updatedAt: now,
       })
       .where(eq(webChatSessions.id, sessionId));
@@ -557,7 +561,7 @@ export async function respondToInternalChat(
       });
     }
 
-    if (!chat.firstResponseAt) {
+    if (!lockedChat.firstResponseAt) {
       await tx.insert(supportChatEvents).values({
         sessionId,
         eventType: "first_response",

@@ -142,7 +142,7 @@ async function convertChatToTicket(sessionId: string, actor: ConversionActor): P
     const [existing] = await db.select({ id: tickets.id, ticketNumber: tickets.ticketNumber })
       .from(tickets).where(eq(tickets.id, initialChat.ticketId!)).limit(1);
     if (!existing) throw new Error("CHAT_LINKED_TICKET_NOT_FOUND");
-    return { ticketId: existing.id, ticketNumber: existing.ticketNumber, created: false, submitted: Boolean(alreadyConverted) };
+    return { ticketId: existing.id, ticketNumber: existing.ticketNumber, created: false, submitted: false };
   }
   if (initialChat.closedAt || (customer && initialChat.aiState === "active")) {
     throw new Error("CHAT_TICKET_NOT_AVAILABLE");

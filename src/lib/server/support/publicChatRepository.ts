@@ -1,3 +1,4 @@
+import { lockChatForWrite } from "$lib/server/support/chatWriteLock";
 import { env } from "$env/dynamic/private";
 import {
   createHash,
@@ -269,6 +270,7 @@ export async function addPublicChatSystemMessage(
   if (!session) throw new Error("CHAT_SESSION_INVALID");
 
   await db.transaction(async (tx) => {
+    await lockChatForWrite(tx, sessionId, session);
     if (session.ticketId) {
       await tx.insert(ticketMessages).values({
         ticketId: session.ticketId,
@@ -479,6 +481,7 @@ export async function addPublicChatMessage(
     const storedImages = await uploadSupportChatMessageAttachments(sessionId, messageId, files);
     try {
       await db.transaction(async (tx) => {
+        await lockChatForWrite(tx, sessionId, { ticketId: session.ticketId, tokenHash: hashSessionToken(token) });
         await tx.insert(webChatMessages).values({
           id: messageId,
           sessionId,
@@ -543,6 +546,7 @@ export async function addPublicChatMessage(
   const storedImages = await uploadSupportMessageAttachments(ticketId, messageId, files);
   try {
     await db.transaction(async (tx) => {
+      await lockChatForWrite(tx, sessionId, { ticketId: session.ticketId, tokenHash: hashSessionToken(token) });
       await tx.insert(ticketMessages).values({
         id: messageId,
         ticketId,

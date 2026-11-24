@@ -75,7 +75,7 @@ export async function resumeActiveCustomerChatSession(input: {
         ),
       )
       .orderBy(desc(webChatSessions.updatedAt), desc(webChatSessions.createdAt))
-      .limit(1);
+      .limit(1).for("update");
 
     if (!session) return null;
     if (input.requiredQueueId && session.queueId !== input.requiredQueueId) {

@@ -1,3 +1,4 @@
+import { lockChatForWrite } from "$lib/server/support/chatWriteLock";
 import { and, eq, inArray } from "drizzle-orm";
 import { hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
@@ -84,6 +85,7 @@ export async function addInternalChatNote(
     : [];
 
   await db.transaction(async (tx) => {
+    await lockChatForWrite(tx, sessionId, { ticketId: null });
     await tx.insert(webChatMessages).values({
       sessionId,
       authorType: "user",
