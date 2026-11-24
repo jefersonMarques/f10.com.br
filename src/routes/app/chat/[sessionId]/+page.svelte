@@ -75,13 +75,24 @@
   let chat: ChatDetails = data.initial.chat;
   type ContextPanel = "customer" | "attendance" | "tickets" | "tasks" | "remote";
   let activeContextPanel: ContextPanel | null = null;
-  function selectContextPanel(panel: ContextPanel | null): void {
+  let savedScrollTop = 0;
+  let savedNearBottom = true;
+
+  async function selectContextPanel(panel: ContextPanel | null): Promise<void> {
+    if (activeContextPanel === panel) return;
+    if (activeContextPanel === null && messagesElement) {
+      savedScrollTop = messagesElement.scrollTop;
+      savedNearBottom = isNearBottom();
+    }
     activeContextPanel = panel;
+    if (panel !== null) return;
+    await tick();
+    if (savedNearBottom) await scrollToLatest("auto");
+    else messagesElement?.scrollTo({ top: savedScrollTop, behavior: "auto" });
   }
 
   async function openHistory(): Promise<void> {
-    activeContextPanel = null;
-    await tick();
+    await selectContextPanel(null);
     messagesElement?.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -173,6 +184,8 @@
     conversationInitialized = false;
     composerExpanded = false;
     activeContextPanel = null;
+    savedScrollTop = 0;
+    savedNearBottom = true;
     conversationKey = data.chatInbox.find((item) => item.sessionId === chat.sessionId)?.conversationKey ?? null;
     hasOlderMessages = false;
     loadingOlderMessages = false;
@@ -248,18 +261,20 @@
   }
 
   function isNearBottom(): boolean {
+    if (activeContextPanel !== null) return savedNearBottom;
     if (!messagesElement) return true;
     return messagesElement.scrollHeight - messagesElement.scrollTop - messagesElement.clientHeight <= BOTTOM_THRESHOLD;
   }
 
   async function scrollToLatest(behavior: ScrollBehavior = "smooth"): Promise<void> {
     await tick();
+    if (activeContextPanel !== null) return;
     messagesElement?.scrollTo({ top: messagesElement.scrollHeight, behavior });
     newMessageCount = 0;
   }
 
   function handleMessagesScroll(): void {
-    if (isNearBottom()) newMessageCount = 0;
+    if (activeContextPanel === null && isNearBottom()) newMessageCount = 0;
   }
 
   function persistDraft(): void {
@@ -282,6 +297,7 @@
   function collapseComposerOnOutsidePointerDown(event: PointerEvent): void {
     if (!composerExpanded || sending || !composerContainer) return;
     if (event.composedPath().includes(composerContainer)) return;
+    if (event.target instanceof Element && event.target.closest("[data-chat-panel-navigation]")) return;
     composerExpanded = false;
   }
 
@@ -575,7 +591,7 @@
           </div>
         {/if}
       </header>
-      <nav class="relative z-20 flex h-11 shrink-0 items-center border-b border-[var(--app-border)] bg-white px-3 sm:px-4" aria-label="Seções do chat">
+      <nav class="relative z-20 flex h-11 shrink-0 items-center border-b border-[var(--app-border)] bg-white px-3 sm:px-4" aria-label="Seções do chat" data-chat-panel-navigation>
         <div class="flex h-full min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap sm:gap-5">
           <button type="button" class={supportTabClass(null, activeContextPanel)} aria-pressed={activeContextPanel === null} on:click={() => selectContextPanel(null)}><MessageSquare size={14}/>Conversa</button>
           <button type="button" class={supportTabClass("customer", activeContextPanel)} aria-pressed={activeContextPanel === "customer"} on:click={() => selectContextPanel("customer")}><UserRound size={14}/>Cliente</button>
@@ -587,7 +603,7 @@
         </div>
       </nav>
 
-      <div class="flex min-h-0 flex-1 flex-col" class:hidden={activeContextPanel !== null}>
+      <div class={activeContextPanel === null ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
       <div class="relative min-h-[260px] flex-1 bg-[var(--app-surface-subtle)] lg:min-h-0">
         <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="absolute inset-0 overflow-y-auto px-3 py-4 sm:px-5">
           <div class="min-w-0">

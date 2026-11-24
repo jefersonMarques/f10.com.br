@@ -68,11 +68,11 @@
     return filteredUrl.pathname + filteredUrl.search;
   }
 
-  function matchesScope(chat: ChatInboxItem, value: ChatInboxScope): boolean {
+  function matchesScope(chat: ChatInboxItem, value: ChatInboxScope, userId: string): boolean {
     if (value === "all") return true;
     if (value === "finished") return !isChatOpen(chat);
     if (!isChatOpen(chat)) return false;
-    if (value === "mine") return chat.assignedUserId === currentUserId;
+    if (value === "mine") return chat.assignedUserId === userId;
     if (value === "unassigned") return !chat.assignedUserId;
     return isChatAwaitingAgent(chat);
   }
@@ -97,8 +97,8 @@
       .includes(normalized);
   }
 
-  function scopeCount(value: ChatInboxScope): number {
-    return inboxChats.filter((chat) => matchesScope(chat, value)).length;
+  function scopeCount(value: ChatInboxScope, items: ChatInboxItem[], userId: string): number {
+    return items.filter((chat) => matchesScope(chat, value, userId)).length;
   }
 
   function formatRelative(value: string | Date): string {
@@ -146,7 +146,7 @@
     lastNavigatedUrl = $page.url.href;
     scope = readChatInboxScope($page.url);
   }
-  $: filteredChats = inboxChats.filter((chat) => matchesScope(chat, scope) && matchesQuery(chat, query))
+  $: filteredChats = inboxChats.filter((chat) => matchesScope(chat, scope, currentUserId) && matchesQuery(chat, query))
     .sort((left, right) => scope === "waiting"
       ? (left.waitingSinceMs ?? Number.MAX_SAFE_INTEGER) - (right.waitingSinceMs ?? Number.MAX_SAFE_INTEGER)
       : new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
@@ -188,7 +188,7 @@
               aria-pressed={scope === item.value}
               class={`application-text-caption flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 font-semibold ${scope === item.value ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>
               {item.label}
-              <span class="tabular-nums text-[11px]">{scopeCount(item.value)}</span>
+              <span class="tabular-nums text-[11px]">{scopeCount(item.value, inboxChats, currentUserId)}</span>
             </button>
           {/each}
         </div>
