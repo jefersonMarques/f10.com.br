@@ -184,7 +184,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (requestsTicketCreation(message)) {
       return json(assistantPayload({
-        answer: "Entendi. Posso levar você para a abertura de um chamado. Ele só será criado depois que você revisar e confirmar os dados.",
+        answer: "Posso registrar um chamado aqui mesmo. Você poderá revisar os dados antes de enviar.",
         action: "ticket_offer",
         ticketUrl: "/cliente/chamados/novo",
         aiAvailable,
@@ -193,7 +193,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (requestsHumanSupport(message)) {
       return json(assistantPayload({
-        answer: "Para falar com um atendente, confirme seu acesso F10 no formulário abaixo. O encaminhamento acontecerá após a identificação.",
+        answer: "Posso encaminhar sua solicitação para nossa equipe.",
         action: "handoff",
         handoffReason: "O cliente pediu explicitamente atendimento humano.",
         aiAvailable,
@@ -267,7 +267,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (result.action === "handoff" || unresolvedCount >= MAX_UNRESOLVED_COUNT - 1) {
       return json(assistantPayload({
-        answer: "Não consegui encontrar uma resposta segura. Para continuar com um atendente, confirme seu acesso F10 no formulário abaixo.",
+        answer: "Essa situação precisa de uma análise da nossa equipe técnica.",
         action: "handoff",
         handoffReason: result.escalationReason || "O Assistente F10 solicitou atendimento humano.",
         aiAvailable,

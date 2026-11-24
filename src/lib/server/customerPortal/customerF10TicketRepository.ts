@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   and,
   desc,
@@ -89,6 +89,8 @@ export type CreateCustomerF10TicketInput = {
   subject: string;
   message: string;
   files?: File[];
+  assistantTranscript?: string;
+  requestId?: string;
 };
 
 export function canUseGlobalCustomerContext(session: CustomerF10PortalSession): boolean {
@@ -475,6 +477,13 @@ export async function getCustomerF10Ticket(
   };
 }
 
+function createIdempotentTicketId(session: CustomerF10PortalSession, input: CreateCustomerF10TicketInput): string {
+  const digest = createHash("sha256")
+    .update(JSON.stringify(["f10:chat-ticket:v1", session.legacyUserId, session.contactId, input.scope, input.groupId, input.unitId, input.requestId]))
+    .digest("hex");
+  return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+}
+
 export async function createCustomerF10Ticket(
   session: CustomerF10PortalSession,
   input: CreateCustomerF10TicketInput,
@@ -498,15 +507,35 @@ export async function createCustomerF10Ticket(
   if (subject.length < 3 || subject.length > 180) throw new Error("CUSTOMER_TICKET_SUBJECT_INVALID");
   if (message.length < 1 || message.length > 10_000) throw new Error("CUSTOMER_TICKET_MESSAGE_INVALID");
 
+  const transcript = input.assistantTranscript?.trim().slice(0, 8000) ?? "";
+  const ticketId = input.requestId
+    ? createIdempotentTicketId(session, input)
+    : randomUUID();
+  const db = getDatabase();
+
+  async function findExistingTicket() {
+    if (!input.requestId) return null;
+    const [existing] = await db.select({ id: tickets.id, ticketNumber: tickets.ticketNumber })
+      .from(tickets)
+      .innerJoin(ticketCustomerContexts, eq(ticketCustomerContexts.ticketId, tickets.id))
+      .where(and(
+        eq(tickets.id, ticketId),
+        eq(ticketCustomerContexts.customerContactId, session.contactId),
+        eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
+      )).limit(1);
+    return existing ?? null;
+  }
+
+  const existingTicket = await findExistingTicket();
+  if (existingTicket) return existingTicket;
+
   const intake = await resolveCustomerPortalTicketIntake();
-  const ticketId = randomUUID();
   const messageId = randomUUID();
   const storedAttachments = await uploadSupportMessageAttachments(
     ticketId,
     messageId,
     input.files ?? [],
   );
-  const db = getDatabase();
   const now = new Date();
   const sla = await calculateTicketSlaDeadlines(intake.queueId, now);
 
@@ -527,6 +556,7 @@ export async function createCustomerF10Ticket(
           firstResponseDueAt: sla.firstResponseDueAt,
           resolutionDueAt: sla.resolutionDueAt,
         })
+        .onConflictDoNothing({ target: tickets.id })
         .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
       if (!created) throw new Error("CUSTOMER_TICKET_NOT_CREATED");
 
@@ -537,7 +567,7 @@ export async function createCustomerF10Ticket(
         customerContactId: session.contactId,
         visibility: "public",
         channel: "portal",
-        body: message,
+        body: transcript ? `${message}\n\n---\n\nHistórico do Assistente F10:\n\n${transcript}` : message,
       });
 
       if (storedAttachments.length > 0) {
@@ -590,6 +620,10 @@ export async function createCustomerF10Ticket(
     });
   } catch (cause) {
     await deleteStoredSupportImages(storedAttachments);
+    if (cause instanceof Error && cause.message === "CUSTOMER_TICKET_NOT_CREATED") {
+      const existing = await findExistingTicket();
+      if (existing) return existing;
+    }
     throw cause;
   }
 

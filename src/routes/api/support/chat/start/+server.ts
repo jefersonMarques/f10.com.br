@@ -217,7 +217,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
       requiredQueueId: requestedQueueId,
       customerContext,
       handoffReason,
-      requestHuman: true,
+      requestHuman: department !== "support" || availability.isOpen !== false,
     });
     let existingSession = resumedSession;
     let session;
@@ -225,6 +225,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     if (existingSession) {
       session = existingSession;
     } else {
+      if (department === "support" && availability.isOpen === false) {
+        return json({ error: "SUPPORT_OUTSIDE_HOURS", nextOpenLabel: availability.nextOpenLabel }, { status: 409, headers: { "Cache-Control": "no-store" } });
+      }
       try {
         session = await startPublicChat(clientAddress, {
           name,
