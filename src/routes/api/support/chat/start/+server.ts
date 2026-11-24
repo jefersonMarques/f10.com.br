@@ -227,14 +227,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     } else {
       try {
         session = await startPublicChat(clientAddress, {
-        name,
-        email,
-        phone,
-        message,
-        entryOptionId: effectiveEntryOptionId,
-        contextUrl,
-        contextData: handoffContextData,
-        enableAi: false,
+          name,
+          email,
+          phone,
+          message,
+          entryOptionId: effectiveEntryOptionId,
+          contextUrl,
+          contextData: handoffContextData,
+          enableAi: false,
           customerContext,
         });
       } catch (cause) {

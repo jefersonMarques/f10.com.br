@@ -16,6 +16,8 @@
 
   let chatOpen = false;
   let mounted = false;
+  let chatActive = data.hasActiveChat;
+  $: chatActive = data.hasActiveChat;
 
   $: isArticlePage = /^\/ajuda-f10\/[^/]+\/?$/.test($page.url.pathname);
 
@@ -23,8 +25,23 @@
     chatOpen = true;
   }
 
+  async function checkActiveChat(): Promise<void> {
+    try {
+      const response = await fetch("/api/support/chat/resume", { cache: "no-store" });
+      if (response.ok) {
+        const result = await response.json() as { active?: boolean };
+        chatActive = result.active === true;
+      } else if (response.status === 401 || response.status === 409) {
+        chatActive = false;
+      }
+    } catch {
+      // O estado da conversa permanece no servidor.
+    }
+  }
+
   function closeChat(): void {
     chatOpen = false;
+    void checkActiveChat();
   }
 
   onMount(() => {
@@ -50,15 +67,16 @@
   />
 {/if}
 
-{#if mounted && !chatOpen && !isArticlePage}
+{#if mounted && !chatOpen && (!isArticlePage || chatActive)}
   <button
     type="button"
-    class="fixed bottom-5 right-5 z-[10010] inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#000A57] text-white shadow-[0_14px_36px_rgba(1,13,40,0.24)] transition hover:-translate-y-0.5 hover:bg-[#111B71] hover:shadow-[0_18px_42px_rgba(1,13,40,0.3)] sm:bottom-6 sm:right-6"
-    aria-label="Abrir Assistente F10"
-    title="Assistente F10"
+    class={`fixed right-5 z-[10010] inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#000A57] text-white shadow-[0_14px_36px_rgba(1,13,40,0.24)] transition hover:-translate-y-0.5 hover:bg-[#111B71] hover:shadow-[0_18px_42px_rgba(1,13,40,0.3)] sm:right-6 ${isArticlePage ? "bottom-20 sm:bottom-24" : "bottom-5 sm:bottom-6"}`}
+    aria-label={chatActive ? "Retomar atendimento" : "Abrir Assistente F10"}
+    title={chatActive ? "Retomar atendimento" : "Assistente F10"}
     on:click={openChat}
   >
     <MessageCircleMore size={23} aria-hidden="true" />
+    {#if chatActive}<span class="absolute right-1 top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#22A05B]" aria-hidden="true"></span>{/if}
   </button>
 {/if}
 

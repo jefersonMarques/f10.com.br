@@ -22,11 +22,14 @@
 
   let chatOpen = false;
   let chatUnread = false;
+  let chatActive = data.hasActiveChat;
+  let lastActiveCheckAt = 0;
+  $: chatActive = data.hasActiveChat;
   let observedSessionId = "";
   let observedAgentMessageId = "";
 
   $: customerSupport = {
-    authenticated: true,
+    authenticated: data.customer.authProvider === "f10",
     name: data.customer.name,
     requiresNameConfirmation: data.customer.requiresNameConfirmation ?? false,
     email: data.customer.email,
@@ -73,6 +76,7 @@
       observedSessionId = "";
       observedAgentMessageId = "";
       chatUnread = false;
+      await checkActiveChat();
       return;
     }
 
@@ -88,7 +92,11 @@
         headers: { Authorization: `Bearer ${session.token}` },
         cache: "no-store",
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        await checkActiveChat();
+        return;
+      }
+      chatActive = true;
 
       const payload = await response.json() as { messages?: ChatMessagePreview[] };
       const messages = Array.isArray(payload.messages) ? payload.messages : [];
@@ -111,6 +119,22 @@
     }
   }
 
+  async function checkActiveChat(): Promise<void> {
+    if (Date.now() - lastActiveCheckAt < 15_000) return;
+    lastActiveCheckAt = Date.now();
+    try {
+      const response = await fetch("/api/support/chat/resume", { cache: "no-store" });
+      if (response.ok) {
+        const payload = await response.json() as { active?: boolean };
+        chatActive = payload.active === true;
+      } else if (response.status === 401 || response.status === 409) {
+        chatActive = false;
+      }
+    } catch {
+      // A consulta de presença não interrompe o portal.
+    }
+  }
+
   function openChat(): void {
     chatUnread = false;
     chatOpen = true;
@@ -118,8 +142,9 @@
   }
 
   function closeChat(): void {
-    void checkChatNotification(true);
     chatOpen = false;
+    lastActiveCheckAt = 0;
+    void checkChatNotification(true);
   }
 
   onMount(() => {
@@ -139,14 +164,16 @@
     <button
       type="button"
       class="fixed bottom-5 right-5 z-[10010] inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#000A57] text-white shadow-[0_14px_36px_rgba(1,13,40,0.24)] transition hover:-translate-y-0.5 hover:bg-[#111B71] hover:shadow-[0_18px_42px_rgba(1,13,40,0.3)] sm:bottom-6 sm:right-6"
-      aria-label={chatUnread ? "Abrir Assistente F10 — nova mensagem" : "Abrir Assistente F10"}
-      title={chatUnread ? "Nova mensagem no Assistente F10" : "Assistente F10"}
+      aria-label={chatUnread ? "Abrir Assistente F10 — nova mensagem" : chatActive ? "Retomar atendimento" : "Abrir Assistente F10"}
+      title={chatUnread ? "Nova mensagem no Assistente F10" : chatActive ? "Retomar atendimento" : "Assistente F10"}
       on:click={openChat}
     >
       <span class="relative inline-flex h-full w-full items-center justify-center">
         <MessageCircleMore size={23} aria-hidden="true" />
         {#if chatUnread}
           <span class="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-[#F7F8FB] bg-[#E53935]" aria-hidden="true"></span>
+        {:else if chatActive}
+          <span class="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-[#F7F8FB] bg-[#22A05B]" aria-hidden="true"></span>
         {/if}
       </span>
     </button>
