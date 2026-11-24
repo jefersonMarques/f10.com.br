@@ -227,6 +227,31 @@ body::after {
   font-size: var(--application-text-section);
 }
 
+/* Leitura consistente das mensagens em chats e tickets. */
+.support-chat-message-body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: normal;
+  overflow-wrap: anywhere;
+}
+
+.support-chat-message-body--compact {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.support-chat-message-meta {
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: normal;
+}
+
+.support-chat-message-meta--compact {
+  font-size: 11px;
+}
+
 @media (min-width: 640px) {
   .application-content {
     padding: 1.25rem;

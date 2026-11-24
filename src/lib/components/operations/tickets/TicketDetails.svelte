@@ -28,6 +28,7 @@
   } from "lucide-svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import { isSameChatMessageGroup } from "$lib/support/chatMessageGrouping";
   import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import UserAvatar from "$lib/components/application/UserAvatar.svelte";
   import MessageTaskPopover from "$lib/components/support/MessageTaskPopover.svelte";
@@ -89,6 +90,14 @@
 
   function showExternalImagesForMessage(messageId: string): void {
     allowedExternalImageMessages = new Set([...allowedExternalImageMessages, messageId]);
+  }
+
+  function groupedTicketChatMessage(index: number): boolean {
+    const current = ticketData.details.messages[index];
+    const previous = ticketData.details.messages[index - 1];
+    return current?.channel === "web_chat"
+      && previous?.channel === "web_chat"
+      && isSameChatMessageGroup(previous, current);
   }
   let noteDraft = "";
   let composerFileInput: HTMLInputElement | null = null;
@@ -582,18 +591,18 @@
         {#if activeMainPanel === "conversation"}
           <section class={surface === "page" ? "flex min-h-[720px] flex-col" : "flex min-h-0 flex-1 flex-col"}>
             <div class={surface === "page"
-              ? "min-w-0 flex-1 space-y-3 bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"
-              : "min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"}>
-              {#each ticketData.details.messages as message}
-                {#if message.sourceTicketNumber && message.sourceTicketNumber !== ticketData.details.ticket.ticketNumber}
-                  <div class="flex justify-center">
+              ? "min-w-0 flex flex-1 flex-col bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"
+              : "min-h-0 min-w-0 flex flex-1 flex-col overflow-y-auto bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"}>
+              {#each ticketData.details.messages as message, index}
+                {#if message.sourceTicketNumber && message.sourceTicketNumber !== ticketData.details.ticket.ticketNumber && !groupedTicketChatMessage(index)}
+                  <div class="mt-4 flex justify-center">
                     <span class="rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-2.5 py-1 text-[11px] text-[var(--app-text-muted)]">
                       Origem: #{message.sourceTicketNumber} · {message.channel ?? "Ticket"}
                     </span>
                   </div>
                 {/if}
                 {#if message.authorType === "system"}
-                  <div class="flex min-w-0 justify-center py-1">
+                  <div class="mt-4 flex min-w-0 justify-center py-1">
                     <article class="min-w-0 max-w-[95%] rounded-xl bg-[var(--app-surface-muted)] px-3.5 py-2.5 text-center sm:max-w-[84%]">
                       <div class="flex items-center justify-center gap-2 text-[10px] text-[#8B919E]">
                         <strong class="font-semibold text-[#69707F]">Sistema</strong>
@@ -603,7 +612,7 @@
                     </article>
                   </div>
                 {:else if message.visibility === "internal"}
-                  <div class="flex min-w-0 justify-center py-1">
+                  <div class="mt-4 flex min-w-0 justify-center py-1">
                     <article class="group relative w-fit min-w-0 max-w-[95%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-3.5 py-3 sm:max-w-[84%] sm:px-4">
                       <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
                         <UserAvatar userId={message.authorUserId ?? null} name={message.authorUserName ?? "Equipe F10"} hasAvatar={message.authorHasAvatar ?? false} size="xs"/>
@@ -637,17 +646,19 @@
                     </article>
                   </div>
                 {:else}
-                  <div class={`flex w-full min-w-0 ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-                    <article class={`group relative w-fit min-w-0 max-w-[95%] rounded-2xl px-3.5 py-3 text-left sm:max-w-[84%] sm:px-4 ${message.authorType === "customer" ? "rounded-bl-md bg-[var(--app-surface-muted)]" : "rounded-br-md bg-[var(--app-info-bg)]"}`}>
-                      <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <UserAvatar userId={message.authorUserId ?? null} name={message.authorUserName ?? message.customerName ?? "Atendimento F10"} hasAvatar={message.authorHasAvatar ?? false} size="xs"/>
-                        <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-text)]">{message.authorUserName ?? message.customerName ?? "Atendimento F10"}</strong>
-                        <span class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
-                      </div>
+                  <div class={`flex w-full min-w-0 ${message.authorType === "customer" ? "justify-start" : "justify-end"} ${groupedTicketChatMessage(index) ? "mt-2.5" : "mt-4"}`}>
+                    <article class={`group relative w-fit min-w-0 max-w-[90%] rounded-2xl px-4 py-3 text-left sm:max-w-[80%] ${message.authorType === "customer" ? "rounded-bl-md bg-[var(--app-surface-muted)]" : "rounded-br-md bg-[var(--app-info-bg)]"}`}>
+                      {#if !groupedTicketChatMessage(index)}
+                        <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <UserAvatar userId={message.authorUserId ?? null} name={message.authorUserName ?? message.customerName ?? "Atendimento F10"} hasAvatar={message.authorHasAvatar ?? false} size="xs"/>
+                          <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-text)]">{message.authorUserName ?? message.customerName ?? "Atendimento F10"}</strong>
+                          <span class="ml-auto shrink-0 whitespace-nowrap text-[12px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
+                        </div>
+                      {/if}
                       {#if message.channel === "email"}
                         <EmailMessageBody text={message.body} hasInlineImages={Boolean(message.inlineImages?.length)} className="mt-2 min-w-0 text-[var(--app-text)]"/>
                       {:else}
-                        <SupportChatMarkdown text={message.body} repairMultilineFormatting size="md" className="mt-2 text-[var(--app-text)]"/>
+                        <SupportChatMarkdown text={message.body} repairMultilineFormatting size="md" className={`${groupedTicketChatMessage(index) ? "" : "mt-2"} text-[var(--app-text)]`}/>
                       {/if}
                       {#if message.inlineImages?.length}
                         <div class="mt-3 min-w-0 space-y-2">

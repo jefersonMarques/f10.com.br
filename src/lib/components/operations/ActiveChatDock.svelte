@@ -2,6 +2,7 @@
   import { onMount, tick } from "svelte";
   import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import MessageTaskPopover from "$lib/components/support/MessageTaskPopover.svelte";
+  import { isSameChatMessageGroup } from "$lib/support/chatMessageGrouping";
   import {
     CheckCircle2,
     EllipsisVertical,
@@ -35,6 +36,7 @@
     id: string;
     authorType: string;
     authorUserName: string | null;
+    authorUserId?: string | null;
     visibility: string;
     body: string;
     createdAt: string | Date;
@@ -405,21 +407,24 @@
         <button type="button" on:click={() => void toggleChat(activeChat.sessionId)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#737A89] hover:bg-[#F3F4F7]" aria-label="Recolher conversa"><Minus size={15}/></button>
       </header>
 
-      <div bind:this={messageViewport} class="min-h-0 flex-1 space-y-2.5 overflow-y-auto bg-[#F7F8FA] px-3 py-4">
-        {#each messages as message (message.id)}
+      <div bind:this={messageViewport} class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[#F7F8FA] px-3 py-4">
+        {#each messages as message, index (message.id)}
           {#if message.authorType === "system"}
-            <div class="application-text-meta mx-auto max-w-[88%] rounded-lg bg-[#ECEEF3] px-3 py-2 text-center leading-4 text-[#737A89]">{message.body}</div>
+            <div class="support-chat-message-meta support-chat-message-meta--compact mx-auto mt-3 max-w-[88%] rounded-lg bg-[#ECEEF3] px-3 py-2 text-center text-[#687184]">{message.body}</div>
           {:else}
-            <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-              <div class={`group relative max-w-[84%] rounded-2xl px-3 py-2.5 ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3E9] bg-white text-[#424957]" : "rounded-br-md bg-[#000A57] text-white"}`}>
-                {#if message.authorUserName && message.authorType !== "customer"}<span class="application-text-meta mb-1 block font-semibold opacity-70">{message.authorUserName}</span>{/if}
-                <p class="application-text-caption whitespace-pre-wrap break-words leading-5">{message.body}</p>
+            <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"} ${isSameChatMessageGroup(messages[index - 1], message) ? "mt-2.5" : "mt-4"}`}>
+              <div class={`group relative min-w-0 max-w-[88%] rounded-2xl px-3.5 py-3 ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3E9] bg-white text-[#424957]" : "rounded-br-md bg-[#000A57] text-white"}`}>
+                <p class="support-chat-message-body support-chat-message-body--compact whitespace-pre-wrap">{message.body}</p>
                 {#if message.attachments?.length}
                   <div class="mt-2 space-y-1 border-t border-current/10 pt-2">
                     {#each message.attachments as attachment}<a href={attachment.url} target="_blank" rel="noreferrer" class="application-text-meta block truncate underline underline-offset-2">{attachment.originalName}</a>{/each}
                   </div>
                 {/if}
-                <span class="application-text-meta mt-1 block text-right opacity-55">{formatMessageTime(message.createdAt)}</span>
+                {#if !isSameChatMessageGroup(message, messages[index + 1])}
+                  <span class={`support-chat-message-meta support-chat-message-meta--compact mt-2 block text-right ${message.authorType === "customer" ? "text-[#687184]" : "text-white/80"}`}>
+                    {message.authorType === "customer" ? activeChat.customerName ?? "Cliente" : message.authorUserName ?? "Equipe F10"} · {formatMessageTime(message.createdAt)}
+                  </span>
+                {/if}
                 <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
                   taskLinks={message.taskLinks ?? []} onReact={(code) => reactMessage(message, code)}
                   canCreateTask={taskProjects.length > 0}

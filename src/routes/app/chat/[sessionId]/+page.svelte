@@ -29,6 +29,7 @@
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import { isSameChatMessageGroup } from "$lib/support/chatMessageGrouping";
   import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import MessageTaskPopover from "$lib/components/support/MessageTaskPopover.svelte";
   import ChatInbox from "$lib/components/support/ChatInbox.svelte";
@@ -196,6 +197,14 @@
     if (message.authorType === "customer") return chat.customerName ?? "Cliente";
     if (message.authorType === "system") return message.authorUserName ?? "Sistema F10";
     return message.authorUserName ?? "Equipe F10";
+  }
+
+  function groupedWithPrevious(index: number): boolean {
+    return isSameChatMessageGroup(messages[index - 1], messages[index]);
+  }
+
+  function groupedWithNext(index: number): boolean {
+    return isSameChatMessageGroup(messages[index], messages[index + 1]);
   }
 
   function attachmentUrl(message: ChatMessage, attachmentId: string): string {
@@ -571,16 +580,16 @@
               {:else if hasOlderMessages}
                 <button type="button" on:click={() => void loadOlderMessages()} class="inline-flex h-8 items-center gap-2 rounded-full border border-[#D9DDE7] bg-white px-3.5 text-[9.5px] font-semibold text-[#000A57] shadow-sm transition hover:border-[#BBC2D1] hover:bg-[#F9FAFC]"><History size={12} />Carregar mensagens anteriores</button>
               {:else if conversationInitialized && messages.length > 0}
-                <span class="text-[9px] text-[#A0A5B0]">Início do histórico disponível</span>
+                <span class="text-[11px] text-[#858B98]">Início do histórico disponível</span>
               {/if}
             </div>
 
-            <div class="space-y-3.5">
+            <div class="flex flex-col">
               {#each messages as message, index (message.id)}
                 {#if showSessionDivider(index)}
                   <div class="flex items-center gap-3 py-2" aria-label="Início de uma sessão de atendimento">
                     <span class="h-px flex-1 bg-[#E3E6ED]"></span>
-                    <span class="inline-flex items-center gap-1.5 rounded-full border border-[#E1E4EA] bg-white px-3 py-1 text-[8.5px] font-medium text-[#858B99]"><History size={10} />Atendimento · {formatDateTime(message.createdAt)}</span>
+                    <span class="inline-flex items-center gap-1.5 rounded-full border border-[#E1E4EA] bg-white px-3 py-1 text-[11px] font-medium text-[#757D8C]"><History size={10} />Atendimento · {formatDateTime(message.createdAt)}</span>
                     <span class="h-px flex-1 bg-[#E3E6ED]"></span>
                   </div>
                 {/if}
@@ -595,7 +604,7 @@
                 {/if}
 
                 {#if message.visibility === "internal"}
-                  <div class="flex justify-center py-1">
+                  <div class="mt-5 flex justify-center py-1">
                     <article class="group relative w-full max-w-[88%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-4 py-3 text-[var(--app-text)] shadow-sm">
                       <div class="mb-2 flex items-center justify-between gap-3"><span class="text-[12px] font-semibold text-[var(--app-warning-text)]">Nota interna · {messageAuthor(message)}</span><span class="text-[11px] text-[var(--app-text-muted)]">{formatTime(message.createdAt)}</span></div>
                       <SupportChatMarkdown text={message.body} size="md" className="mt-2 text-[var(--app-text)]"/>
@@ -607,8 +616,8 @@
                     </article>
                   </div>
                 {:else}
-                  <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-                    <article class={`group relative max-w-[88%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#000A57] text-white"}`}>
+                  <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"} ${groupedWithPrevious(index) ? "mt-2.5" : "mt-5"}`}>
+                    <article class={`group relative min-w-0 max-w-[90%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[80%] ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#000A57] text-white"}`}>
                       {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-[var(--app-info-text)]"><Bot size={13} />{message.authorUserName ?? "Sistema F10"}</div>{/if}
 
                       {#if message.attachments && message.attachments.length > 0}
@@ -627,7 +636,9 @@
                       {/if}
 
                       {#if message.body}<SupportChatMarkdown text={message.body} isCustomer={message.authorType === "user"} size="md" />{/if}
-                      <div class={`mt-2 flex items-center gap-1.5 text-[11px] ${message.authorType === "customer" ? "text-[#989EAB]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/65"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
+                      {#if !groupedWithNext(index)}
+                        <div class={`support-chat-message-meta mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${message.authorType === "customer" ? "text-[#687184]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/80"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
+                      {/if}
                       {#if message.authorType !== "system"}
                         <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
                           onReact={(code) => reactMessage(message, code)}

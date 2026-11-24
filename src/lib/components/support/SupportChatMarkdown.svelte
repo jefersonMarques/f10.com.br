@@ -12,12 +12,12 @@
   $: blocks = parseChatMarkdown(repairMultilineFormatting ? normalizeTicketMessageMarkdown(text) : text);
 </script>
 
-<div class={`min-w-0 space-y-2 break-words ${size === "md" ? "text-[14px] leading-[1.75]" : "text-[13px] leading-[1.75]"} ${className}`}>
+<div class={`min-w-0 space-y-2 break-words ${size === "md" ? "support-chat-message-body" : "text-[13px] leading-[1.7] tracking-normal"} ${className}`}>
   {#each blocks as block}
     {#if block.kind === "space"}
       <div class="h-1.5" aria-hidden="true"></div>
     {:else if block.kind === "heading"}
-      <div class={`font-semibold ${block.level === 1 ? "pt-1 text-[15px]" : block.level === 2 ? "text-[14px]" : "text-[13px]"}`}>
+      <div class={`font-semibold ${block.level === 1 ? "pt-1 text-[17px]" : block.level === 2 ? "text-[16px]" : "text-[15px]"}`}>
         <SupportChatMarkdownTokens tokens={block.tokens ?? []} {isCustomer}/>
       </div>
     {:else if block.kind === "bullet" || block.kind === "ordered"}
