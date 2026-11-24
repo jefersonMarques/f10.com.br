@@ -221,6 +221,28 @@
   </div>
 
   {#if report}
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Supervisão atual">
+      <article class="rounded-2xl border border-app-border bg-app-surface p-4">
+        <MessageCircle size={20} class="text-app-primary"/>
+        <strong class="mt-2 block text-[24px] font-semibold text-app-text">{report.summary.active}</strong>
+        <span class="application-text-caption text-app-text-muted">Chats abertos</span>
+      </article>
+      <article class="rounded-2xl border border-app-border bg-app-surface p-4">
+        <Users size={20} class="text-app-success-text"/>
+        <strong class="mt-2 block text-[24px] font-semibold text-app-text">{report.summary.onlineOperators}</strong>
+        <span class="application-text-caption text-app-text-muted">Operadores online no relatório</span>
+      </article>
+      <article class="rounded-2xl border border-app-border bg-app-surface p-4">
+        <Headphones size={20} class="text-app-warning-text"/>
+        <strong class="mt-2 block text-[24px] font-semibold text-app-text">{report.summary.unassignedWaiting}</strong>
+        <span class="application-text-caption text-app-text-muted">Aguardando sem responsável</span>
+      </article>
+      <article class="rounded-2xl border border-app-warning-border bg-app-surface p-4">
+        <AlertTriangle size={20} class="text-app-warning-text"/>
+        <strong class="mt-2 block text-[24px] font-semibold text-app-warning-text">{report.summary.critical}</strong>
+        <span class="application-text-caption text-app-text-muted">No limite de escalada crítica</span>
+      </article>
+    </div>
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <button type="button" on:click={showWaiting}
         class="rounded-2xl border border-app-border bg-app-surface p-4 text-left hover:border-app-primary">
@@ -359,7 +381,8 @@
           <thead class="application-text-meta bg-app-subtle font-semibold text-app-text-soft">
             <tr>
               <th class="px-5 py-3">Operador</th>
-              <th class="px-3 py-3">Atribuídos</th>
+              <th class="px-3 py-3">Abertos agora</th>
+              <th class="px-3 py-3">Atribuídos no período</th>
               <th class="px-3 py-3">Respondidos</th>
               <th class="px-3 py-3">Aguardando</th>
               <th class="px-3 py-3">Atraso após atribuição</th>
@@ -370,7 +393,8 @@
           <tbody class="divide-y divide-app-border-soft">
             {#each report.agents as agent (agent.id)}
               <tr class="application-text-caption text-app-text-muted">
-                <td class="px-5 py-3 font-semibold text-app-text">{agent.name}</td>
+                <td class="px-5 py-3 font-semibold text-app-text"><span class={`mr-2 inline-block h-2 w-2 rounded-full ${agent.presence === "online" ? "bg-emerald-600" : agent.presence === "busy" || agent.presence === "away" ? "bg-amber-500" : "bg-slate-400"}`} title={agent.presence ?? "offline"}></span>{agent.name}</td>
+                <td class="px-3 py-3 font-semibold">{agent.active}</td>
                 <td class="px-3 py-3">{agent.assigned}</td>
                 <td class="px-3 py-3">{agent.responded}</td>
                 <td class="px-3 py-3">{agent.waiting}</td>
@@ -379,7 +403,7 @@
                 <td class="px-3 py-3">{formatMinutes(agent.p90FirstMinutes)}</td>
               </tr>
             {:else}
-              <tr><td colspan="7" class="application-text-caption px-5 py-5 text-app-text-soft">Sem atendimentos atribuídos.</td></tr>
+              <tr><td colspan="8" class="application-text-caption px-5 py-5 text-app-text-soft">Sem atendimentos atribuídos.</td></tr>
             {/each}
           </tbody>
         </table>
@@ -389,7 +413,7 @@
     <p class="application-text-meta px-1 leading-5 text-app-text-soft">
       Tempos em minutos corridos, inclusive fora do expediente. O limite considera o SLA da fila quando ativo; caso contrário, 10 minutos de atenção operacional.
       Encerramento pelo cliente após o limite é um indício de abandono, não prova da motivação.
-      Sessões expiradas ficam separadas. Conversas ainda abertas anteriores ao período também entram no monitoramento atual.
+      Sessões antigas sem identidade continuam sujeitas à expiração. Chats autenticados permanecem abertos até o encerramento.
       Indicadores individuais só consideram o tempo após atribuição registrada; para chats antigos sem esse registro, o valor é exibido como indisponível.
     </p>
   {:else if loading}

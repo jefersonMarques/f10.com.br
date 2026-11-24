@@ -1,9 +1,11 @@
-import { and, desc, eq, gt, gte, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import type { PermissionScope } from "$lib/server/auth/permissions";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { teams, users } from "$lib/server/db/schema";
 import { supportQueues } from "$lib/server/db/supportSchema";
+import { getChatWaitingSettings } from "$lib/server/settings/chatWaitingSettingsRepository";
+import { listSupportAgentPresence } from "$lib/server/support/supportAgentPresence";
 import { isFinancialChatOption } from "$lib/support/chatEntryRouting";
 import {
   calculateChatPerformance,
@@ -75,6 +77,7 @@ function buildAgentRows(
 ): ChatAgentPerformance[] {
   const agents = new Map<string, {
     assigned: number;
+    active: number;
     responded: number;
     waiting: number;
     late: number;
@@ -84,7 +87,7 @@ function buildAgentRows(
   function register(userId: string) {
     const existing = agents.get(userId);
     if (existing) return existing;
-    const result = { assigned: 0, responded: 0, waiting: 0, late: 0, responseMinutes: [] as number[] };
+    const result = { assigned: 0, active: 0, responded: 0, waiting: 0, late: 0, responseMinutes: [] as number[] };
     agents.set(userId, result);
     return result;
   }
@@ -93,6 +96,7 @@ function buildAgentRows(
     if (item.agentId) {
       const assigned = register(item.agentId);
       assigned.assigned += 1;
+      if (item.state === "active" || needsAttention(item)) assigned.active += 1;
       if (needsAttention(item)) {
         assigned.waiting += 1;
         if (item.agentWaitingMinutes !== null && item.agentWaitingMinutes >= item.thresholdMinutes) assigned.late += 1;
@@ -112,6 +116,7 @@ function buildAgentRows(
     id,
     name: userNames.get(id) ?? "Operador não identificado",
     assigned: item.assigned,
+    active: item.active,
     responded: item.responded,
     waiting: item.waiting,
     late: item.late,
@@ -128,11 +133,17 @@ async function getMessageSummaries(since: Date, now: Date): Promise<Map<string, 
   // A união remove mensagens duplicadas quando um chat é convertido em ticket.
   const result = await db.execute(sql`
     WITH selected_chats AS (
-      SELECT id, ticket_id
+      SELECT id, ticket_id, created_at, closed_at
       FROM web_chat_sessions
       WHERE created_at >= ${since.toISOString()}::timestamptz
-        OR (closed_at IS NULL AND expires_at > ${now.toISOString()}::timestamptz)
-      ORDER BY created_at DESC, id DESC
+        OR (closed_at IS NULL AND (
+          expires_at > ${now.toISOString()}::timestamptz
+          OR (legacy_user_id IS NOT NULL AND group_id IS NOT NULL AND unit_id IS NOT NULL)
+        ))
+      ORDER BY (closed_at IS NULL AND (
+        expires_at > ${now.toISOString()}::timestamptz
+        OR (legacy_user_id IS NOT NULL AND group_id IS NOT NULL AND unit_id IS NOT NULL)
+      )) DESC, created_at DESC, id DESC
       LIMIT ${REPORT_LIMIT}
     ),
     messages AS (
@@ -148,6 +159,8 @@ async function getMessageSummaries(since: Date, now: Date): Promise<Map<string, 
       INNER JOIN selected_chats chat ON chat.ticket_id = msg.ticket_id
       WHERE msg.visibility = 'public'
         AND msg.channel = 'web_chat'
+        AND msg.created_at >= chat.created_at
+        AND (chat.closed_at IS NULL OR msg.created_at <= chat.closed_at)
         AND msg.author_type IN ('customer', 'user')
     ),
     last_human AS (
@@ -216,10 +229,13 @@ export async function getSupportChatPerformance(
   const since = new Date(now.getTime() - filters.periodDays * 86_400_000);
   const activeCondition = and(
     isNull(webChatSessions.closedAt),
-    gt(webChatSessions.expiresAt, now),
+    or(
+      gt(webChatSessions.expiresAt, now),
+      and(isNotNull(webChatSessions.legacyUserId), isNotNull(webChatSessions.groupId), isNotNull(webChatSessions.unitId)),
+    ),
   );
 
-  const [queueRows, userRows, sessionRows, messages] = await Promise.all([
+  const [queueRows, userRows, sessionRows, messages, waitingSettings] = await Promise.all([
     db.select({
       id: supportQueues.id,
       code: supportQueues.code,
@@ -240,11 +256,15 @@ export async function getSupportChatPerformance(
       closedAt: webChatSessions.closedAt,
       closeReason: webChatSessions.closeReason,
       expiresAt: webChatSessions.expiresAt,
+      legacyUserId: webChatSessions.legacyUserId,
+      groupId: webChatSessions.groupId,
+      unitId: webChatSessions.unitId,
     }).from(webChatSessions)
       .where(or(gte(webChatSessions.createdAt, since), activeCondition))
-      .orderBy(desc(webChatSessions.createdAt), desc(webChatSessions.id))
+      .orderBy(desc(sql`coalesce(${activeCondition}, false)`), desc(webChatSessions.createdAt), desc(webChatSessions.id))
       .limit(REPORT_LIMIT + 1),
     getMessageSummaries(since, now),
+    getChatWaitingSettings(),
   ]);
 
   const queues = queueRows.map((queue) => ({
@@ -284,6 +304,7 @@ export async function getSupportChatPerformance(
       firstResponseAt,
       closedAt: parseChatTimestamp(chat.closedAt),
       expiresAt: chat.expiresAt,
+      persistent: Boolean(chat.legacyUserId) && chat.groupId !== null && chat.unitId !== null,
       pendingCustomerAt,
       closeReason: chat.closeReason,
       now,
@@ -345,6 +366,11 @@ export async function getSupportChatPerformance(
   );
 
   const waiting = filtered.filter(needsAttention);
+  const active = filtered.filter((item) => item.state === "active" || needsAttention(item));
+  const critical = waiting.filter((item) => item.waitingSince !== null
+    && now.getTime() - Date.parse(item.waitingSince) >= waitingSettings.supervisorEscalationSeconds * 1000);
+  const agentRows = buildAgentRows(filtered, userNames);
+  const agentPresence = await listSupportAgentPresence(agentRows.map((agent) => agent.id));
   const responseMinutes = filtered.flatMap((item) =>
     item.firstResponseMinutes === null ? [] : [item.firstResponseMinutes]
   );
@@ -357,6 +383,10 @@ export async function getSupportChatPerformance(
     received: filtered.length,
     answered: filtered.filter((item) => item.firstResponseMinutes !== null).length,
     waiting: waiting.length,
+    active: active.length,
+    unassignedWaiting: waiting.filter((item) => !item.agentId).length,
+    critical: critical.length,
+    onlineOperators: agentRows.filter((agent) => agentPresence.get(agent.id)?.effectiveStatus === "online").length,
     late: waiting.filter((item) => item.overdue).length,
     longestWaitingMinutes: waiting.length > 0
       ? Math.max(...waiting.map((item) => item.waitingMinutes ?? 0))
@@ -393,7 +423,7 @@ export async function getSupportChatPerformance(
       item.agentId === user.id || item.firstResponderId === user.id
     )).sort((first, second) => first.name.localeCompare(second.name, "pt-BR")),
     summary,
-    agents: buildAgentRows(filtered, userNames),
+    agents: agentRows.map((agent) => ({ ...agent, presence: agentPresence.get(agent.id)?.effectiveStatus ?? "offline" })),
     listTotal: visible.length,
     page: filters.page,
     pageCount: Math.max(1, Math.ceil(visible.length / LIST_LIMIT)),

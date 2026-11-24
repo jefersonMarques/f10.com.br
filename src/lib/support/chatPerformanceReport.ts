@@ -35,6 +35,8 @@ export type ChatAgentPerformance = {
   id: string;
   name: string;
   assigned: number;
+  active: number;
+  presence?: "online" | "busy" | "offline" | "away";
   responded: number;
   waiting: number;
   late: number;
@@ -53,6 +55,10 @@ export type SupportChatReport = {
     received: number;
     answered: number;
     waiting: number;
+    active: number;
+    unassignedWaiting: number;
+    critical: number;
+    onlineOperators: number;
     late: number;
     longestWaitingMinutes: number | null;
     medianFirstMinutes: number | null;

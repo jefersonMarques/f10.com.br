@@ -14,6 +14,7 @@ export type ChatMetricInput = {
   firstResponseAt: Date | null;
   closedAt: Date | null;
   expiresAt: Date;
+  persistent?: boolean;
   pendingCustomerAt: Date | null;
   closeReason: string | null;
   now: Date;
@@ -59,7 +60,7 @@ export function calculateChatPerformance(input: ChatMetricInput): ChatMetricResu
     closeReason, now, thresholdMinutes,
   } = input;
 
-  const expired = !closedAt && expiresAt.getTime() <= now.getTime();
+  const expired = !input.persistent && !closedAt && expiresAt.getTime() <= now.getTime();
   const endAt = closedAt ?? (expired ? expiresAt : now);
   const closed = Boolean(closedAt) || expired;
   const reason: ChatClosureReason | null = !closed

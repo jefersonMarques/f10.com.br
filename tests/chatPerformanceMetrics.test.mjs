@@ -86,3 +86,20 @@ test("percentiles use correct interpolation without mutating inputs", () => {
   assert.deepEqual(samples, [10, 1, 20, 5]);
   assert.equal(percentileMinutes([], 0.9), null);
 });
+
+test("authenticated chats remain in the waiting queue beyond credential expiration", () => {
+  const metric = calculateChatPerformance({ ...base, persistent: true, now: time(65) });
+  assert.equal(metric.state, "waiting_first");
+  assert.equal(metric.closureReason, null);
+  assert.equal(metric.waitingMinutes, 65);
+  assert.equal(metric.overdue, true);
+});
+
+test("persistent chat closes only after an explicit closure", () => {
+  const metric = calculateChatPerformance({
+    ...base, persistent: true, now: time(90), closedAt: time(75), closeReason: "agent",
+  });
+  assert.equal(metric.state, "closed_unanswered");
+  assert.equal(metric.closureReason, "agent");
+  assert.equal(metric.waitingMinutes, 75);
+});
