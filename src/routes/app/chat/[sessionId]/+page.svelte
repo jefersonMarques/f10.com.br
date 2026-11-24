@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { supportTabClass } from "$lib/support/supportWorkspacePresentation";
   import { getCustomerChatPresence, CUSTOMER_CHAT_PRESENCE_LABELS } from "$lib/support/chatOperationalPolicy";
   import { browser } from "$app/environment";
   import {
@@ -18,14 +19,14 @@
     History,
     ListTodo,
     LoaderCircle,
-    MessageCircleMore,
+    MessageSquare,
+    Paperclip,
     MonitorCog,
     Plus,
     Send,
     TicketCheck,
     UserRound,
     UserRoundCog,
-    X,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
@@ -74,9 +75,18 @@
   let chat: ChatDetails = data.initial.chat;
   type ContextPanel = "customer" | "attendance" | "tickets" | "tasks" | "remote";
   let activeContextPanel: ContextPanel | null = null;
-  const contextPanelLabels: Record<ContextPanel, string> = { customer: "Cliente", attendance: "Atendimento", tickets: "Chamados", tasks: "Tarefas", remote: "Acesso remoto" };
-  function toggleContextPanel(panel: ContextPanel): void {
-    activeContextPanel = activeContextPanel === panel ? null : panel;
+  function selectContextPanel(panel: ContextPanel | null): void {
+    activeContextPanel = panel;
+  }
+
+  async function openHistory(): Promise<void> {
+    activeContextPanel = null;
+    await tick();
+    messagesElement?.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function chatInitials(name: string): string {
+    return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "C";
   }
 
   let messageBody = "";
@@ -162,6 +172,7 @@
     replyFiles = [];
     conversationInitialized = false;
     composerExpanded = false;
+    activeContextPanel = null;
     conversationKey = data.chatInbox.find((item) => item.sessionId === chat.sessionId)?.conversationKey ?? null;
     hasOlderMessages = false;
     loadingOlderMessages = false;
@@ -212,9 +223,6 @@
     return isSameChatMessageGroup(messages[index - 1], messages[index]);
   }
 
-  function groupedWithNext(index: number): boolean {
-    return isSameChatMessageGroup(messages[index], messages[index + 1]);
-  }
 
   function attachmentUrl(message: ChatMessage, attachmentId: string): string {
     const sourceSessionId = message.sourceSessionId ?? chat.sessionId;
@@ -502,40 +510,32 @@
 <ApplicationContent
   width="full"
   padding="none"
-  className="h-[calc(100dvh-var(--application-header-height))] min-h-[620px] overflow-hidden bg-[#F5F6FA]"
+  className="bg-[var(--app-surface)] lg:h-[calc(100dvh-var(--application-header-height))] lg:min-h-[540px] lg:overflow-hidden"
 >
-  <div class="support-chat-workspace h-full min-h-0 p-3 lg:p-4">
-    <ChatInbox chats={data.chatInbox} currentUserId={data.chatCurrentUserId} selectedConversationKey={conversationKey} compact>
-    <main class="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
-      <header class="shrink-0 border-b border-[#E9EBF1] bg-white px-4 pb-3 pt-4 sm:px-5">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-3">
+  <ChatInbox chats={data.chatInbox} currentUserId={data.chatCurrentUserId} selectedConversationKey={conversationKey}>
+    <main class="flex min-h-[480px] min-w-0 flex-col overflow-hidden bg-white lg:min-h-0">
+      <header class="shrink-0 border-b border-[var(--app-border)] bg-white px-3 py-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-2.5">
+          <div class="flex min-w-0 flex-1 items-center gap-2.5">
             <a href="/app/chat" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#E1E4EA] text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57] lg:hidden" aria-label="Voltar para conversas">
               <ArrowLeft size={16} />
             </a>
-            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
-              <MessageCircleMore size={19} />
-            </span>
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <h1 class="truncate text-[14px] font-semibold text-[#202637]">{chat.customerName ?? "Cliente"}</h1>
+            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--app-info-bg)] text-[12px] font-bold text-[#000A57]">{chatInitials(chat.customerName ?? "Cliente")}</span>
+            <div class="min-w-0 flex-1">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="shrink-0 text-[11px] font-bold text-[#000A57]">{chat.ticketNumber ? "#" + chat.ticketNumber : "CHAT"}</span>
+                <h1 title={chat.customerName ?? "Cliente"} class="min-w-0 truncate text-[14px] font-semibold text-[#202637]">{chat.customerName ?? "Cliente"}</h1>
+              </div>
+              <div class="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-[#838997]">
+                <span class="shrink-0 font-semibold text-[#35509A]">{statusLabels[chat.status] ?? chat.status}</span>
+                <span aria-hidden="true">·</span>
+                <span class="min-w-0 truncate">{f10UnitName || chat.organizationName || chat.customerEmail || "Atendimento F10"}</span>
+                {#if chat.aiState === "escalated" || chat.aiState === "active"}<span aria-hidden="true">·</span><span>{aiLabels[chat.aiState]}</span>{/if}
                 {#if !chat.closedAt}
                   {@const presence = getCustomerChatPresence(chat.lastSeenAt, Date.now())}
-                  <span class="inline-flex items-center gap-1 text-[11px] text-[var(--app-text-muted)]" title={chat.lastSeenAt ? new Date(chat.lastSeenAt).toLocaleString("pt-BR") : "Sem atividade registrada"}><span class={`h-2 w-2 rounded-full ${presence === "recent" ? "bg-emerald-600" : presence === "away" ? "bg-amber-500" : "bg-slate-400"}`}></span>{CUSTOMER_CHAT_PRESENCE_LABELS[presence]}</span>
-                {/if}
-                {#if chat.ticketNumber}
-                  <span class="rounded-full bg-[#FFF0E4] px-2 py-1 text-[9px] font-bold text-[#B95B12]">Chamado #{chat.ticketNumber}</span>
-                {:else}
-                  <span class="rounded-full bg-[#EEF0FF] px-2 py-1 text-[9px] font-bold text-[#000A57]">Chat</span>
-                {/if}
-                <span class="rounded-full bg-[#F2F3F6] px-2 py-1 text-[9px] font-semibold text-[#666D7C]">{statusLabels[chat.status]}</span>
-                {#if chat.aiState === "escalated" || chat.aiState === "active"}
-                  <span class={`rounded-full px-2 py-1 text-[9px] font-semibold ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B4343]" : "bg-[#F0EEFF] text-[#5E51A6]"}`}>{aiLabels[chat.aiState]}</span>
+                  <span class="inline-flex items-center gap-1" title={chat.lastSeenAt ? new Date(chat.lastSeenAt).toLocaleString("pt-BR") : "Sem atividade registrada"}><span class={`h-2 w-2 rounded-full ${presence === "recent" ? "bg-emerald-600" : presence === "away" ? "bg-amber-500" : "bg-slate-400"}`}></span>{CUSTOMER_CHAT_PRESENCE_LABELS[presence]}</span>
                 {/if}
               </div>
-              <p class="mt-1 truncate text-[10px] text-[#858B98]">
-                {f10UnitName ? `${f10UnitName}${f10GroupName ? ` · ${f10GroupName}` : ""}` : chat.organizationName ?? chat.customerEmail ?? "Atendimento F10"}
-              </p>
             </div>
           </div>
 
@@ -550,43 +550,47 @@
             </a>
 
             {#if data.canRespond && !chat.assignedUserId && chat.status !== "closed"}
-              <form method="POST" action="?/claim"><button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#176B35] px-3 text-[10px] font-semibold text-white"><Hand size={13} /> Pegar</button></form>
+              <form method="POST" action="?/claim"><button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--app-primary)] px-3 text-[12px] font-semibold text-white"><Hand size={15} /> Pegar chat</button></form>
             {/if}
 
             {#if chat.ticketId && chat.ticketNumber}
               <a href={`/app/tickets/${chat.ticketId}`} title="Abrir chamado e concluir pelo workflow" class="hidden h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[12px] font-semibold text-white sm:inline-flex"><TicketCheck size={13} /> #{chat.ticketNumber}</a>
             {:else if data.canCreateTicket && chat.status !== "closed"}
               <form method="POST" action="?/createTicket" class="hidden sm:block" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}>
-                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white"><TicketCheck size={13} /> Criar chamado</button>
+                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--app-primary)] px-3 text-[12px] font-semibold text-white"><TicketCheck size={14} /> Criar chamado</button>
               </form>
             {/if}
 
             {#if canWrite && chat.status !== "closed"}
               <form method="POST" action="?/finish" on:submit={(event) => { if (!confirm(chat.ticketId ? "Finalizar somente o chat? O chamado vinculado permanecerá em andamento conforme seu status atual." : "Finalizar esta conversa? Nenhum chamado será criado.")) event.preventDefault(); }}>
-                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#E5C6C6] bg-[#FFF8F8] px-2.5 text-[10px] font-semibold text-[#984343]"><CheckCircle2 size={13} /> <span class="hidden sm:inline">Finalizar</span></button>
+                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#E5C6C6] bg-[#FFF8F8] px-2.5 text-[12px] font-semibold text-[#984343]"><CheckCircle2 size={13} /> <span class="hidden sm:inline">Finalizar</span></button>
               </form>
             {/if}
           </div>
         </div>
 
-        <div class="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[#EEF0F5] pt-3" aria-label="Opções da conversa">
-          <button type="button" on:click={() => toggleContextPanel("customer")} aria-label="Cliente" title="Cliente" aria-pressed={activeContextPanel === "customer"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><UserRound size={16}/> <span class="hidden sm:inline">Cliente</span></button>
-          <button type="button" on:click={() => toggleContextPanel("attendance")} aria-label="Atendimento" title="Atendimento" aria-pressed={activeContextPanel === "attendance"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><UserRoundCog size={16}/> <span class="hidden sm:inline">Atendimento</span></button>
-          <button type="button" on:click={() => toggleContextPanel("tickets")} aria-label="Chamados" title="Chamados" aria-pressed={activeContextPanel === "tickets"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><TicketCheck size={16}/> <span class="hidden sm:inline">Chamados</span></button>
-          {#if data.canViewTasks}<button type="button" on:click={() => toggleContextPanel("tasks")} aria-label="Tarefas" title="Tarefas" aria-pressed={activeContextPanel === "tasks"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><ListTodo size={16}/> <span class="hidden sm:inline">Tarefas</span></button>{/if}
-          {#if chat.ticketId}<button type="button" on:click={() => toggleContextPanel("remote")} aria-label="Remoto" title="Remoto" aria-pressed={activeContextPanel === "remote"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><MonitorCog size={16}/> <span class="hidden sm:inline">Remoto</span></button>{/if}
-          <button type="button" on:click={() => { activeContextPanel = null; messagesElement?.scrollTo({ top: 0, behavior: "smooth" }); }} aria-label="Histórico" title="Histórico" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><History size={16}/> <span class="hidden sm:inline">Histórico</span></button>
-        </div>
         {#if form?.message}
           <div class={`mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[10px] font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
             {#if form.success}<CheckCircle2 size={13} />{:else}<CircleAlert size={13} />{/if}{form.message}
           </div>
         {/if}
       </header>
+      <nav class="relative z-20 flex h-11 shrink-0 items-center border-b border-[var(--app-border)] bg-white px-3 sm:px-4" aria-label="Seções do chat">
+        <div class="flex h-full min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap sm:gap-5">
+          <button type="button" class={supportTabClass(null, activeContextPanel)} aria-pressed={activeContextPanel === null} on:click={() => selectContextPanel(null)}><MessageSquare size={14}/>Conversa</button>
+          <button type="button" class={supportTabClass("customer", activeContextPanel)} aria-pressed={activeContextPanel === "customer"} on:click={() => selectContextPanel("customer")}><UserRound size={14}/>Cliente</button>
+          {#if data.canViewTasks}<button type="button" class={supportTabClass("tasks", activeContextPanel)} aria-pressed={activeContextPanel === "tasks"} on:click={() => selectContextPanel("tasks")}><ListTodo size={14}/>Tarefas</button>{/if}
+          <button type="button" class={supportTabClass("attendance", activeContextPanel)} aria-pressed={activeContextPanel === "attendance"} on:click={() => selectContextPanel("attendance")}><UserRoundCog size={14}/>Atendimento</button>
+          <button type="button" class={supportTabClass("tickets", activeContextPanel)} aria-pressed={activeContextPanel === "tickets"} on:click={() => selectContextPanel("tickets")}><TicketCheck size={14}/>Chamados</button>
+          <button type="button" class={supportTabClass("history", activeContextPanel)} on:click={() => void openHistory()}><History size={14}/>Histórico</button>
+          {#if chat.ticketId}<button type="button" class={supportTabClass("remote", activeContextPanel)} aria-pressed={activeContextPanel === "remote"} on:click={() => selectContextPanel("remote")}><MonitorCog size={14}/>Acesso remoto</button>{/if}
+        </div>
+      </nav>
 
-      <div class="relative min-h-0 flex-1 bg-[#F7F8FB]">
-        <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="h-full overflow-y-auto px-4 py-5 sm:px-6">
-          <div class="mx-auto max-w-[840px]">
+      <div class="flex min-h-0 flex-1 flex-col" class:hidden={activeContextPanel !== null}>
+      <div class="relative min-h-[260px] flex-1 bg-[var(--app-surface-subtle)] lg:min-h-0">
+        <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="absolute inset-0 overflow-y-auto px-3 py-4 sm:px-5">
+          <div class="min-w-0">
             <div class="mb-4 flex min-h-8 items-center justify-center">
               {#if loadingOlderMessages}
                 <span class="inline-flex items-center gap-2 text-[9.5px] font-medium text-[#858B99]"><LoaderCircle size={13} class="animate-spin" />Carregando mensagens antigas...</span>
@@ -629,9 +633,15 @@
                     </article>
                   </div>
                 {:else}
-                  <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"} ${groupedWithPrevious(index) ? "mt-2.5" : "mt-5"}`}>
-                    <article class={`group relative min-w-0 max-w-[90%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[80%] ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#000A57] text-white"}`}>
-                      {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-[var(--app-info-text)]"><Bot size={13} />{message.authorUserName ?? "Sistema F10"}</div>{/if}
+                  <div class={`flex w-full min-w-0 ${message.authorType === "customer" ? "justify-start" : message.authorType === "system" ? "justify-center" : "justify-end"} ${groupedWithPrevious(index) ? "mt-2.5" : "mt-4"}`}>
+                    <article class={`group relative w-fit min-w-0 max-w-[90%] rounded-2xl px-4 py-3 text-left sm:max-w-[80%] ${message.authorType === "customer" ? "rounded-bl-md bg-[var(--app-surface-muted)]" : message.authorType === "system" ? "rounded-xl bg-[var(--app-surface-muted)]" : "rounded-br-md bg-[var(--app-info-bg)]"}`}>
+                      {#if !groupedWithPrevious(index)}
+                        <div class="mb-2 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--app-surface)] text-[10px] font-bold text-[var(--app-primary)]">{chatInitials(messageAuthor(message))}</span>
+                          <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-text)]">{messageAuthor(message)}</strong>
+                          <span class="ml-auto shrink-0 whitespace-nowrap text-[12px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
+                        </div>
+                      {/if}
 
                       {#if message.attachments && message.attachments.length > 0}
                         <div class="mb-2 grid gap-2">
@@ -648,10 +658,7 @@
                         </div>
                       {/if}
 
-                      {#if message.body}<SupportChatMarkdown text={message.body} isCustomer={message.authorType === "user"} size="md" />{/if}
-                      {#if !groupedWithNext(index)}
-                        <div class={`support-chat-message-meta mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${message.authorType === "customer" ? "text-[#687184]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/80"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
-                      {/if}
+                      {#if message.body}<SupportChatMarkdown text={message.body} repairMultilineFormatting size="md" className="text-[var(--app-text)]"/>{/if}
                       {#if message.authorType !== "system"}
                         <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
                           onReact={(code) => reactMessage(message, code)}
@@ -674,7 +681,7 @@
 
       {#if liveCustomerDraft && !chat.closedAt}
         <div class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-2.5">
-          <div class="mx-auto max-w-[840px] rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface-subtle)] px-3.5 py-2.5" aria-live="polite">
+          <div class="min-w-0 rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface-subtle)] px-3.5 py-2.5" aria-live="polite">
             <span class="text-[10px] font-semibold text-[var(--app-text-muted)]">Cliente digitando...</span>
             <p class="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--app-text)]">{liveCustomerDraft}</p>
           </div>
@@ -683,7 +690,7 @@
 
       {#if chat.status !== "closed" && (canWrite || data.canInternalNote)}
         <footer class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-3 sm:px-5">
-          <div class="mx-auto max-w-[840px]">
+          <div class="min-w-0">
             {#if !composerExpanded}
               <button
                 type="button"
@@ -741,7 +748,7 @@
                       <div class="flex items-center gap-1">
                         <button type="button" disabled={sending} aria-label="Anexar arquivos" title="Anexar arquivo"
                           on:click={() => replyEditor?.openFilePicker()}
-                          class="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Download size={17}/></button>
+                          class="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Paperclip size={18}/></button>
                       <button type="submit" disabled={sending || (!messageBody.trim() && replyFiles.length === 0)}
                         class="inline-flex h-10 items-center gap-2 rounded-lg bg-[var(--app-primary)] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
                         <Send size={15}/>{sending ? "Enviando..." : "Enviar"}
@@ -767,14 +774,11 @@
       {:else if data.canRespond && chat.assignedUserId && !assignedToMe && chat.status !== "closed"}
         <footer class="shrink-0 border-t border-[#E2E5ED] bg-[#FAFAFC] px-4 py-3 text-center text-[10px] text-[#777D8D]">Este atendimento está atribuído a <strong>{chat.assignedUserName ?? "outro atendente"}</strong>.</footer>
       {/if}
+      </div>
       {#if activeContextPanel}
-        <aside class="absolute inset-y-0 right-0 z-40 w-full max-w-[360px] space-y-3 overflow-y-auto border-l border-[#E2E5ED] bg-[#F5F6FA] p-3 shadow-2xl" aria-label="Detalhes do atendimento">
-          <div class="sticky top-0 z-10 flex items-center justify-between rounded-xl bg-white px-3 py-2 shadow-sm">
-            <strong class="text-[14px] text-[#202637]">{contextPanelLabels[activeContextPanel]}</strong>
-            <button type="button" on:click={() => activeContextPanel = null} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#69707E] hover:bg-[#F2F3F7]" aria-label="Fechar detalhes"><X size={18}/></button>
-          </div>
+        <div class="min-h-[260px] min-w-0 flex-1 space-y-3 overflow-y-auto bg-[var(--app-surface-subtle)] p-4 sm:p-5 lg:min-h-0" aria-label="Detalhes do atendimento">
           {#if activeContextPanel === "customer"}
-      <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
+      <section class="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
         <div class="flex items-center gap-3">
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UserRound size={17} /></span>
           <div class="min-w-0"><h2 class="truncate text-[12px] font-semibold text-[#303644]">{chat.customerName ?? "Cliente"}</h2><p class="mt-0.5 truncate text-[12px] text-[#8B919F]">{chat.customerEmail ?? "Sem e-mail informado"}</p></div>
@@ -794,7 +798,7 @@
       </section>
           {/if}
           {#if activeContextPanel === "attendance"}
-      <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
+      <section class="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
         <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2"><Clock3 size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Atendimento</h3></div><span class="text-[11px] text-[#9A9FAC]">{formatDateTime(chat.createdAt)}</span></div>
         <div class="mt-3 grid grid-cols-2 gap-2">
           <div class="rounded-xl bg-[#F7F8FA] px-3 py-2.5"><span class="text-[11px] text-[#969CAA]">Fila</span><strong class="mt-1 block truncate text-[12px] text-[#454B5B]">{chat.queueName}</strong></div>
@@ -812,7 +816,7 @@
       </section>
           {/if}
           {#if activeContextPanel === "tickets"}
-      <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
+      <section class="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2"><TicketCheck size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Chamados relacionados</h3></div>
           {#if !loadingRelatedTickets}<span class="rounded-full bg-[#F2F3F6] px-2 py-1 text-[11px] font-semibold text-[#6D7382]">{relatedTickets.length}</span>{/if}
@@ -847,7 +851,7 @@
       </section>
 
       {#if chat.ticketId}
-        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
+        <section class="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
           <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2"><TicketCheck size={14} class="text-[#EA6D0B]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Chamado #{chat.ticketNumber}</h3></div><a href={`/app/tickets/${chat.ticketId}`} class="text-[12px] font-semibold text-[#000A57] hover:underline">Abrir</a></div>
           <p class="mt-2 text-[12px] text-[#8B919F]">Prioridade atual: <strong class="text-[#555C6B]">{priorityLabels[chat.priority]}</strong></p>
           {#if data.canManageTicket && chat.status !== "closed"}
@@ -856,7 +860,7 @@
           {/if}
         </section>
       {:else}
-        <section class="rounded-[20px] border border-[#DCE1F2] bg-[#F8F9FF] p-4 shadow-[0_10px_28px_rgba(1,13,40,0.035)]">
+        <section class="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
           <div class="flex items-center gap-2 text-[#000A57]"><TicketCheck size={15} /><h3 class="text-[11px] font-semibold">Conversa sem chamado</h3></div>
           <p class="mt-2 text-[12px] leading-4 text-[#747C8D]">Continue o atendimento normalmente. Crie um chamado apenas quando o caso precisar de acompanhamento formal.</p>
           {#if data.canCreateTicket && chat.status !== "closed"}<form method="POST" action="?/createTicket" class="mt-3" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}><button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] text-[12px] font-semibold text-white"><TicketCheck size={13} />Criar chamado</button></form>{/if}
@@ -865,7 +869,7 @@
           {/if}
           {#if activeContextPanel === "tasks"}
       {#if data.canViewTasks}
-        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
+        <section class="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
           <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2"><ListTodo size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Tarefas do chamado</h3></div><span class="rounded-full bg-[#F2F3F6] px-2 py-1 text-[11px] font-semibold text-[#6D7382]">{data.linkedTasks.length}</span></div>
           {#if data.linkedTasks.length > 0}<div class="mt-3 space-y-2">{#each data.linkedTasks as task}<a href={`/app/tasks/${task.id}`} class="block rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-2.5 transition hover:border-[#C9CFE0] hover:bg-white"><strong class="line-clamp-1 text-[12px] text-[#454B59]">{task.title}</strong><span class="mt-1 block text-[10px] text-[#9298A5]">{task.projectName}{task.dueOn ? ` · ${task.dueOn}` : ""}</span></a>{/each}</div>{:else}<p class="mt-3 text-[12px] text-[#8B919F]">Nenhuma tarefa vinculada.</p>{/if}
           {#if data.canCreateTask && data.taskProjects.length > 0 && chat.status !== "closed"}
@@ -876,7 +880,7 @@
           {/if}
           {#if activeContextPanel === "remote"}
       {#if chat.ticketId}
-        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
+        <section class="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
           <div class="flex items-center gap-2"><MonitorCog size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Acesso remoto</h3></div>
           {#if onlineRemoteDevices.length > 0}<p class="mt-2 text-[12px] font-medium text-[#398155]">{onlineRemoteDevices.length} {onlineRemoteDevices.length === 1 ? "computador online" : "computadores online"}</p>{:else if data.remoteDevices.length > 0}<p class="mt-2 text-[12px] text-[#858B99]">Computadores vinculados estão offline.</p>{:else}<p class="mt-2 text-[12px] text-[#858B99]">Nenhum computador vinculado.</p>{/if}
           <div class="mt-3 flex flex-col gap-2">
@@ -886,13 +890,10 @@
         </section>
       {/if}
           {/if}
-        </aside>
+        </div>
       {/if}
     </main>
-    </ChatInbox>
-
-
-  </div>
+  </ChatInbox>
 </ApplicationContent>
 
 {#if messageForTask}

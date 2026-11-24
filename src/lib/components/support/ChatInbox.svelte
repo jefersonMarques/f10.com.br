@@ -5,7 +5,7 @@
   import { replaceState } from "$app/navigation";
   import { isChatAwaitingAgent, isChatOpen } from "$lib/support/chatInboxClassification";
   import { readChatInboxScope, withChatInboxScope, type ChatInboxScope } from "$lib/support/chatInboxScope";
-  import { Clock3, History, MessageCircleMore, Search, UserRound } from "lucide-svelte";
+  import { Clock3, History, Search } from "lucide-svelte";
 
   type ChatInboxItem = {
     conversationKey: string;
@@ -39,7 +39,6 @@
   export let chats: ChatInboxItem[] = [];
   export let currentUserId = "";
   export let selectedConversationKey: string | null = null;
-  export let compact = false;
 
   let inboxChats: ChatInboxItem[] = chats;
   let query = "";
@@ -179,120 +178,81 @@
   });
 </script>
 
-<section class="grid h-full min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:grid-cols-[315px_minmax(0,1fr)]">
-  <header class="min-w-0 rounded-2xl border border-[#E2E5ED] bg-white px-4 py-3 lg:col-span-2">
-    <div class="flex items-center gap-3">
-      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white shadow-sm">
-        <MessageCircleMore size={18} aria-hidden="true" />
-      </span>
-      <div class="min-w-0">
-        <h2 class="truncate text-[14px] font-semibold text-[#202637]">Conversas</h2>
-        <p class="mt-0.5 text-[10px] text-[#8B919F]">{inboxChats.length} clientes/contextos no seu escopo</p>
+<section class="flex min-h-[540px] flex-col bg-[var(--app-surface)] lg:h-full lg:min-h-0">
+  <header class="relative z-30 w-full min-w-0 shrink-0 border-b border-[var(--app-border)] bg-white">
+    <div class="flex w-full min-w-0 min-h-[54px] flex-wrap items-center gap-2 px-4 py-2">
+      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div class="flex max-w-full overflow-x-auto rounded-lg bg-[#F3F4F7] p-0.5">
+          {#each scopes as item (item.value)}
+            <button type="button" on:click={() => selectScope(item.value)}
+              aria-pressed={scope === item.value}
+              class={`application-text-caption flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 font-semibold ${scope === item.value ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>
+              {item.label}
+              <span class="tabular-nums text-[11px]">{scopeCount(item.value)}</span>
+            </button>
+          {/each}
+        </div>
+        <label class="relative min-w-[170px] flex-[1_1_220px]">
+          <Search size={14} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9499A5]" aria-hidden="true"/>
+          <input bind:this={searchElement} bind:value={query} placeholder="Cliente, escola ou chamado"
+            aria-label="Buscar conversas" class="application-text-control h-9 w-full rounded-lg border border-[#E6E8EF] bg-[#F8F9FC] pl-9 pr-8 text-[13px]"/>
+          <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#9499A5]">/</span>
+        </label>
       </div>
-    </div>
-
-    <label class="relative mt-3 block max-w-[680px]">
-      <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9AA0AD]" aria-hidden="true" />
-      <input
-        bind:this={searchElement}
-        bind:value={query}
-        placeholder="Buscar cliente, escola ou chamado..."
-        class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#F8F9FB] pl-10 pr-9 text-[13px] text-[#343A49] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10"
-      />
-      <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#E0E3EA] bg-white px-1.5 py-0.5 text-[9px] text-[#9DA2AD]">/</span>
-    </label>
-
-    <div class="mt-3 flex gap-1.5 overflow-x-auto pb-1">
-      {#each scopes as item}
-        <button
-          type="button"
-          on:click={() => selectScope(item.value)}
-          aria-pressed={scope === item.value}
-          class={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors duration-150 ${scope === item.value
-            ? "bg-[var(--app-primary)] text-white shadow-sm"
-            : "border border-[var(--app-border-control)] bg-[var(--app-surface)] text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"}`}
-        >
-          {item.label}
-          <span class={`rounded-full px-1.5 py-0.5 text-[10px] ${scope === item.value
-            ? "bg-white/20 text-white"
-            : "bg-[var(--app-surface-muted)] text-[var(--app-text-muted)]"}`}>{scopeCount(item.value)}</span>
-        </button>
-      {/each}
     </div>
   </header>
 
-  <aside class={`min-h-0 overflow-y-auto rounded-2xl border border-[#E2E5ED] bg-white p-3 ${compact ? "hidden lg:block" : ""}`}>
-    {#if filteredChats.length === 0}
-      <div class="rounded-2xl border border-dashed border-[#DDE1EA] bg-[#FAFAFC] px-5 py-12 text-center">
-        <MessageCircleMore size={30} class="mx-auto text-[#BEC3CD]" aria-hidden="true" />
-        <p class="mt-3 text-[11px] font-semibold text-[#5E6574]">Nenhuma conversa</p>
-        <p class="mt-1 text-[10px] leading-4 text-[#9298A5]">Altere a busca ou o filtro para continuar.</p>
-      </div>
-    {:else}
-      <div class="space-y-2">
-        {#each filteredChats as chat}
-          <a
-            href={conversationHref(chat.sessionId)}
-            class={`block overflow-hidden rounded-2xl border px-3.5 py-3 transition ${selectedConversationKey === chat.conversationKey ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
-          >
-            <div class="flex gap-3">
-              <span class={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isChatOpen(chat) && chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#A44141]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
-                <UserRound size={17} aria-hidden="true" />
-                {#if isChatOpen(chat)}
-                  {@const presence = getCustomerChatPresence(chat.lastSeenAt, clockMs)}
-                  <span class={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${presence === "recent" ? "bg-emerald-600" : presence === "away" ? "bg-amber-500" : "bg-slate-400"}`} title={CUSTOMER_CHAT_PRESENCE_LABELS[presence]} aria-label={CUSTOMER_CHAT_PRESENCE_LABELS[presence]}></span>
-                {/if}
-                {#if isChatAwaitingAgent(chat)}
-                  <span class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-[#EA6D0B]"></span>
-                {/if}
-              </span>
-
-              <div class="min-w-0 flex-1">
-                <div class="flex items-start justify-between gap-2">
-                  <strong class="truncate text-[11.5px] font-semibold text-[#303645]">{chat.customerName ?? "Cliente"}</strong>
+  <div class="grid min-h-[540px] bg-white lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(330px,390px)_minmax(0,1fr)]">
+    <aside class="flex min-h-[240px] max-h-[38dvh] flex-col overflow-hidden border-b border-[var(--app-border)] bg-white lg:max-h-none lg:min-h-0 lg:border-b-0 lg:border-r">
+      <header class="flex h-11 shrink-0 items-center justify-between border-b border-[var(--app-border-soft)] px-4">
+        <h2 class="text-[13px] font-semibold text-[#202637]">Conversas</h2>
+        <span class="text-[12px] font-medium tabular-nums text-[#707787]">{filteredChats.length}</span>
+      </header>
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        {#if filteredChats.length === 0}
+          <div class="flex min-h-[160px] items-center justify-center px-4 text-center text-[12px] text-[#9297A4]">Nenhuma conversa encontrada.</div>
+        {:else}
+          <div class="divide-y divide-[var(--app-border-soft)]">
+            {#each filteredChats as chat (chat.conversationKey)}
+              <a href={conversationHref(chat.sessionId)} aria-current={selectedConversationKey === chat.conversationKey ? "page" : undefined}
+                class={`block border-l-[3px] px-3 py-3 transition-colors ${selectedConversationKey === chat.conversationKey ? "border-[var(--app-primary)] bg-[var(--app-surface-selected)]" : "border-transparent hover:bg-[var(--app-surface-subtle)]"}`}>
+                <div class="flex min-w-0 items-center justify-between gap-3">
+                  <div class="flex min-w-0 items-center gap-2">
+                    {#if isChatAwaitingAgent(chat)}
+                      <span class="h-2 w-2 shrink-0 rounded-full bg-[#EA6D0B]" title="Aguardando resposta" aria-label="Aguardando resposta"></span>
+                    {/if}
+                    <span class="shrink-0 text-[11px] font-bold text-[#000A57]">{chat.ticketNumber ? "#" + chat.ticketNumber : "CHAT"}</span>
+                    {#if !isChatOpen(chat)}
+                      <span class="text-[11px] text-[#737989]">Finalizada</span>
+                    {:else if chat.aiState === "escalated"}
+                      <span class="text-[11px] font-medium text-[#A14A4A]">Aguardando equipe</span>
+                    {/if}
+                    {#if chat.sessionCount > 1}
+                      <span class="inline-flex shrink-0 items-center gap-1 text-[11px] text-[#737989]" title={`${chat.sessionCount} sessões de atendimento`}><History size={12}/>{chat.sessionCount}</span>
+                    {/if}
+                  </div>
                   {#if isChatAwaitingAgent(chat) && chat.waitingSinceMs != null}
                     <span class={`flex shrink-0 items-center gap-1 text-[12px] font-semibold tabular-nums ${clockMs - chat.waitingSinceMs >= 120_000 ? "text-[#A13C3C]" : "text-[#A65B13]"}`} title="Tempo sem resposta humana"><Clock3 size={12}/>{formatWaitingTime(chat.waitingSinceMs, clockMs)}</span>
                   {:else}
-                    <span class="flex shrink-0 items-center gap-1 text-[11px] text-[#697184]"><Clock3 size={11}/>{formatRelative(chat.updatedAt)}</span>
+                    <span class="shrink-0 whitespace-nowrap text-[11px] text-[#9298A5]">{formatRelative(chat.updatedAt)}</span>
                   {/if}
                 </div>
-
-                <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
-                  {#if chat.ticketNumber}
-                    <span class="shrink-0 rounded-md bg-[#FFF0E4] px-1.5 py-0.5 text-[9px] font-bold text-[#B95B12]">#{chat.ticketNumber}</span>
-                  {:else}
-                    <span class="shrink-0 rounded-md bg-[#EEF0FF] px-1.5 py-0.5 text-[9px] font-bold text-[#000A57]">CHAT</span>
+                <strong class="mt-1 block min-w-0 break-words text-[13px] font-semibold leading-5 text-[#303645]">{chat.customerName ?? "Cliente"}</strong>
+                <p class="mt-1 line-clamp-2 break-words text-[13px] leading-5 text-[#505766]">{messagePrefix(chat)}{chat.lastMessageBody ?? chat.subject}</p>
+                <div class="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[#737989]">
+                  {#if isChatOpen(chat)}
+                    {@const presence = getCustomerChatPresence(chat.lastSeenAt, clockMs)}
+                    <span class={`h-2 w-2 shrink-0 rounded-full ${presence === "recent" ? "bg-emerald-600" : presence === "away" ? "bg-amber-500" : "bg-slate-400"}`} title={CUSTOMER_CHAT_PRESENCE_LABELS[presence]} aria-label={CUSTOMER_CHAT_PRESENCE_LABELS[presence]}></span>
                   {/if}
-                  <span class="min-w-0 flex-1 truncate text-[9.5px] font-medium text-[#747B8B]">
-                    {chat.customerContext?.unitName ?? chat.organizationName ?? chat.customerEmail ?? "Atendimento F10"}
-                  </span>
-                  {#if chat.sessionCount > 1}
-                    <span class="inline-flex shrink-0 items-center gap-1 rounded-md bg-[#F1F2F5] px-1.5 py-0.5 text-[8.5px] font-semibold text-[#747B8B]" title={`${chat.sessionCount} sessões de atendimento agrupadas`}>
-                      <History size={9} aria-hidden="true" /> {chat.sessionCount}
-                    </span>
-                  {/if}
+                  <span class="min-w-0 flex-1 truncate">{chat.customerContext?.unitName ?? chat.organizationName ?? chat.customerEmail ?? "Atendimento F10"}</span>
+                  <span class="max-w-[120px] truncate text-[11px]" title={chat.assignedUserName ?? "Sem responsável"}>{chat.assignedUserName ?? "Sem responsável"}</span>
                 </div>
-
-                {#if !isChatOpen(chat)}
-                  <span class="mt-2 inline-flex rounded-md bg-[var(--app-surface-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--app-text-muted)]">Finalizada</span>
-                {/if}
-
-                <p class={`mt-2 line-clamp-1 text-[10.5px] leading-4 ${chat.lastMessageAuthorType === "customer" ? "font-medium text-[#474E5D]" : "text-[#777E8D]"}`}>
-                  {messagePrefix(chat)}{chat.lastMessageBody ?? chat.subject}
-                </p>
-
-                {#if !compact}
-                  <div class="mt-2 flex items-center justify-between gap-2 text-[9px] text-[#969CA9]">
-                    <span class="truncate">{chat.assignedUserName ?? "Não atribuído"}</span>
-                    {#if isChatOpen(chat) && chat.aiState === "escalated"}<span class="shrink-0 font-semibold text-[#A14A4A]">Aguardando equipe</span>{/if}
-                  </div>
-                {/if}
-              </div>
-            </div>
-          </a>
-        {/each}
+              </a>
+            {/each}
+          </div>
+        {/if}
       </div>
-    {/if}
-  </aside>
-  <slot />
+    </aside>
+    <slot />
+  </div>
 </section>

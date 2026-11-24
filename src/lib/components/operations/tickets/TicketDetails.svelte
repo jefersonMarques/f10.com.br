@@ -47,6 +47,7 @@
     labelClasses,
     priorityLabels,
   } from "./presentation";
+  import { supportTabClass as tabClass } from "$lib/support/supportWorkspacePresentation";
   import type { TicketDetailsData, TicketMainPanel, TicketWorkflow } from "./types";
   import EmailMessageBody from "./EmailMessageBody.svelte";
   import LivePageSync from "$lib/components/application/LivePageSync.svelte";
@@ -193,13 +194,6 @@
 
   $: isInfoPanel = surface !== "page" && ["service", "customer", "tasks"].includes(activeMainPanel);
   $: if (activeMainPanel === "collaboration") activeMainPanel = "service";
-
-  function tabClass(panel: TicketMainPanel, currentPanel: TicketMainPanel): string {
-    const base = "inline-flex h-full shrink-0 items-center gap-1.5 border-b-2 px-1 text-[12px] font-semibold transition-colors";
-    return currentPanel === panel
-      ? `${base} border-[var(--app-primary)] text-[var(--app-primary)]`
-      : `${base} border-transparent text-[var(--app-text-muted)] hover:text-[var(--app-primary)]`;
-  }
 
   function selectTab(panel: TicketMainPanel): void {
     activeMainPanel = panel;
