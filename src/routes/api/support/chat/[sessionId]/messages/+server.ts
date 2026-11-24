@@ -11,6 +11,7 @@ import {
 } from "$lib/server/support/publicChatRepository";
 import { SUPPORT_ATTACHMENT_MAX_FILES } from "$lib/server/support/supportMessageAttachmentRepository";
 import { updateLiveChatDraft } from "$lib/server/support/liveChatDrafts";
+import { getPublicChatWaitingStatus } from "$lib/server/support/chatWaitingService";
 
 const MAX_BODY_BYTES = 36 * 1024 * 1024;
 
@@ -80,9 +81,12 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
   }
 
   try {
-    const messages = await listPublicChatMessages(sessionId, token);
+    const [messages, waiting] = await Promise.all([
+      listPublicChatMessages(sessionId, token),
+      getPublicChatWaitingStatus(sessionId),
+    ]);
     return json(
-      { messages, aiState: session.aiState, ticketId: session.ticketId },
+      { messages, aiState: session.aiState, ticketId: session.ticketId, waiting },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (cause) {

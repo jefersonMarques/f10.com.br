@@ -24,6 +24,7 @@
     lastMessageBody: string | null;
     lastMessageAuthorType: string | null;
     updatedAt: string | Date;
+    waitingSinceMs?: number | null;
     customerContext: {
       groupName: string;
       unitName: string;
@@ -40,6 +41,7 @@
 
   let inboxChats: ChatInboxItem[] = chats;
   let query = "";
+  let clockMs = Date.now();
   let scope: ChatInboxScope = readChatInboxScope($page.url);
   let lastNavigatedUrl = $page.url.href;
   let searchElement: HTMLInputElement;
@@ -108,6 +110,12 @@
     return `${Math.floor(hours / 24)} d`;
   }
 
+  function formatWaitingTime(waitingSinceMs: number, now: number): string {
+    const seconds = Math.max(0, Math.floor((now - waitingSinceMs) / 1000));
+    const minutes = Math.floor(seconds / 60);
+    return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  }
+
   function messagePrefix(chat: ChatInboxItem): string {
     if (chat.lastMessageAuthorType === "customer") return "Cliente: ";
     if (chat.lastMessageAuthorType === "user") return "Equipe: ";
@@ -137,7 +145,10 @@
     lastNavigatedUrl = $page.url.href;
     scope = readChatInboxScope($page.url);
   }
-  $: filteredChats = inboxChats.filter((chat) => matchesScope(chat, scope) && matchesQuery(chat, query));
+  $: filteredChats = inboxChats.filter((chat) => matchesScope(chat, scope) && matchesQuery(chat, query))
+    .sort((left, right) => scope === "waiting"
+      ? (left.waitingSinceMs ?? Number.MAX_SAFE_INTEGER) - (right.waitingSinceMs ?? Number.MAX_SAFE_INTEGER)
+      : new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 
   onMount(() => {
     const handleKeydown = (event: KeyboardEvent) => {
@@ -153,11 +164,13 @@
 
     void refreshInbox();
     const intervalId = window.setInterval(() => void refreshInbox(), 5_000);
+    const clockIntervalId = window.setInterval(() => { clockMs = Date.now(); }, 1_000);
     window.addEventListener("keydown", handleKeydown);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearInterval(intervalId);
+      window.clearInterval(clockIntervalId);
       window.removeEventListener("keydown", handleKeydown);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
@@ -223,7 +236,7 @@
             <div class="flex gap-3">
               <span class={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isChatOpen(chat) && chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#A44141]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
                 <UserRound size={17} aria-hidden="true" />
-                {#if isChatAwaitingAgent(chat) && chat.lastMessageAuthorType === "customer"}
+                {#if isChatAwaitingAgent(chat)}
                   <span class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-[#EA6D0B]"></span>
                 {/if}
               </span>
@@ -231,7 +244,11 @@
               <div class="min-w-0 flex-1">
                 <div class="flex items-start justify-between gap-2">
                   <strong class="truncate text-[11.5px] font-semibold text-[#303645]">{chat.customerName ?? "Cliente"}</strong>
-                  <span class="flex shrink-0 items-center gap-1 text-[9px] text-[#9CA1AD]"><Clock3 size={10} />{formatRelative(chat.updatedAt)}</span>
+                  {#if isChatAwaitingAgent(chat) && chat.waitingSinceMs != null}
+                    <span class={`flex shrink-0 items-center gap-1 text-[12px] font-semibold tabular-nums ${clockMs - chat.waitingSinceMs >= 120_000 ? "text-[#A13C3C]" : "text-[#A65B13]"}`} title="Tempo sem resposta humana"><Clock3 size={12}/>{formatWaitingTime(chat.waitingSinceMs, clockMs)}</span>
+                  {:else}
+                    <span class="flex shrink-0 items-center gap-1 text-[11px] text-[#697184]"><Clock3 size={11}/>{formatRelative(chat.updatedAt)}</span>
+                  {/if}
                 </div>
 
                 <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">

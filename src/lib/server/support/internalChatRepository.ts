@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { chatWaitingSinceMs } from "$lib/server/support/chatWaitingQuery";
 import {
   and,
   asc,
@@ -104,6 +105,7 @@ export async function listInternalChats(
       firstResponseDueAt: tickets.firstResponseDueAt,
       resolutionDueAt: tickets.resolutionDueAt,
       firstResponseAt: sql<Date | null>`coalesce(${tickets.firstResponseAt}, ${webChatSessions.firstResponseAt})`,
+      waitingSinceMs: chatWaitingSinceMs(),
       lastMessageBody: sql<string | null>`coalesce(
         (
           select tm.body
@@ -202,6 +204,7 @@ export async function getInternalChat(
       firstResponseDueAt: tickets.firstResponseDueAt,
       resolutionDueAt: tickets.resolutionDueAt,
       firstResponseAt: sql<Date | null>`coalesce(${tickets.firstResponseAt}, ${webChatSessions.firstResponseAt})`,
+      waitingSinceMs: chatWaitingSinceMs(),
       linkedTaskId: tickets.linkedTaskId,
       lastSeenAt: webChatSessions.lastSeenAt,
       createdAt: webChatSessions.createdAt,

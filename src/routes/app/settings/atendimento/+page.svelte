@@ -20,7 +20,7 @@
     formAction === "save" ? "hours"
       : formAction === "saveRouting" ? "routing"
         : formAction === "saveFinanceReadOnly" ? "chat"
-        : ["createQueue", "saveQueueSla", "saveQueueDueDays",
+        : ["saveChatWaiting", "createQueue", "saveQueueSla", "saveQueueDueDays",
             "createEntryOption", "updateEntryOption", "deleteEntryOption"].includes(formAction)
           ? "chat" : "teams";
 
@@ -142,6 +142,20 @@
   </section>
 
   {:else if activeTab === "chat"}
+  <section class="rounded-2xl border border-app-border bg-app-surface p-5">
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Clock3 size={20}/></span>
+      <h2 class="text-[16px] font-semibold text-app-text">Monitoramento de espera</h2>
+    </div>
+    <form method="POST" action="?/saveChatWaiting" class="mt-4 grid gap-4 sm:grid-cols-2">
+      <label class="flex items-center gap-2 text-[13px] font-medium"><input type="checkbox" name="enabled" checked={data.chatWaiting.enabled} class="h-4 w-4 rounded"/> Ativar monitoramento</label>
+      <label class="flex items-center gap-2 text-[13px] font-medium"><input type="checkbox" name="offerTicket" checked={data.chatWaiting.offerTicket} class="h-4 w-4 rounded"/> Oferecer abertura de chamado</label>
+      <label class="block text-[13px] font-medium">Primeiro aviso (segundos)<input type="number" name="delaySeconds" min="10" max="3600" required value={data.chatWaiting.delaySeconds} class="mt-1 block h-10 w-full rounded-xl border border-app-border-control px-3"/></label>
+      <label class="block text-[13px] font-medium">Intervalo de reforço (segundos)<input type="number" name="repeatSeconds" min="60" max="3600" required value={data.chatWaiting.repeatSeconds} class="mt-1 block h-10 w-full rounded-xl border border-app-border-control px-3"/></label>
+      <label class="flex items-center gap-2 text-[13px] font-medium"><input type="checkbox" name="notifyTeam" checked={data.chatWaiting.notifyTeam} class="h-4 w-4 rounded"/> Reforçar alerta da equipe</label>
+      <button type="submit" class="justify-self-end inline-flex h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[13px] font-semibold text-white"><Save size={15}/> Salvar</button>
+    </form>
+  </section>
   <section class="mt-4 rounded-[22px] border border-app-border bg-app-surface p-5 sm:p-6">
     <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF2E8] text-[#C85C08]"><MessagesSquare size={18}/></span>

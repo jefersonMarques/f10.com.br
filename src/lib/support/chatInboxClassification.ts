@@ -3,6 +3,7 @@ export type ChatInboxState = {
   closedAt?: string | Date | null;
   aiState?: string | null;
   lastMessageAuthorType?: string | null;
+  waitingSinceMs?: number | null;
 };
 
 const FINAL_STATUSES = new Set(["resolved", "closed"]);
@@ -12,6 +13,9 @@ export function isChatOpen(chat: ChatInboxState): boolean {
 }
 
 export function isChatAwaitingAgent(chat: ChatInboxState): boolean {
+  if (chat.waitingSinceMs !== undefined) {
+    return isChatOpen(chat) && chat.waitingSinceMs !== null;
+  }
   return isChatOpen(chat)
     && chat.status !== "waiting_customer"
     && (

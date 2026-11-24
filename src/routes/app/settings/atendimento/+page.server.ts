@@ -1,4 +1,5 @@
 import { fail } from "@sveltejs/kit";
+import { getChatWaitingSettings, updateChatWaitingSettings } from "$lib/server/settings/chatWaitingSettingsRepository";
 import { isFinanceReadOnlyEnabled, updateFinanceReadOnlySettings } from "$lib/server/finance/financeSettings";
 import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
@@ -83,18 +84,38 @@ function readEntryOption(formData: FormData) {
 
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
-  const [settings, queue, routing, chatEntry, emailInboxes, financeReadOnlyEnabled] = await Promise.all([
+  const [settings, queue, routing, chatEntry, emailInboxes, financeReadOnlyEnabled, chatWaiting] = await Promise.all([
     getSupportHoursSettings(),
     getSupportQueueTeamSettings(),
     getSupportRoutingSettings(),
     getSupportChatEntrySettings(),
     getSupportEmailInboxTeamSettings(),
     isFinanceReadOnlyEnabled(),
+    getChatWaitingSettings(),
   ]);
-  return { settings, queue, routing, chatEntry, emailInboxes, financeReadOnlyEnabled };
+  return { settings, queue, routing, chatEntry, emailInboxes, financeReadOnlyEnabled, chatWaiting };
 };
 
 export const actions: Actions = {
+  saveChatWaiting: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
+    const formData = await request.formData();
+    const delaySeconds = Number(readString(formData, "delaySeconds"));
+    const repeatSeconds = Number(readString(formData, "repeatSeconds"));
+    if (!Number.isInteger(delaySeconds) || delaySeconds < 10 || delaySeconds > 3600
+      || !Number.isInteger(repeatSeconds) || repeatSeconds < 60 || repeatSeconds > 3600) {
+      return fail(400, { success: false, action: "saveChatWaiting", message: "Revise os tempos de espera e reforço." });
+    }
+    await updateChatWaitingSettings(session.user.id, {
+      enabled: formData.has("enabled"),
+      delaySeconds,
+      notifyTeam: formData.has("notifyTeam"),
+      repeatSeconds,
+      offerTicket: formData.has("offerTicket"),
+    });
+    return { success: true, action: "saveChatWaiting", message: "Monitoramento de espera atualizado." };
+  },
+
   saveFinanceReadOnly: async ({ cookies, request }) => {
     const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const enabled = (await request.formData()).has("enabled");
