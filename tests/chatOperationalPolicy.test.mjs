@@ -26,3 +26,10 @@ test("finishing a chat does not close its ticket", () => {
   assert.match(source, /closedBy: "agent"/);
   assert.match(source, /hasOpenChatForTicket/);
 });
+
+test("first escalation is not suppressed by the ordinary reminder limit", () => {
+  const source = readFileSync("src/lib/server/support/chatWaitingService.ts", "utf8");
+  assert.match(source, /if \(!firstEscalation && \(previous\.length >= MAX_REMINDERS_PER_CYCLE/);
+  assert.match(source, /SUPERVISOR_EVENT/);
+  assert.match(source, /level === "supervisor" && recipientIds\.length === 0/);
+});

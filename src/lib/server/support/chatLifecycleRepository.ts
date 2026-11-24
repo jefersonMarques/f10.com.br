@@ -97,7 +97,7 @@ export async function finishInternalChat(
         visibility: "public",
         channel: "web_chat",
         authorUserId: actorUserId,
-        body: `Atendimento finalizado por ${actor.name}.`,
+        body: `Chat finalizado por ${actor.name}. O chamado permanece com seu status atual.`,
       });
 
       await tx.insert(ticketEvents).values({

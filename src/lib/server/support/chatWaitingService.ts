@@ -96,7 +96,10 @@ async function sendReminder(
     settings.teamEscalationSeconds,
     settings.supervisorEscalationSeconds,
   );
-  const recipientIds = await getReminderRecipients(chat, level);
+  let recipientIds = await getReminderRecipients(chat, level);
+  if (level === "supervisor" && recipientIds.length === 0) {
+    recipientIds = await getReminderRecipients(chat, "team");
+  }
   const notifications = await getDatabase().transaction(async (tx) => {
     const [locked] = await tx.select({
       ticketId: webChatSessions.ticketId,
@@ -134,8 +137,8 @@ async function sendReminder(
         eq(supportChatEvents.eventType, REMINDER_EVENT),
         gt(supportChatEvents.occurredAt, new Date(waitingSinceMs - 1)),
       )).orderBy(desc(supportChatEvents.occurredAt)).limit(MAX_REMINDERS_PER_CYCLE);
-    if (previous.length >= MAX_REMINDERS_PER_CYCLE
-      || (!firstEscalation && previous[0] && now.getTime() - previous[0].occurredAt.getTime() < settings.repeatSeconds * 1000)) return [];
+    if (!firstEscalation && (previous.length >= MAX_REMINDERS_PER_CYCLE
+      || (previous[0] && now.getTime() - previous[0].occurredAt.getTime() < settings.repeatSeconds * 1000))) return [];
 
     if (firstEscalation && escalationEvent) {
       await tx.insert(supportChatEvents).values({ sessionId: chat.id, eventType: escalationEvent, occurredAt: now });
@@ -200,12 +203,19 @@ export async function processChatWaitingReminders(): Promise<void> {
   }).from(webChatSessions).where(and(
     isNull(webChatSessions.closedAt),
     sql`${waiting} <= ${now - settings.delaySeconds * 1000}`,
-    sql`(not exists (
-      select 1 from support_chat_events e
-      where e.session_id = ${webChatSessions.id} and e.event_type in (${REMINDER_EVENT}, ${NO_RECIPIENT_EVENT})
-        and extract(epoch from e.occurred_at) * 1000 >= greatest(
-          ${waiting}, ${now - settings.repeatSeconds * 1000}
-        )
+    sql`((
+      not exists (
+        select 1 from support_chat_events e
+        where e.session_id = ${webChatSessions.id} and e.event_type in (${REMINDER_EVENT}, ${NO_RECIPIENT_EVENT})
+          and extract(epoch from e.occurred_at) * 1000 >= greatest(
+            ${waiting}, ${now - settings.repeatSeconds * 1000}
+          )
+      )
+      and (
+        select count(*) from support_chat_events e
+        where e.session_id = ${webChatSessions.id} and e.event_type = ${REMINDER_EVENT}
+          and extract(epoch from e.occurred_at) * 1000 >= ${waiting}
+      ) < ${MAX_REMINDERS_PER_CYCLE}
     ) or (
       ${waiting} <= ${now - settings.teamEscalationSeconds * 1000}
       and not exists (
@@ -217,11 +227,6 @@ export async function processChatWaitingReminders(): Promise<void> {
           and extract(epoch from e.occurred_at) * 1000 >= ${waiting}
       )
     ))`,
-    sql`(
-      select count(*) from support_chat_events e
-      where e.session_id = ${webChatSessions.id} and e.event_type = ${REMINDER_EVENT}
-        and extract(epoch from e.occurred_at) * 1000 >= ${waiting}
-    ) < ${MAX_REMINDERS_PER_CYCLE}`,
   )).orderBy(waiting).limit(BATCH_SIZE);
 
   for (const chat of candidates) {

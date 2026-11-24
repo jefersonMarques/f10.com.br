@@ -554,7 +554,7 @@
             {/if}
 
             {#if chat.ticketId && chat.ticketNumber}
-              <a href={`/app/tickets/${chat.ticketId}`} class="hidden h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white sm:inline-flex"><TicketCheck size={13} /> #{chat.ticketNumber}</a>
+              <a href={`/app/tickets/${chat.ticketId}`} title="Abrir chamado e concluir pelo workflow" class="hidden h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[12px] font-semibold text-white sm:inline-flex"><TicketCheck size={13} /> #{chat.ticketNumber}</a>
             {:else if data.canCreateTicket && chat.status !== "closed"}
               <form method="POST" action="?/createTicket" class="hidden sm:block" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}>
                 <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white"><TicketCheck size={13} /> Criar chamado</button>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { getCustomerChatPresence, CUSTOMER_CHAT_PRESENCE_LABELS } from "$lib/support/chatOperationalPolicy";
   import { page } from "$app/stores";
   import { replaceState } from "$app/navigation";
   import { isChatAwaitingAgent, isChatOpen } from "$lib/support/chatInboxClassification";
@@ -24,6 +25,7 @@
     lastMessageBody: string | null;
     lastMessageAuthorType: string | null;
     updatedAt: string | Date;
+    lastSeenAt?: string | Date | null;
     waitingSinceMs?: number | null;
     customerContext: {
       groupName: string;
@@ -236,6 +238,10 @@
             <div class="flex gap-3">
               <span class={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isChatOpen(chat) && chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#A44141]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
                 <UserRound size={17} aria-hidden="true" />
+                {#if isChatOpen(chat)}
+                  {@const presence = getCustomerChatPresence(chat.lastSeenAt, clockMs)}
+                  <span class={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${presence === "recent" ? "bg-emerald-600" : presence === "away" ? "bg-amber-500" : "bg-slate-400"}`} title={CUSTOMER_CHAT_PRESENCE_LABELS[presence]} aria-label={CUSTOMER_CHAT_PRESENCE_LABELS[presence]}></span>
+                {/if}
                 {#if isChatAwaitingAgent(chat)}
                   <span class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-[#EA6D0B]"></span>
                 {/if}
