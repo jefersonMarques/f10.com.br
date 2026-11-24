@@ -33,3 +33,20 @@ test("both ticket and chat note composers share mention component", () => {
     assert.match(content, /<MentionTextarea users=/);
   }
 });
+
+test("mention positioning is coalesced and cancelled when the popover closes", () => {
+  assert.match(source, /if \(positionFrame !== null \|\| !active \|\| !open\) return/);
+  assert.match(source, /positionFrame = requestAnimationFrame/);
+  assert.match(source, /cancelAnimationFrame\(positionFrame\)/);
+  assert.match(source, /suggestionsPopover\?\.contains\(target\)\) return/);
+  assert.match(source, /suggestionsPopover\.style\[property\] !== value/);
+  assert.doesNotMatch(source, /await tick\(\)/);
+  assert.doesNotMatch(source, /addEventListener\("scroll", positionSuggestions/);
+});
+
+test("unchanged cursor and query do not trigger another mention update", () => {
+  assert.match(source, /query === nextQuery && mentionStart === nextStart && open\) return/);
+  assert.match(source, /refreshMentionState\(input\.value\)/);
+  assert.match(source, /if \(!active && open\) closeSuggestions\(\)/);
+  assert.match(source, /event\.stopPropagation\(\)/);
+});

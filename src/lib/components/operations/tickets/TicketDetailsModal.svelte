@@ -7,7 +7,7 @@
   export let onRefresh: () => void | Promise<void> = () => undefined;
 
   function handleKeydown(event: KeyboardEvent): void {
-    if (event.key === "Escape") onClose();
+    if (event.key === "Escape" && !event.defaultPrevented) onClose();
   }
 </script>
 

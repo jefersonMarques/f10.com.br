@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { onDestroy, tick } from "svelte";
+  import { onDestroy } from "svelte";
 
   type MentionUser = {
     id: string;
@@ -18,6 +18,7 @@
   export let autoGrow = false;
   export let suggestionsAbove = false;
   export let value = "";
+  export let active = true;
 
   let textarea: HTMLTextAreaElement;
   let suggestionsPopover: HTMLDivElement;
@@ -26,6 +27,8 @@
   let open = false;
   let selectedIndex = 0;
   let selectedMentions: Array<{ id: string; token: string }> = [];
+  let positionFrame: number | null = null;
+  let listening = false;
 
   function normalize(value: string): string {
     return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -51,12 +54,9 @@
     .map((mention) => mention.id);
 
   $: if (browser && textarea && suggestionsPopover) {
-    if (open && suggestions.length > 0) {
-      void showSuggestions(query, suggestionsAbove);
-    } else {
-      hideSuggestions();
-    }
+    syncSuggestions(active && open && suggestions.length > 0, suggestionsAbove);
   }
+  $: if (!active && open) closeSuggestions();
 
   function resizeTextarea(): void {
     if (!autoGrow || !textarea) return;
@@ -65,14 +65,20 @@
     textarea.style.overflowY = textarea.scrollHeight > 144 ? "auto" : "hidden";
   }
 
-  function handleInput(): void {
-    refreshMentionState();
+  function handleInput(event: Event): void {
+    const input = event.currentTarget as HTMLTextAreaElement;
+    refreshMentionState(input.value);
     resizeTextarea();
   }
 
-  function refreshMentionState(): void {
-    const cursor = textarea?.selectionStart ?? value.length;
-    const left = value.slice(0, cursor);
+  function handleCursorChange(): void {
+    refreshMentionState(textarea?.value ?? value);
+  }
+
+  function refreshMentionState(text: string): void {
+    if (!active) return;
+    const cursor = textarea?.selectionStart ?? text.length;
+    const left = text.slice(0, cursor);
     const match = left.match(/(?:^|\s)@([a-zA-Z0-9._-]*)$/);
 
     if (!match) {
@@ -82,8 +88,10 @@
 
     const nextQuery = match[1] ?? "";
     if (query !== nextQuery) selectedIndex = 0;
+    const nextStart = cursor - nextQuery.length - 1;
+    if (query === nextQuery && mentionStart === nextStart && open) return;
     query = nextQuery;
-    mentionStart = cursor - query.length - 1;
+    mentionStart = nextStart;
     open = true;
   }
 
@@ -95,13 +103,60 @@
   }
 
   function hideSuggestions(): void {
+    if (!browser) return;
+    if (positionFrame !== null) {
+      cancelAnimationFrame(positionFrame);
+      positionFrame = null;
+    }
+    if (listening) {
+      window.removeEventListener("scroll", handleViewportScroll, true);
+      window.removeEventListener("resize", schedulePosition);
+      window.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+      listening = false;
+    }
     if (suggestionsPopover?.matches(":popover-open")) {
       suggestionsPopover.hidePopover();
     }
-    if (!browser) return;
-    window.removeEventListener("scroll", positionSuggestions, true);
-    window.removeEventListener("resize", positionSuggestions);
-    window.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+  }
+
+  function handleViewportScroll(event: Event): void {
+    const target = event.target;
+    if (target instanceof Node && suggestionsPopover?.contains(target)) return;
+    schedulePosition();
+  }
+
+  function schedulePosition(): void {
+    if (positionFrame !== null || !active || !open) return;
+    positionFrame = requestAnimationFrame(() => {
+      positionFrame = null;
+      if (!active || !open || suggestions.length === 0
+        || !textarea?.isConnected || !suggestionsPopover?.isConnected
+        || textarea.getClientRects().length === 0) {
+        hideSuggestions();
+        return;
+      }
+      if (!suggestionsPopover.matches(":popover-open")) {
+        suggestionsPopover.showPopover();
+      }
+      if (!listening) {
+        window.addEventListener("scroll", handleViewportScroll, true);
+        window.addEventListener("resize", schedulePosition);
+        window.addEventListener("pointerdown", handleOutsidePointerDown, true);
+        listening = true;
+      }
+      positionSuggestions();
+    });
+  }
+
+  function syncSuggestions(visible: boolean, _preferAbove: boolean): void {
+    if (visible) schedulePosition();
+    else hideSuggestions();
+  }
+
+  function setPopoverStyle(property: "width" | "maxHeight" | "left" | "top", value: string): void {
+    if (suggestionsPopover.style[property] !== value) {
+      suggestionsPopover.style[property] = value;
+    }
   }
 
   function positionSuggestions(): void {
@@ -118,29 +173,16 @@
     const availableHeight = placeAbove ? availableAbove : availableBelow;
     const maxHeight = Math.max(60, Math.min(240, availableHeight));
 
-    suggestionsPopover.style.width = `${width}px`;
-    suggestionsPopover.style.maxHeight = `${maxHeight}px`;
+    setPopoverStyle("width", `${Math.round(width)}px`);
+    setPopoverStyle("maxHeight", `${Math.round(maxHeight)}px`);
 
     const height = suggestionsPopover.getBoundingClientRect().height;
     const top = placeAbove
       ? Math.max(8, anchor.top - height - 8)
       : Math.min(anchor.bottom + 8, window.innerHeight - height - 8);
 
-    suggestionsPopover.style.left = `${Math.round(left)}px`;
-    suggestionsPopover.style.top = `${Math.round(Math.max(8, top))}px`;
-  }
-
-  async function showSuggestions(_query: string, _preferAbove: boolean): Promise<void> {
-    await tick();
-    if (!open || !suggestions.length || !textarea || !suggestionsPopover) return;
-
-    if (!suggestionsPopover.matches(":popover-open")) {
-      suggestionsPopover.showPopover();
-      window.addEventListener("scroll", positionSuggestions, true);
-      window.addEventListener("resize", positionSuggestions);
-      window.addEventListener("pointerdown", handleOutsidePointerDown, true);
-    }
-    positionSuggestions();
+    setPopoverStyle("left", `${Math.round(left)}px`);
+    setPopoverStyle("top", `${Math.round(Math.max(8, top))}px`);
   }
 
   function handleOutsidePointerDown(event: PointerEvent): void {
@@ -166,7 +208,8 @@
 
     requestAnimationFrame(() => {
       const nextCursor = start + token.length + 1;
-      textarea.focus();
+      if (!textarea?.isConnected || !active) return;
+      textarea.focus({ preventScroll: true });
       textarea.setSelectionRange(nextCursor, nextCursor);
       resizeTextarea();
     });
@@ -175,11 +218,12 @@
   function handleKeydown(event: KeyboardEvent): void {
     if (event.key === "Escape" && open) {
       event.preventDefault();
+      event.stopPropagation();
       closeSuggestions();
       return;
     }
 
-    if (!open || suggestions.length === 0) return;
+    if (!active || !open || suggestions.length === 0 || event.isComposing) return;
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -195,7 +239,9 @@
 
   function handleKeyup(event: KeyboardEvent): void {
     if (["Escape", "Enter", "ArrowUp", "ArrowDown"].includes(event.key)) return;
-    refreshMentionState();
+    if (["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(event.key)) {
+      handleCursorChange();
+    }
   }
 
   onDestroy(() => hideSuggestions());
@@ -212,7 +258,7 @@
     {required}
     class={className}
     on:input={handleInput}
-    on:click={refreshMentionState}
+    on:click={handleCursorChange}
     on:focus={resizeTextarea}
     on:keyup={handleKeyup}
     on:keydown={handleKeydown}
