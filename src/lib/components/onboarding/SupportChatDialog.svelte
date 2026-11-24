@@ -8,6 +8,7 @@
   } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import ChatWaitingOffer from "$lib/components/support/ChatWaitingOffer.svelte";
   import FinancePaymentPanel from "$lib/components/finance/FinancePaymentPanel.svelte";
   import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import {
@@ -169,6 +170,9 @@
 
   let session: ChatSession | null = null;
   let messages: ChatMessage[] = [];
+  let waitingStatus: { waitingSinceMs: number | null; offerTicket: boolean } = { waitingSinceMs: null, offerTicket: false };
+  let conversionSubmitting = false;
+  let convertedTicket: { ticketId: string; ticketNumber: number } | null = null;
   let guestMessages: GuestMessage[] = [];
   let status: SupportStatus | null = null;
   let entryOptions: EntryOption[] = [];
@@ -357,6 +361,7 @@
   function clearStoredSession(): void {
     if (browser) window.sessionStorage.removeItem(STORAGE_KEY);
     session = null;
+    waitingStatus = { waitingSinceMs: null, offerTicket: false };
     messages = [];
     newMessageCount = 0;
     authRequiredForSession = false;
@@ -871,7 +876,8 @@
   }
 
   async function refreshMessages(forceScroll: boolean): Promise<void> {
-    if (!session || loadingMessages || authRequiredForSession) return;
+    if (!session || loadingMessages || authRequiredForSession || conversionSubmitting) return;
+    const requestedSessionId = session.sessionId;
     loadingMessages = true;
     const wasNearBottom = isNearBottom();
     const previousServerMessages = messages.filter((message) => !message.optimistic);
@@ -884,6 +890,7 @@
       });
       const payload = await response.json() as Record<string, unknown>;
 
+      if (conversionSubmitting || session?.sessionId !== requestedSessionId) return;
       if (response.status === 401) {
         if (payload.error === "CUSTOMER_AUTH_REQUIRED") {
           authRequiredForSession = true;
@@ -899,6 +906,13 @@
       }
 
       if (!response.ok) return;
+      if (payload.waiting && typeof payload.waiting === "object") {
+        const waiting = payload.waiting as Record<string, unknown>;
+        waitingStatus = {
+          waitingSinceMs: typeof waiting.waitingSinceMs === "number" ? waiting.waitingSinceMs : null,
+          offerTicket: waiting.offerTicket === true,
+        };
+      }
       const nextMessages = Array.isArray(payload.messages) ? payload.messages as ChatMessage[] : [];
       const nextLastId = nextMessages.at(-1)?.id;
       const changed = nextMessages.length !== previousServerMessages.length || nextLastId !== previousLastId || messages.some((message) => message.optimistic);
@@ -1144,8 +1158,35 @@
     onClose();
   }
 
+  async function handleConvertedTicket(ticket: { ticketId: string; ticketNumber: number }): Promise<void> {
+    clearStoredSession();
+    revokeImages(pendingImages);
+    pendingImages = [];
+    reply = "";
+    guestReply = "";
+    guestMessages = [];
+    handoffRequested = false;
+    conversionSubmitting = false;
+    errorMessage = "";
+    attachmentError = "";
+    convertedTicket = ticket;
+    if (browser) {
+      window.sessionStorage.removeItem(GUEST_KEY);
+      window.sessionStorage.removeItem(SUPPORT_ASSISTANT_GUEST_KEY);
+      persistDraft("");
+    }
+    updateUnresolvedCount(0);
+    await scrollToLatest();
+  }
+
+  function startNewConversation(): void {
+    convertedTicket = null;
+    resetFinanceChoice();
+    ensureGuestGreeting();
+  }
+
   async function finishCustomerConversation(): Promise<void> {
-    if (finishingChat || !browser) return;
+    if (finishingChat || conversionSubmitting || !browser) return;
     if (!window.confirm("Finalizar esta conversa?")) return;
 
     conversationMenuOpen = false;
@@ -1243,6 +1284,20 @@
     </header>
 
     <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F8F9FC] px-4 py-4" aria-live="polite">
+      {#if convertedTicket}
+        <div class="space-y-4 rounded-2xl border border-[#DDE2EB] bg-white p-5 shadow-sm">
+          <div class="flex items-center gap-3">
+            <CheckCircle2 size={28} class="shrink-0 text-[#207345]"/>
+            <div>
+              <h3 class="text-[16px] font-semibold text-[#18233D]">Chamado #{convertedTicket.ticketNumber} aberto</h3>
+              <p class="mt-1 text-[13px] leading-5 text-[#5E687A]">Seu chamado foi registrado. Nossa equipe dará continuidade por lá; você não precisa permanecer na fila.</p>
+            </div>
+          </div>
+          <a href={`/cliente/chamados/${convertedTicket.ticketId}`} target="_blank" rel="noopener noreferrer" class="flex min-h-11 items-center justify-center rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white">Acompanhar chamado</a>
+          <a href="/cliente/chamados" target="_blank" rel="noopener noreferrer" class="flex min-h-11 items-center justify-center rounded-xl border border-[#DDE2EB] text-[14px] font-semibold text-[#000A57]">Meus chamados</a>
+          <button type="button" on:click={startNewConversation} class="w-full py-2 text-[13px] font-medium text-[#596171]">Iniciar outra conversa</button>
+        </div>
+      {:else}
       {#if activeDepartment === "finance" && !session && financeAction === null}
         <div class="space-y-3 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm">
           <h3 class="text-[14px] font-semibold text-[#18233D]">Como podemos ajudar?</h3>
@@ -1407,6 +1462,21 @@
             {/each}
           </div>
         {/if}
+        {#if authState.authenticated && !authRequiredForSession && !departmentSessionMismatch}
+          {#key session.sessionId}
+            <ChatWaitingOffer
+              sessionId={session.sessionId}
+              token={session.token}
+              waitingSinceMs={waitingStatus.waitingSinceMs}
+              available={waitingStatus.offerTicket}
+              unitName={authState.unitName}
+              groupName={authState.groupName}
+              suggestedDescription={messages.filter((message) => message.authorType === "customer" && !message.optimistic).at(-1)?.body ?? ""}
+              bind:submitting={conversionSubmitting}
+              onConverted={handleConvertedTicket}
+            />
+          {/key}
+        {/if}
       {:else}
         <div class="space-y-3">
           {#each (activeDepartment === "support" ? guestMessages : []) as message (message.id)}
@@ -1495,13 +1565,16 @@
           {/if}
         </div>
       {/if}
+      {/if}
     </div>
 
     {#if newMessageCount > 0}
       <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-20 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3 py-2 text-[11px] font-semibold text-white shadow-lg">{newMessageCount} nova{newMessageCount > 1 ? "s" : ""}<ArrowDown size={12}/></button>
     {/if}
 
-    {#if session && (activeDepartment !== "finance" || authState.authenticated)}
+    {#if convertedTicket}
+      <div class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-2 text-center text-[12px] text-[#697184]">Continue o atendimento pelo chamado.</div>
+    {:else if session && (activeDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>
         {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[12px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte o arquivo para anexar</div>{/if}
         {#if errorMessage}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[12px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
@@ -1515,7 +1588,7 @@
         <div class="flex items-end gap-2">
           <button type="button" on:click={() => fileInputElement?.click()} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDE1E9] text-[#667080] hover:text-[#000A57]" aria-label="Anexar arquivo"><Paperclip size={16}/></button>
           <textarea bind:value={reply} maxlength="4000" rows="1" placeholder="Escreva sua mensagem..." class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[14px] leading-6 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" on:input={handleCustomerDraftInput} on:keydown={handleReplyKeydown} on:paste={handleReplyPaste}></textarea>
-          <button type="submit" disabled={sending || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
+          <button type="submit" disabled={sending || conversionSubmitting || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>
       </form>
     {:else if activeDepartment === "support" && !handoffRequested}

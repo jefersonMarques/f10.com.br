@@ -3,7 +3,7 @@ import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/
 import { createCustomerTicketFromChat } from "$lib/server/support/chatTicketBridge";
 import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_FILES } from "$lib/server/support/supportMessageAttachmentRepository";
 
-const MAX_BODY_BYTES = 42 * 1024 * 1024;
+const MAX_BODY_BYTES = 34 * 1024 * 1024;
 
 export const POST: RequestHandler = async ({ request, cookies, params, url }) => {
   if (request.headers.get("origin") !== url.origin) return json({ error: "INVALID_ORIGIN" }, { status: 403 });
@@ -24,7 +24,8 @@ export const POST: RequestHandler = async ({ request, cookies, params, url }) =>
   const subjectValue = form.get("subject");
   const descriptionValue = form.get("description");
   const files = form.getAll("files").filter((item): item is File => item instanceof File && item.size > 0);
-  if (files.length > SUPPORT_ATTACHMENT_MAX_FILES || files.some((file) => file.size > SUPPORT_ATTACHMENT_MAX_BYTES)) {
+  if (files.length > SUPPORT_ATTACHMENT_MAX_FILES || files.some((file) => file.size > SUPPORT_ATTACHMENT_MAX_BYTES)
+    || files.reduce((sum, file) => sum + file.size, 0) > 32 * 1024 * 1024) {
     return json({ error: "INVALID_ATTACHMENTS" }, { status: 413 });
   }
 
