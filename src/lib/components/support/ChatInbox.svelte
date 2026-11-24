@@ -177,8 +177,8 @@
   });
 </script>
 
-<section class="flex h-full min-h-0 flex-col bg-white">
-  <header class="shrink-0 px-4 pb-3 pt-4">
+<section class="grid h-full min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:grid-cols-[315px_minmax(0,1fr)]">
+  <header class="min-w-0 rounded-2xl border border-[#E2E5ED] bg-white px-4 py-3 lg:col-span-2">
     <div class="flex items-center gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white shadow-sm">
         <MessageCircleMore size={18} aria-hidden="true" />
@@ -189,13 +189,13 @@
       </div>
     </div>
 
-    <label class="relative mt-4 block">
+    <label class="relative mt-3 block max-w-[680px]">
       <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9AA0AD]" aria-hidden="true" />
       <input
         bind:this={searchElement}
         bind:value={query}
         placeholder="Buscar cliente, escola ou chamado..."
-        class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#F8F9FB] pl-10 pr-9 text-[11px] text-[#343A49] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10"
+        class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#F8F9FB] pl-10 pr-9 text-[13px] text-[#343A49] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10"
       />
       <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#E0E3EA] bg-white px-1.5 py-0.5 text-[9px] text-[#9DA2AD]">/</span>
     </label>
@@ -206,7 +206,7 @@
           type="button"
           on:click={() => selectScope(item.value)}
           aria-pressed={scope === item.value}
-          class={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150 ${scope === item.value
+          class={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors duration-150 ${scope === item.value
             ? "bg-[var(--app-primary)] text-white shadow-sm"
             : "border border-[var(--app-border-control)] bg-[var(--app-surface)] text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"}`}
         >
@@ -219,7 +219,7 @@
     </div>
   </header>
 
-  <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+  <aside class={`min-h-0 overflow-y-auto rounded-2xl border border-[#E2E5ED] bg-white p-3 ${compact ? "hidden lg:block" : ""}`}>
     {#if filteredChats.length === 0}
       <div class="rounded-2xl border border-dashed border-[#DDE1EA] bg-[#FAFAFC] px-5 py-12 text-center">
         <MessageCircleMore size={30} class="mx-auto text-[#BEC3CD]" aria-hidden="true" />
@@ -287,5 +287,6 @@
         {/each}
       </div>
     {/if}
-  </div>
+  </aside>
+  <slot />
 </section>

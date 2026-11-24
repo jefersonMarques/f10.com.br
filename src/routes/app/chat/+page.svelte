@@ -16,11 +16,8 @@
   padding="none"
   className="h-[calc(100dvh-var(--application-header-height))] min-h-[620px] overflow-hidden bg-[#F5F6FA]"
 >
-  <div class="grid h-full min-h-0 grid-cols-1 gap-4 p-3 lg:grid-cols-[320px_minmax(0,1fr)] lg:p-4">
-    <aside class="min-h-0 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
-      <ChatInbox chats={data.chatInbox} currentUserId={data.chatCurrentUserId} />
-    </aside>
-
+  <div class="h-full min-h-0 p-3 lg:p-4">
+    <ChatInbox chats={data.chatInbox} currentUserId={data.chatCurrentUserId}>
     <main class="hidden min-h-0 items-center justify-center overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white p-8 shadow-[0_12px_32px_rgba(1,13,40,0.04)] lg:flex">
       <div class="max-w-[560px] text-center">
         <span class="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#000A57] text-white shadow-[0_12px_26px_rgba(0,10,87,0.18)]">
@@ -54,5 +51,6 @@
         </a>
       </div>
     </main>
+    </ChatInbox>
   </div>
 </ApplicationContent>

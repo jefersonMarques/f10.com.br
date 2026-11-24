@@ -24,6 +24,7 @@
     TicketCheck,
     UserRound,
     UserRoundCog,
+    X,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
@@ -70,6 +71,13 @@
   let loadedSessionId = data.initial.chat.sessionId;
   let messages: ChatMessage[] = data.initial.messages;
   let chat: ChatDetails = data.initial.chat;
+  type ContextPanel = "customer" | "attendance" | "tickets" | "tasks" | "remote";
+  let activeContextPanel: ContextPanel | null = null;
+  const contextPanelLabels: Record<ContextPanel, string> = { customer: "Cliente", attendance: "Atendimento", tickets: "Chamados", tasks: "Tarefas", remote: "Acesso remoto" };
+  function toggleContextPanel(panel: ContextPanel): void {
+    activeContextPanel = activeContextPanel === panel ? null : panel;
+  }
+
   let messageBody = "";
   let messageForTask: ChatMessage | null = null;
   let replyFiles: File[] = [];
@@ -495,16 +503,8 @@
   padding="none"
   className="h-[calc(100dvh-var(--application-header-height))] min-h-[620px] overflow-hidden bg-[#F5F6FA]"
 >
-  <div class="support-chat-workspace grid h-full min-h-0 grid-cols-1 gap-3 p-3 lg:grid-cols-[315px_minmax(0,1fr)] lg:gap-4 lg:p-4 xl:grid-cols-[315px_minmax(520px,1fr)_310px]">
-    <aside class="hidden min-h-0 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)] lg:block">
-      <ChatInbox
-        chats={data.chatInbox}
-        currentUserId={data.chatCurrentUserId}
-        selectedConversationKey={conversationKey}
-        compact
-      />
-    </aside>
-
+  <div class="support-chat-workspace h-full min-h-0 p-3 lg:p-4">
+    <ChatInbox chats={data.chatInbox} currentUserId={data.chatCurrentUserId} selectedConversationKey={conversationKey} compact>
     <main class="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
       <header class="shrink-0 border-b border-[#E9EBF1] bg-white px-4 pb-3 pt-4 sm:px-5">
         <div class="flex items-start justify-between gap-3">
@@ -549,9 +549,9 @@
             {/if}
 
             {#if chat.ticketId && chat.ticketNumber}
-              <a href={`/app/tickets/${chat.ticketId}`} class="hidden h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white sm:inline-flex xl:hidden"><TicketCheck size={13} /> #{chat.ticketNumber}</a>
+              <a href={`/app/tickets/${chat.ticketId}`} class="hidden h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white sm:inline-flex"><TicketCheck size={13} /> #{chat.ticketNumber}</a>
             {:else if data.canCreateTicket && chat.status !== "closed"}
-              <form method="POST" action="?/createTicket" class="hidden sm:block xl:hidden" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}>
+              <form method="POST" action="?/createTicket" class="hidden sm:block" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}>
                 <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white"><TicketCheck size={13} /> Criar chamado</button>
               </form>
             {/if}
@@ -564,6 +564,14 @@
           </div>
         </div>
 
+        <div class="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[#EEF0F5] pt-3" aria-label="Opções da conversa">
+          <button type="button" on:click={() => toggleContextPanel("customer")} aria-label="Cliente" title="Cliente" aria-pressed={activeContextPanel === "customer"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><UserRound size={16}/> <span class="hidden sm:inline">Cliente</span></button>
+          <button type="button" on:click={() => toggleContextPanel("attendance")} aria-label="Atendimento" title="Atendimento" aria-pressed={activeContextPanel === "attendance"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><UserRoundCog size={16}/> <span class="hidden sm:inline">Atendimento</span></button>
+          <button type="button" on:click={() => toggleContextPanel("tickets")} aria-label="Chamados" title="Chamados" aria-pressed={activeContextPanel === "tickets"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><TicketCheck size={16}/> <span class="hidden sm:inline">Chamados</span></button>
+          {#if data.canViewTasks}<button type="button" on:click={() => toggleContextPanel("tasks")} aria-label="Tarefas" title="Tarefas" aria-pressed={activeContextPanel === "tasks"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><ListTodo size={16}/> <span class="hidden sm:inline">Tarefas</span></button>{/if}
+          {#if chat.ticketId}<button type="button" on:click={() => toggleContextPanel("remote")} aria-label="Remoto" title="Remoto" aria-pressed={activeContextPanel === "remote"} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><MonitorCog size={16}/> <span class="hidden sm:inline">Remoto</span></button>{/if}
+          <button type="button" on:click={() => { activeContextPanel = null; messagesElement?.scrollTo({ top: 0, behavior: "smooth" }); }} aria-label="Histórico" title="Histórico" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E2E5ED] px-2.5 text-[12px] text-[#505766] hover:bg-[#EEF0FF]"><History size={16}/> <span class="hidden sm:inline">Histórico</span></button>
+        </div>
         {#if form?.message}
           <div class={`mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[10px] font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
             {#if form.success}<CheckCircle2 size={13} />{:else}<CircleAlert size={13} />{/if}{form.message}
@@ -753,61 +761,67 @@
       {:else if data.canRespond && chat.assignedUserId && !assignedToMe && chat.status !== "closed"}
         <footer class="shrink-0 border-t border-[#E2E5ED] bg-[#FAFAFC] px-4 py-3 text-center text-[10px] text-[#777D8D]">Este atendimento está atribuído a <strong>{chat.assignedUserName ?? "outro atendente"}</strong>.</footer>
       {/if}
-    </main>
-
-    <aside class="hidden min-h-0 space-y-3 overflow-y-auto pr-1 xl:block">
+      {#if activeContextPanel}
+        <aside class="absolute inset-y-0 right-0 z-40 w-full max-w-[360px] space-y-3 overflow-y-auto border-l border-[#E2E5ED] bg-[#F5F6FA] p-3 shadow-2xl" aria-label="Detalhes do atendimento">
+          <div class="sticky top-0 z-10 flex items-center justify-between rounded-xl bg-white px-3 py-2 shadow-sm">
+            <strong class="text-[14px] text-[#202637]">{contextPanelLabels[activeContextPanel]}</strong>
+            <button type="button" on:click={() => activeContextPanel = null} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#69707E] hover:bg-[#F2F3F7]" aria-label="Fechar detalhes"><X size={18}/></button>
+          </div>
+          {#if activeContextPanel === "customer"}
       <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
         <div class="flex items-center gap-3">
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UserRound size={17} /></span>
-          <div class="min-w-0"><h2 class="truncate text-[12px] font-semibold text-[#303644]">{chat.customerName ?? "Cliente"}</h2><p class="mt-0.5 truncate text-[9.5px] text-[#8B919F]">{chat.customerEmail ?? "Sem e-mail informado"}</p></div>
+          <div class="min-w-0"><h2 class="truncate text-[12px] font-semibold text-[#303644]">{chat.customerName ?? "Cliente"}</h2><p class="mt-0.5 truncate text-[12px] text-[#8B919F]">{chat.customerEmail ?? "Sem e-mail informado"}</p></div>
         </div>
-        {#if chat.organizationName}<p class="mt-3 text-[10px] font-medium text-[#646B7A]">{chat.organizationName}</p>{/if}
-        {#if chat.customerPhone}<p class="mt-1 text-[10px] text-[#777E8D]">{chat.customerPhone}</p>{/if}
+        {#if chat.organizationName}<p class="mt-3 text-[12px] font-medium text-[#646B7A]">{chat.organizationName}</p>{/if}
+        {#if chat.customerPhone}<p class="mt-1 text-[12px] text-[#777E8D]">{chat.customerPhone}</p>{/if}
         {#if f10UnitName}
           <div class="mt-4 border-t border-[#EEF0F5] pt-4">
-            <h3 class="text-[9px] font-bold uppercase tracking-[0.09em] text-[#858C9B]">Contexto F10</h3>
+            <h3 class="text-[11px] font-bold uppercase tracking-[0.09em] text-[#858C9B]">Contexto F10</h3>
             <dl class="mt-3 space-y-2.5">
-              <div><dt class="text-[9px] text-[#969CAA]">Escola / unidade</dt><dd class="mt-0.5 text-[10.5px] font-semibold text-[#414857]">{f10UnitName}</dd></div>
-              {#if f10GroupName}<div><dt class="text-[9px] text-[#969CAA]">Grupo</dt><dd class="mt-0.5 text-[10.5px] font-semibold text-[#414857]">{f10GroupName}</dd></div>{/if}
-              {#if f10LegacyUserId}<div><dt class="text-[9px] text-[#969CAA]">Usuário F10</dt><dd class="mt-0.5 truncate font-mono text-[9.5px] text-[#5C6372]">{f10LegacyUserId}</dd></div>{/if}
+              <div><dt class="text-[11px] text-[#969CAA]">Escola / unidade</dt><dd class="mt-0.5 text-[13px] font-semibold text-[#414857]">{f10UnitName}</dd></div>
+              {#if f10GroupName}<div><dt class="text-[11px] text-[#969CAA]">Grupo</dt><dd class="mt-0.5 text-[13px] font-semibold text-[#414857]">{f10GroupName}</dd></div>{/if}
+              {#if f10LegacyUserId}<div><dt class="text-[11px] text-[#969CAA]">Usuário F10</dt><dd class="mt-0.5 truncate font-mono text-[12px] text-[#5C6372]">{f10LegacyUserId}</dd></div>{/if}
             </dl>
           </div>
         {/if}
       </section>
-
+          {/if}
+          {#if activeContextPanel === "attendance"}
       <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
-        <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2"><Clock3 size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Atendimento</h3></div><span class="text-[9px] text-[#9A9FAC]">{formatDateTime(chat.createdAt)}</span></div>
+        <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2"><Clock3 size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Atendimento</h3></div><span class="text-[11px] text-[#9A9FAC]">{formatDateTime(chat.createdAt)}</span></div>
         <div class="mt-3 grid grid-cols-2 gap-2">
-          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2.5"><span class="text-[9px] text-[#969CAA]">Fila</span><strong class="mt-1 block truncate text-[10px] text-[#454B5B]">{chat.queueName}</strong></div>
-          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2.5"><span class="text-[9px] text-[#969CAA]">{chat.ticketId ? "SLA" : "Chamado"}</span><strong class={`mt-1 block truncate text-[10px] ${slaText().includes("Vencido") ? "text-[#A13C3C]" : "text-[#454B5B]"}`}>{slaText()}</strong></div>
+          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2.5"><span class="text-[11px] text-[#969CAA]">Fila</span><strong class="mt-1 block truncate text-[12px] text-[#454B5B]">{chat.queueName}</strong></div>
+          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2.5"><span class="text-[11px] text-[#969CAA]">{chat.ticketId ? "SLA" : "Chamado"}</span><strong class={`mt-1 block truncate text-[12px] ${slaText().includes("Vencido") ? "text-[#A13C3C]" : "text-[#454B5B]"}`}>{slaText()}</strong></div>
         </div>
         <div class="mt-4 border-t border-[#EEF0F5] pt-3">
-          <span class="text-[9px] text-[#8D93A0]">Responsável pelo chat</span><p class="mt-1 text-[10.5px] font-semibold text-[#414857]">{chat.assignedUserName ?? "Não atribuído"}</p>
+          <span class="text-[11px] text-[#8D93A0]">Responsável pelo chat</span><p class="mt-1 text-[13px] font-semibold text-[#414857]">{chat.assignedUserName ?? "Não atribuído"}</p>
           {#if data.canAssign && chat.status !== "closed"}
             <form method="POST" action="?/assign" class="mt-2.5 flex gap-2">
-              <select name="assignedUserId" required class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[10px]"><option value="" disabled selected={!chat.assignedUserId}>Selecionar...</option>{#each data.assignees as assignee}<option value={assignee.id} selected={assignee.id === chat.assignedUserId}>{assignee.name}</option>{/each}</select>
+              <select name="assignedUserId" required class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[12px]"><option value="" disabled selected={!chat.assignedUserId}>Selecionar...</option>{#each data.assignees as assignee}<option value={assignee.id} selected={assignee.id === chat.assignedUserId}>{assignee.name}</option>{/each}</select>
               <button type="submit" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[#000A57]" aria-label="Atribuir atendimento"><UserRoundCog size={14} /></button>
             </form>
           {/if}
         </div>
       </section>
-
+          {/if}
+          {#if activeContextPanel === "tickets"}
       <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2"><TicketCheck size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Chamados relacionados</h3></div>
-          {#if !loadingRelatedTickets}<span class="rounded-full bg-[#F2F3F6] px-2 py-1 text-[9px] font-semibold text-[#6D7382]">{relatedTickets.length}</span>{/if}
+          {#if !loadingRelatedTickets}<span class="rounded-full bg-[#F2F3F6] px-2 py-1 text-[11px] font-semibold text-[#6D7382]">{relatedTickets.length}</span>{/if}
         </div>
 
         {#if loadingRelatedTickets}
-          <div class="mt-3 flex items-center gap-2 text-[9.5px] text-[#8B919F]"><LoaderCircle size={12} class="animate-spin" />Carregando chamados...</div>
+          <div class="mt-3 flex items-center gap-2 text-[12px] text-[#8B919F]"><LoaderCircle size={12} class="animate-spin" />Carregando chamados...</div>
         {:else if relatedTickets.length === 0}
-          <p class="mt-3 text-[9.5px] leading-4 text-[#8B919F]">Nenhum outro chamado encontrado para este cliente e contexto.</p>
+          <p class="mt-3 text-[12px] leading-4 text-[#8B919F]">Nenhum outro chamado encontrado para este cliente e contexto.</p>
         {:else}
           <div class="mt-3 space-y-2">
             {#each openRelatedTickets as ticket}
               <a href={`/app/tickets/${ticket.id}`} class={`block rounded-xl border px-3 py-2.5 transition hover:border-[#BFC6D5] ${ticket.isCurrent ? "border-[#C8CEE8] bg-[#F7F8FF]" : "border-[#E6E9EF] bg-[#FAFAFC]"}`}>
-                <div class="flex items-center justify-between gap-2"><strong class="text-[9.5px] text-[#000A57]">#{ticket.ticketNumber}</strong><span class="rounded-full bg-white px-2 py-0.5 text-[8px] font-semibold text-[#6A7180]">{statusLabels[ticket.status] ?? ticket.status}</span></div>
-                <p class="mt-1 line-clamp-2 text-[9.5px] leading-4 text-[#505766]">{ticket.subject}</p>
+                <div class="flex items-center justify-between gap-2"><strong class="text-[12px] text-[#000A57]">#{ticket.ticketNumber}</strong><span class="rounded-full bg-white px-2 py-0.5 text-[8px] font-semibold text-[#6A7180]">{statusLabels[ticket.status] ?? ticket.status}</span></div>
+                <p class="mt-1 line-clamp-2 text-[12px] leading-4 text-[#505766]">{ticket.subject}</p>
                 {#if ticket.isCurrent}<span class="mt-1.5 inline-block text-[8px] font-semibold text-[#EA6D0B]">Chamado desta conversa</span>{/if}
               </a>
             {/each}
@@ -815,10 +829,10 @@
 
           {#if closedRelatedTickets.length > 0}
             <details class="mt-3 border-t border-[#EEF0F5] pt-3">
-              <summary class="flex cursor-pointer list-none items-center justify-between text-[9px] font-semibold text-[#6D7382]">Encerrados ({closedRelatedTickets.length}) <ChevronDown size={12} /></summary>
+              <summary class="flex cursor-pointer list-none items-center justify-between text-[11px] font-semibold text-[#6D7382]">Encerrados ({closedRelatedTickets.length}) <ChevronDown size={12} /></summary>
               <div class="mt-2 space-y-1.5">
                 {#each closedRelatedTickets as ticket}
-                  <a href={`/app/tickets/${ticket.id}`} class="block rounded-lg border border-[#EBEDF2] bg-[#FAFAFC] px-2.5 py-2 transition hover:bg-white"><div class="flex items-center justify-between gap-2"><strong class="text-[8.5px] text-[#646B79]">#{ticket.ticketNumber}</strong><span class="text-[8px] text-[#969CA8]">{statusLabels[ticket.status] ?? ticket.status}</span></div><p class="mt-0.5 line-clamp-1 text-[8.5px] text-[#777E8D]">{ticket.subject}</p></a>
+                  <a href={`/app/tickets/${ticket.id}`} class="block rounded-lg border border-[#EBEDF2] bg-[#FAFAFC] px-2.5 py-2 transition hover:bg-white"><div class="flex items-center justify-between gap-2"><strong class="text-[10px] text-[#646B79]">#{ticket.ticketNumber}</strong><span class="text-[8px] text-[#969CA8]">{statusLabels[ticket.status] ?? ticket.status}</span></div><p class="mt-0.5 line-clamp-1 text-[10px] text-[#777E8D]">{ticket.subject}</p></a>
                 {/each}
               </div>
             </details>
@@ -828,42 +842,50 @@
 
       {#if chat.ticketId}
         <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
-          <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2"><TicketCheck size={14} class="text-[#EA6D0B]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Chamado #{chat.ticketNumber}</h3></div><a href={`/app/tickets/${chat.ticketId}`} class="text-[9.5px] font-semibold text-[#000A57] hover:underline">Abrir</a></div>
-          <p class="mt-2 text-[9.5px] text-[#8B919F]">Prioridade atual: <strong class="text-[#555C6B]">{priorityLabels[chat.priority]}</strong></p>
+          <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2"><TicketCheck size={14} class="text-[#EA6D0B]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Chamado #{chat.ticketNumber}</h3></div><a href={`/app/tickets/${chat.ticketId}`} class="text-[12px] font-semibold text-[#000A57] hover:underline">Abrir</a></div>
+          <p class="mt-2 text-[12px] text-[#8B919F]">Prioridade atual: <strong class="text-[#555C6B]">{priorityLabels[chat.priority]}</strong></p>
           {#if data.canManageTicket && chat.status !== "closed"}
-            <form method="POST" action="?/status" class="mt-4"><label for="chat-ticket-status" class="text-[9px] font-semibold text-[#666D7C]">Status</label><div class="mt-1.5 flex gap-2"><select id="chat-ticket-status" name="status" value={chat.status} class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[10px]"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option></select><button type="submit" class="h-9 rounded-xl bg-[#000A57] px-3 text-[9.5px] font-semibold text-white">Salvar</button></div></form>
-            <form method="POST" action="?/priority" class="mt-3"><label for="chat-ticket-priority" class="text-[9px] font-semibold text-[#666D7C]">Prioridade</label><div class="mt-1.5 flex gap-2"><select id="chat-ticket-priority" name="priority" value={chat.priority} class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[10px]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><button type="submit" class="h-9 rounded-xl bg-[#000A57] px-3 text-[9.5px] font-semibold text-white">Salvar</button></div></form>
+            <form method="POST" action="?/status" class="mt-4"><label for="chat-ticket-status" class="text-[11px] font-semibold text-[#666D7C]">Status</label><div class="mt-1.5 flex gap-2"><select id="chat-ticket-status" name="status" value={chat.status} class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[12px]"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option></select><button type="submit" class="h-9 rounded-xl bg-[#000A57] px-3 text-[12px] font-semibold text-white">Salvar</button></div></form>
+            <form method="POST" action="?/priority" class="mt-3"><label for="chat-ticket-priority" class="text-[11px] font-semibold text-[#666D7C]">Prioridade</label><div class="mt-1.5 flex gap-2"><select id="chat-ticket-priority" name="priority" value={chat.priority} class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[12px]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><button type="submit" class="h-9 rounded-xl bg-[#000A57] px-3 text-[12px] font-semibold text-white">Salvar</button></div></form>
           {/if}
         </section>
       {:else}
         <section class="rounded-[20px] border border-[#DCE1F2] bg-[#F8F9FF] p-4 shadow-[0_10px_28px_rgba(1,13,40,0.035)]">
           <div class="flex items-center gap-2 text-[#000A57]"><TicketCheck size={15} /><h3 class="text-[11px] font-semibold">Conversa sem chamado</h3></div>
-          <p class="mt-2 text-[9.5px] leading-4 text-[#747C8D]">Continue o atendimento normalmente. Crie um chamado apenas quando o caso precisar de acompanhamento formal.</p>
-          {#if data.canCreateTicket && chat.status !== "closed"}<form method="POST" action="?/createTicket" class="mt-3" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}><button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] text-[10px] font-semibold text-white"><TicketCheck size={13} />Criar chamado</button></form>{/if}
+          <p class="mt-2 text-[12px] leading-4 text-[#747C8D]">Continue o atendimento normalmente. Crie um chamado apenas quando o caso precisar de acompanhamento formal.</p>
+          {#if data.canCreateTicket && chat.status !== "closed"}<form method="POST" action="?/createTicket" class="mt-3" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}><button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] text-[12px] font-semibold text-white"><TicketCheck size={13} />Criar chamado</button></form>{/if}
         </section>
       {/if}
-
+          {/if}
+          {#if activeContextPanel === "tasks"}
       {#if data.canViewTasks}
         <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
-          <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2"><ListTodo size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Tarefas do chamado</h3></div><span class="rounded-full bg-[#F2F3F6] px-2 py-1 text-[9px] font-semibold text-[#6D7382]">{data.linkedTasks.length}</span></div>
-          {#if data.linkedTasks.length > 0}<div class="mt-3 space-y-2">{#each data.linkedTasks as task}<a href={`/app/tasks/${task.id}`} class="block rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-2.5 transition hover:border-[#C9CFE0] hover:bg-white"><strong class="line-clamp-1 text-[9.5px] text-[#454B59]">{task.title}</strong><span class="mt-1 block text-[8.5px] text-[#9298A5]">{task.projectName}{task.dueOn ? ` · ${task.dueOn}` : ""}</span></a>{/each}</div>{:else}<p class="mt-3 text-[9.5px] text-[#8B919F]">Nenhuma tarefa vinculada.</p>{/if}
+          <div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2"><ListTodo size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Tarefas do chamado</h3></div><span class="rounded-full bg-[#F2F3F6] px-2 py-1 text-[11px] font-semibold text-[#6D7382]">{data.linkedTasks.length}</span></div>
+          {#if data.linkedTasks.length > 0}<div class="mt-3 space-y-2">{#each data.linkedTasks as task}<a href={`/app/tasks/${task.id}`} class="block rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-2.5 transition hover:border-[#C9CFE0] hover:bg-white"><strong class="line-clamp-1 text-[12px] text-[#454B59]">{task.title}</strong><span class="mt-1 block text-[10px] text-[#9298A5]">{task.projectName}{task.dueOn ? ` · ${task.dueOn}` : ""}</span></a>{/each}</div>{:else}<p class="mt-3 text-[12px] text-[#8B919F]">Nenhuma tarefa vinculada.</p>{/if}
           {#if data.canCreateTask && data.taskProjects.length > 0 && chat.status !== "closed"}
-            <details class="mt-3 border-t border-[#EEF0F5] pt-3"><summary class="flex cursor-pointer list-none items-center gap-1.5 text-[9.5px] font-semibold text-[#000A57]"><Plus size={12} />Criar tarefa</summary><form method="POST" action="?/createTask" class="mt-3 space-y-2"><select name="projectId" required class="h-9 w-full rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[9.5px]">{#each data.taskProjects as project}<option value={project.id}>{project.name}</option>{/each}</select><input name="title" required maxlength="180" value={`Chamado #${chat.ticketNumber} · ${chat.subject}`.slice(0, 180)} class="h-9 w-full rounded-xl border border-[#DDE1EA] px-2.5 text-[9.5px]" /><textarea name="description" rows="2" maxlength="5000" placeholder="O que precisa ser feito?" class="w-full rounded-xl border border-[#DDE1EA] px-2.5 py-2 text-[9.5px]"></textarea><div class="grid grid-cols-2 gap-2"><select name="priority" class="h-9 rounded-xl border border-[#DDE1EA] bg-white px-2 text-[9.5px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><input name="dueOn" type="date" class="h-9 rounded-xl border border-[#DDE1EA] px-2 text-[9.5px]" /></div><button type="submit" class="h-9 w-full rounded-xl bg-[#000A57] text-[9.5px] font-semibold text-white">Criar tarefa</button></form></details>
+            <details class="mt-3 border-t border-[#EEF0F5] pt-3"><summary class="flex cursor-pointer list-none items-center gap-1.5 text-[12px] font-semibold text-[#000A57]"><Plus size={12} />Criar tarefa</summary><form method="POST" action="?/createTask" class="mt-3 space-y-2"><select name="projectId" required class="h-9 w-full rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[12px]">{#each data.taskProjects as project}<option value={project.id}>{project.name}</option>{/each}</select><input name="title" required maxlength="180" value={`Chamado #${chat.ticketNumber} · ${chat.subject}`.slice(0, 180)} class="h-9 w-full rounded-xl border border-[#DDE1EA] px-2.5 text-[12px]" /><textarea name="description" rows="2" maxlength="5000" placeholder="O que precisa ser feito?" class="w-full rounded-xl border border-[#DDE1EA] px-2.5 py-2 text-[12px]"></textarea><div class="grid grid-cols-2 gap-2"><select name="priority" class="h-9 rounded-xl border border-[#DDE1EA] bg-white px-2 text-[12px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><input name="dueOn" type="date" class="h-9 rounded-xl border border-[#DDE1EA] px-2 text-[12px]" /></div><button type="submit" class="h-9 w-full rounded-xl bg-[#000A57] text-[12px] font-semibold text-white">Criar tarefa</button></form></details>
           {/if}
         </section>
       {/if}
-
+          {/if}
+          {#if activeContextPanel === "remote"}
       {#if chat.ticketId}
         <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <div class="flex items-center gap-2"><MonitorCog size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Acesso remoto</h3></div>
-          {#if onlineRemoteDevices.length > 0}<p class="mt-2 text-[9.5px] font-medium text-[#398155]">{onlineRemoteDevices.length} {onlineRemoteDevices.length === 1 ? "computador online" : "computadores online"}</p>{:else if data.remoteDevices.length > 0}<p class="mt-2 text-[9.5px] text-[#858B99]">Computadores vinculados estão offline.</p>{:else}<p class="mt-2 text-[9.5px] text-[#858B99]">Nenhum computador vinculado.</p>{/if}
+          {#if onlineRemoteDevices.length > 0}<p class="mt-2 text-[12px] font-medium text-[#398155]">{onlineRemoteDevices.length} {onlineRemoteDevices.length === 1 ? "computador online" : "computadores online"}</p>{:else if data.remoteDevices.length > 0}<p class="mt-2 text-[12px] text-[#858B99]">Computadores vinculados estão offline.</p>{:else}<p class="mt-2 text-[12px] text-[#858B99]">Nenhum computador vinculado.</p>{/if}
           <div class="mt-3 flex flex-col gap-2">
-            {#if data.remoteReady && onlineRemoteDevices.length === 1 && data.canUseRemote}<form method="POST" action="?/startRemote"><input type="hidden" name="deviceId" value={onlineRemoteDevices[0].id} /><button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] text-[9.5px] font-semibold text-white"><MonitorCog size={12} />Iniciar acesso remoto</button></form>{:else if data.remoteReady && data.canRequestRemote && data.remoteDevices.length === 0}<form method="POST" action="?/enrollRemote"><button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white text-[9.5px] font-semibold text-[#000A57]"><Download size={12} />Instalar suporte remoto</button></form>{/if}
-            {#if data.canRequestRemote}<a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex h-9 w-full items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[9.5px] font-semibold text-[#000A57]">Gerenciar computadores</a>{/if}
+            {#if data.remoteReady && onlineRemoteDevices.length === 1 && data.canUseRemote}<form method="POST" action="?/startRemote"><input type="hidden" name="deviceId" value={onlineRemoteDevices[0].id} /><button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] text-[12px] font-semibold text-white"><MonitorCog size={12} />Iniciar acesso remoto</button></form>{:else if data.remoteReady && data.canRequestRemote && data.remoteDevices.length === 0}<form method="POST" action="?/enrollRemote"><button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white text-[12px] font-semibold text-[#000A57]"><Download size={12} />Instalar suporte remoto</button></form>{/if}
+            {#if data.canRequestRemote}<a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex h-9 w-full items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[12px] font-semibold text-[#000A57]">Gerenciar computadores</a>{/if}
           </div>
         </section>
       {/if}
-    </aside>
+          {/if}
+        </aside>
+      {/if}
+    </main>
+    </ChatInbox>
+
+
   </div>
 </ApplicationContent>
 
