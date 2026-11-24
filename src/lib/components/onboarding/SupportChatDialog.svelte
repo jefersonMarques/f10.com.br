@@ -234,7 +234,7 @@
 
   $: if (!authInitialized) initializeAuthState();
   $: if (browser && isOpen && !restored) restoreStoredState();
-  $: if (browser) syncPolling(isOpen && !authRequiredForSession, session?.sessionId ?? "");
+  $: if (browser) syncPolling(isOpen && !authRequiredForSession && !resumeLoading, session?.sessionId ?? "");
   $: if (browser) syncStatusPolling(isOpen);
   $: if (browser && isOpen && !entryOptionsLoaded && !entryOptionsLoading) void refreshEntryOptions();
   $: if (browser && isOpen && restored && initializedDepartment !== activeDepartment) {
@@ -250,7 +250,7 @@
   }
   $: if (browser && isOpen && restored && !resumeCheckedForOpen) {
     resumeCheckedForOpen = true;
-    if (!session && !convertedTicket && !starting) void checkRestorableChat();
+    if (!convertedTicket && !starting) void checkRestorableChat();
   }
   $: if (!isOpen) {
     resumeCheckedForOpen = false;
@@ -354,7 +354,7 @@
   async function checkRestorableChat(): Promise<void> {
     if (authState.authenticated && !authState.requiresUnitSelection) {
       await recoverActiveChat();
-    } else if (storedSessionHint) {
+    } else if (session || storedSessionHint) {
       await requestResumeChat();
     }
   }
@@ -386,6 +386,7 @@
         return "error";
       }
       if (response.status === 409 && payload.error === "CUSTOMER_CONTEXT_REQUIRED") {
+        if (session || storedSessionHint || !handoffRequested) resumeOnly = true;
         storedSessionHint = session?.sessionId ?? storedSessionHint;
         clearStoredSession();
         authState = { ...authState, requiresUnitSelection: true };
@@ -1343,7 +1344,7 @@
   }
 
   async function finishCustomerConversation(): Promise<void> {
-    if (finishingChat || conversionSubmitting || !browser) return;
+    if (finishingChat || conversionSubmitting || resumeLoading || !browser) return;
     if (!window.confirm("Finalizar esta conversa?")) return;
 
     conversationMenuOpen = false;
