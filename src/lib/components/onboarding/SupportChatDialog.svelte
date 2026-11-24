@@ -253,6 +253,7 @@
   }
   $: if (browser && isOpen && restored && !resumeCheckedForOpen) {
     resumeCheckedForOpen = true;
+    hasConfirmedActiveChat = false;
     if (!convertedTicket && !starting) void checkRestorableChat();
   }
   $: if (!isOpen) {
@@ -1699,7 +1700,13 @@
               <section class="ml-10 space-y-3 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm" aria-label="Atendimento fora do horário">
                 <h3 class="text-[14px] font-semibold text-[#18233D]">Estamos fora do horário de atendimento</h3>
                 <p class="text-[13px] leading-5 text-[#596171]">{status.nextOpenLabel ? "Nossa equipe retorna " + status.nextOpenLabel.toLowerCase() + "." : "Nossa equipe retorna no próximo expediente."} Você pode abrir um chamado agora.</p>
+                {#if hasConfirmedActiveChat}
+                  <button type="button" on:click={() => void requestResumeChat()} class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white"><Ticket size={17}/> Abrir chamado</button>
+                {:else if checkingActiveChat}
+                  <div class="flex min-h-11 items-center justify-center text-[13px] text-[#697184]"><LoaderCircle size={16} class="animate-spin"/></div>
+                {:else}
                 <a href="/cliente/chamados/novo" target="_blank" rel="noopener noreferrer" class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white"><Ticket size={17}/> Abrir chamado</a>
+                {/if}
               </section>
             {/if}
             <div class="ml-10 flex flex-wrap gap-2 pt-1">
