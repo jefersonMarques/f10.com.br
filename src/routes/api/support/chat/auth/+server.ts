@@ -24,6 +24,7 @@ function publicCustomer(session: CustomerF10PortalSession) {
   return {
     authenticated: true,
     name: session.name,
+    requiresNameConfirmation: session.requiresNameConfirmation ?? false,
     email: session.email,
     groupName: session.selectedGroupName,
     unitName: session.selectedUnitName,

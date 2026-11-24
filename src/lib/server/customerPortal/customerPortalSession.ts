@@ -18,6 +18,7 @@ export type CustomerTicketPortalSession = {
   name: string;
   email: string;
   authProvider: "f10" | "portal";
+  requiresNameConfirmation?: boolean;
   legacyUserId: string | null;
   groups: CustomerF10GroupSnapshot[];
   selectedGroupId: number | null;

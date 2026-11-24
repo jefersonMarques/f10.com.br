@@ -3,7 +3,7 @@
   import CustomerPortalNavigation from "$lib/components/customerPortal/CustomerPortalNavigation.svelte";
 
   $: pathname = $page.url.pathname;
-  $: showPortalNavigation = pathname.startsWith("/cliente/chamados") || pathname.startsWith("/cliente/solicitacoes");
+  $: showPortalNavigation = pathname.startsWith("/cliente/chamados") || pathname.startsWith("/cliente/solicitacoes") || pathname === "/cliente/perfil";
 </script>
 
 {#if showPortalNavigation}

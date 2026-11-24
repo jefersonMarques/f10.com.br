@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { CircleHelp, Download, LogOut, Plus, Ticket } from "lucide-svelte";
+  import { CircleHelp, Download, LogOut, Plus, Ticket, UserRound } from "lucide-svelte";
 
   $: pathname = $page.url.pathname;
   $: customer = ($page.data as {
@@ -53,6 +53,9 @@
           aria-label="Novo chamado" title="Novo chamado">
           <Plus size={17}/><span class="hidden lg:inline">Novo chamado</span>
         </a>
+      {/if}
+      {#if customer?.authProvider === "f10"}
+        <a href="/cliente/perfil" aria-label="Meu perfil" title="Meu perfil" class="flex h-10 w-10 items-center justify-center rounded-lg text-white/80 hover:bg-white/10"><UserRound size={17}/></a>
       {/if}
       <form method="POST" action="/cliente/sair">
         <button type="submit"

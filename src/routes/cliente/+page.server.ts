@@ -7,7 +7,7 @@ import {
 } from "$lib/server/customerPortal/customerPortalMailer";
 import { createCustomerPortalLoginToken } from "$lib/server/customerPortal/customerPortalRepository";
 import { authenticateCustomerPortalCredential } from "$lib/server/customerPortal/customerAuthService";
-import { createF10CustomerPortalSession } from "$lib/server/customerPortal/customerF10AuthRepository";
+import { authorizeF10CustomerPortalSession, createF10CustomerPortalSession } from "$lib/server/customerPortal/customerF10AuthRepository";
 import {
   getOptionalCustomerTicketPortalSession,
   normalizeCustomerPortalReturnTo,
@@ -37,6 +37,7 @@ function f10LoginDiagnostic(cause: unknown): string {
 function requiresF10Session(returnTo: string): boolean {
   return (
     returnTo.startsWith("/agendar/")
+    || returnTo.startsWith("/cliente/perfil")
     || returnTo === "/cliente/grupo"
     || returnTo.startsWith("/cliente/grupo?")
     || returnTo === "/cliente/unidade"
@@ -57,7 +58,12 @@ function isInvalidF10Credentials(cause: unknown): boolean {
 export const load: PageServerLoad = async ({ cookies, url }) => {
   const returnTo = normalizeCustomerPortalReturnTo(url.searchParams.get("returnTo") ?? "/cliente/chamados");
   const session = await getOptionalCustomerTicketPortalSession(cookies);
-  if (session) throw redirect(303, returnTo);
+  if (session && (!requiresF10Session(returnTo) || session.authProvider === "f10")) {
+    if (session.requiresNameConfirmation && !returnTo.startsWith("/cliente/perfil")) {
+      throw redirect(303, `/cliente/perfil?${new URLSearchParams({ returnTo })}`);
+    }
+    throw redirect(303, returnTo);
+  }
   return { returnTo };
 };
 
@@ -109,6 +115,10 @@ export const actions: Actions = {
     try {
       const f10Session = await createF10CustomerPortalSession(email, password);
       setCustomerPortalSessionCookie(cookies, f10Session.token, f10Session.expiresAt);
+      const profile = await authorizeF10CustomerPortalSession(f10Session.token);
+      if (profile?.requiresNameConfirmation && !returnTo.startsWith("/cliente/perfil")) {
+        throw redirect(303, `/cliente/perfil?${new URLSearchParams({ returnTo })}`);
+      }
       throw redirect(303, returnTo);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && "location" in cause) {

@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { needsCustomerNameConfirmation } from "$lib/support/customerProfile";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -52,6 +53,7 @@ export type CustomerF10PortalSession = {
   contactId: string;
   name: string;
   email: string;
+  requiresNameConfirmation?: boolean;
   legacyUserId: string;
   groups: CustomerF10GroupSnapshot[];
   selectedGroupId: number | null;
@@ -258,6 +260,7 @@ export async function authorizeF10CustomerPortalSession(
       selectedUnitName: customerPortalSessions.selectedUnitName,
       selectedUnitSchema: customerPortalSessions.selectedUnitSchema,
       name: customerContacts.name,
+      nameConfirmedAt: customerContacts.nameConfirmedAt,
       email: customerContacts.email,
     })
     .from(customerPortalSessions)
@@ -296,6 +299,7 @@ export async function authorizeF10CustomerPortalSession(
     contactId: session.contactId,
     name: session.name,
     email: session.email,
+    requiresNameConfirmation: needsCustomerNameConfirmation(session.name, session.email, Boolean(session.nameConfirmedAt)),
     legacyUserId: session.legacyUserId,
     groups: session.groups,
     selectedGroupId: session.selectedGroupId,

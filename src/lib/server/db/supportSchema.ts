@@ -75,6 +75,7 @@ export const customerContacts = pgTable(
       { onDelete: "set null" },
     ),
     name: text("name").notNull(),
+    nameConfirmedAt: timestamp("name_confirmed_at", { withTimezone: true }),
     email: text("email"),
     phone: text("phone"),
     whatsapp: text("whatsapp"),
