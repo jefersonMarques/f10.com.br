@@ -150,7 +150,7 @@ export async function notifySupportTicketNeedsAttention(
     ? await db
         .select({ id: webChatSessions.id })
         .from(webChatSessions)
-        .where(eq(webChatSessions.ticketId, ticketId))
+        .where(and(eq(webChatSessions.ticketId, ticketId), isNull(webChatSessions.closedAt)))
         .limit(1)
     : [];
   const isChatNotification = Boolean(chatSession?.id);
