@@ -733,6 +733,7 @@
                       submitting={sending}
                       sendOnEnter
                       onSend={() => void sendMessage()}
+                      quickReplyContext={{ customerName: chat.customerName, unitName: chat.customerContext?.unitName, ticketNumber: chat.ticketNumber }}
                       placeholder="Escreva uma mensagem para o cliente..."
                     />
                     <div class="mt-2 flex items-center justify-between gap-3 border-t border-[var(--app-border-soft)] pt-2">

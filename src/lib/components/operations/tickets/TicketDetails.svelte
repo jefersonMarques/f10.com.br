@@ -722,7 +722,7 @@
                     on:paste={pasteComposer}
                     class="w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] p-3" class:hidden={!composerExpanded}>
                     {#if composerMode === "reply"}
-                      <TicketRichTextEditor bind:this={replyEditor} bind:value={replyDraft} bind:files={replyFiles} submitting={Boolean(actionLoading)}/>
+                      <TicketRichTextEditor bind:this={replyEditor} bind:value={replyDraft} bind:files={replyFiles} submitting={Boolean(actionLoading)} quickReplyContext={{ customerName: ticketData.details.ticket.customerName, unitName: ticketData.customerContext?.unitName, ticketNumber: ticketData.details.ticket.ticketNumber }}/>
                     {:else}
                       <MentionTextarea users={ticketData.mentionUsers} name="body" bind:value={noteDraft} active={composerExpanded}
                         rows={3} maxlength={10000} autoGrow suggestionsAbove required={composerFiles.length === 0}

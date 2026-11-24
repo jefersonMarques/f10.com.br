@@ -2,7 +2,9 @@
   import { onDestroy, onMount, tick } from "svelte";
   import { tokenizeChatMarkdown } from "$lib/support/chatMarkdown";
   import { serializeTicketRichText } from "$lib/support/ticketRichTextSerialization";
-  import { Bold, Code, Italic, Paperclip, X } from "lucide-svelte";
+  import { Bold, Code, Italic, Paperclip, X, Zap } from "lucide-svelte";
+  import QuickRepliesMenu from "./QuickRepliesMenu.svelte";
+  import type { QuickReplyContext } from "$lib/support/quickReplies";
 
   export let value = "";
   export let files: File[] = [];
@@ -12,6 +14,9 @@
   export let sendOnEnter = false;
   export let onSend: () => void = () => undefined;
   export let placeholder = "Escreva uma resposta...";
+  export let quickReplyContext: QuickReplyContext | null = null;
+  let quickRepliesOpen = false;
+  let quickReplyRange: Range | null = null;
 
   let editor: HTMLDivElement;
   let fileInput: HTMLInputElement;
@@ -105,7 +110,40 @@
     syncValue();
   }
 
+  function openQuickReplies(): void {
+    if (!quickReplyContext || disabled || submitting) return;
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    quickReplyRange = range && editor.contains(range.commonAncestorContainer) ? range.cloneRange() : null;
+    quickRepliesOpen = true;
+  }
+
+  async function insertQuickReply(text: string): Promise<void> {
+    quickRepliesOpen = false;
+    await tick();
+    if (!editor?.isConnected || disabled || submitting) return;
+    editor.focus({ preventScroll: true });
+    const selection = window.getSelection();
+    const range = quickReplyRange && editor.contains(quickReplyRange.commonAncestorContainer)
+      ? quickReplyRange : document.createRange();
+    if (range !== quickReplyRange) {
+      range.selectNodeContents(editor);
+      range.collapse(false);
+    }
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    quickReplyRange = null;
+    insertPlainText(text);
+    syncValue();
+  }
+
   function formatShortcut(event: KeyboardEvent): void {
+    if (quickReplyContext && event.key === "/" && !event.isComposing && !event.altKey
+      && ((event.ctrlKey || event.metaKey) || (!value.trim() && files.length === 0))) {
+      event.preventDefault();
+      openQuickReplies();
+      return;
+    }
     if (sendOnEnter && event.key === "Enter" && !event.shiftKey && !event.isComposing
       && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
@@ -253,6 +291,9 @@
 
 <div class="w-full min-w-0" aria-label="Editor visual da resposta">
   <div class="flex items-center gap-1 border-b border-[var(--app-border-soft)] pb-2">
+    {#if quickReplyContext}
+      <button type="button" disabled={disabled || submitting} on:mousedown|preventDefault on:click={openQuickReplies} title="Respostas rápidas (/)" aria-label="Respostas rápidas" class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Zap size={16}/></button>
+    {/if}
     <button type="button" on:mousedown|preventDefault on:click={() => formatText("bold")} title="Negrito (Ctrl+B)" aria-label="Negrito"
       class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Bold size={16}/></button>
     <button type="button" on:mousedown|preventDefault on:click={() => formatText("italic")} title="Itálico (Ctrl+I)" aria-label="Itálico"
@@ -284,6 +325,10 @@
     {/if}
   {/if}
 </div>
+
+{#if quickRepliesOpen && quickReplyContext}
+  <QuickRepliesMenu context={quickReplyContext} onInsert={(text) => void insertQuickReply(text)} onClose={() => quickRepliesOpen = false}/>
+{/if}
 
 <style>
   .ticket-rich-editor:empty::before {
