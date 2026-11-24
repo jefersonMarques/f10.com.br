@@ -88,6 +88,10 @@ export const customerF10Identities = pgTable(
       .notNull()
       .references(() => customerContacts.id, { onDelete: "cascade" }),
     loginEmail: text("login_email").notNull(),
+    contactEmail: text("contact_email"),
+    contactPhone: text("contact_phone"),
+    avatarKey: text("avatar_key"),
+    avatarContentType: text("avatar_content_type"),
     firstAuthenticatedAt: timestamp("first_authenticated_at", { withTimezone: true }).notNull().defaultNow(),
     lastAuthenticatedAt: timestamp("last_authenticated_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
