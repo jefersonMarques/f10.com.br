@@ -4,7 +4,14 @@ import { sql } from "drizzle-orm";
 export function chatWaitingSinceMs() {
   return sql<number | null>`case
     when "web_chat_sessions"."closed_at" is not null
-      or "web_chat_sessions"."expires_at" <= now()
+      or (
+        "web_chat_sessions"."expires_at" <= now()
+        and (
+          "web_chat_sessions"."legacy_user_id" is null
+          or "web_chat_sessions"."group_id" is null
+          or "web_chat_sessions"."unit_id" is null
+        )
+      )
       or "web_chat_sessions"."ai_state" = 'active'
       or exists (
         select 1 from tickets t

@@ -160,7 +160,6 @@ export async function processChatWaitingReminders(): Promise<void> {
     subject: webChatSessions.subject,
   }).from(webChatSessions).where(and(
     isNull(webChatSessions.closedAt),
-    gt(webChatSessions.expiresAt, new Date(now)),
     sql`${waiting} <= ${now - settings.delaySeconds * 1000}`,
     sql`not exists (
       select 1 from support_chat_events e

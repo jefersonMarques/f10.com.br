@@ -45,7 +45,7 @@ import {
   uploadSupportMessageAttachments,
 } from "$lib/server/support/supportMessageAttachmentRepository";
 
-const CHAT_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+import { CHAT_TOKEN_TTL_MS, createCustomerChatToken } from "$lib/server/support/customerChatToken";
 const START_WINDOW_MS = 10 * 60 * 1000;
 const START_BLOCK_MS = 30 * 60 * 1000;
 const MESSAGE_WINDOW_MS = 60 * 1000;
@@ -185,11 +185,12 @@ export async function startPublicChat(
     whatsapp: "",
     organizationName: "",
   });
-  const token = randomBytes(32).toString("base64url");
-  const tokenHash = hashSessionToken(token);
-  const expiresAt = new Date(Date.now() + CHAT_SESSION_TTL_MS);
-  const normalizedMessage = input.message.trim();
+  const sessionId = randomUUID();
   const customerContext = input.customerContext ?? null;
+  const token = customerContext ? createCustomerChatToken(sessionId) : randomBytes(32).toString("base64url");
+  const tokenHash = hashSessionToken(token);
+  const expiresAt = new Date(Date.now() + CHAT_TOKEN_TTL_MS);
+  const normalizedMessage = input.message.trim();
   const db = getDatabase();
 
   const result = await db.transaction(async (tx) => {
@@ -198,6 +199,7 @@ export async function startPublicChat(
     const [session] = await tx
       .insert(webChatSessions)
       .values({
+        id: sessionId,
         ticketId: null,
         customerContactId,
         queueId: entryOption.queueId,

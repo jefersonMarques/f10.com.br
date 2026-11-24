@@ -1,79 +1,65 @@
-import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, gt, isNull, lte } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { supportChatEvents, webChatSessions } from "$lib/server/db/chatSchema";
+import {
+  CHAT_TOKEN_RENEWAL_WINDOW_MS,
+  CHAT_TOKEN_TTL_MS,
+  createCustomerChatToken,
+} from "$lib/server/support/customerChatToken";
 import type { PublicChatCustomerContext } from "$lib/server/support/publicChatRepository";
 
-const CHAT_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
-
-function hashSessionToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
+type ChatCustomerContext = Pick<PublicChatCustomerContext, "legacyUserId" | "groupId" | "unitId">;
 
 export type ResumedCustomerChatSession = {
   sessionId: string;
   token: string;
   chatNumber: number;
+  ticketId: string | null;
   expiresAt: Date;
   aiState: "active" | "escalated" | "human" | "disabled";
   entryOptionLabel: string;
+  department: "support" | "finance";
+  escalated: boolean;
 };
 
+function activeCustomerChatCondition(context: ChatCustomerContext) {
+  return and(
+    eq(webChatSessions.legacyUserId, context.legacyUserId),
+    eq(webChatSessions.groupId, context.groupId),
+    eq(webChatSessions.unitId, context.unitId),
+    isNull(webChatSessions.closedAt),
+  );
+}
+
+export async function findActiveCustomerChat(context: ChatCustomerContext): Promise<boolean> {
+  const [chat] = await getDatabase()
+    .select({ id: webChatSessions.id })
+    .from(webChatSessions)
+    .where(activeCustomerChatCondition(context))
+    .limit(1);
+  return Boolean(chat);
+}
+
 export async function resumeActiveCustomerChatSession(input: {
+  customerContext: ChatCustomerContext;
   requiredQueueId?: string | null;
-  customerContext: PublicChatCustomerContext;
-  contextUrl: string;
-  contextData: Record<string, unknown>;
-  handoffReason: string;
+  handoffReason?: string;
+  requestHuman?: boolean;
 }): Promise<ResumedCustomerChatSession | null> {
-  const db = getDatabase();
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + CHAT_SESSION_TTL_MS);
-  const token = randomBytes(32).toString("base64url");
-  const tokenHash = hashSessionToken(token);
-
-  return db.transaction(async (tx) => {
-    // The unique index covers all non-closed sessions, including expired ones.
-    // Retire expired chats in the same customer context before searching for a
-    // resumable session or creating another chat for that context.
-    const expiredSessions = await tx
-      .update(webChatSessions)
-      .set({ closedAt: now, closeReason: "expired", updatedAt: now })
-      .where(and(
-        eq(webChatSessions.legacyUserId, input.customerContext.legacyUserId),
-        eq(webChatSessions.groupId, input.customerContext.groupId),
-        eq(webChatSessions.unitId, input.customerContext.unitId),
-        isNull(webChatSessions.closedAt),
-        lte(webChatSessions.expiresAt, now),
-      ))
-      .returning({ id: webChatSessions.id });
-    if (expiredSessions.length > 0) {
-      await tx.insert(supportChatEvents).values(expiredSessions.map((item) => ({
-        sessionId: item.id,
-        eventType: "expired",
-        occurredAt: now,
-      })));
-    }
-
-    const [session] = await tx
-      .select({
-        id: webChatSessions.id,
-        queueId: webChatSessions.queueId,
-        chatNumber: webChatSessions.chatNumber,
-        aiState: webChatSessions.aiState,
-        contextData: webChatSessions.contextData,
-        humanRequestedAt: webChatSessions.humanRequestedAt,
-      })
-      .from(webChatSessions)
-      .where(
-        and(
-          eq(webChatSessions.legacyUserId, input.customerContext.legacyUserId),
-          eq(webChatSessions.groupId, input.customerContext.groupId),
-          eq(webChatSessions.unitId, input.customerContext.unitId),
-          isNull(webChatSessions.closedAt),
-          gt(webChatSessions.expiresAt, now),
-        ),
-      )
+  return getDatabase().transaction(async (tx) => {
+    const [session] = await tx.select({
+      id: webChatSessions.id,
+      queueId: webChatSessions.queueId,
+      ticketId: webChatSessions.ticketId,
+      chatNumber: webChatSessions.chatNumber,
+      aiState: webChatSessions.aiState,
+      contextData: webChatSessions.contextData,
+      humanRequestedAt: webChatSessions.humanRequestedAt,
+      tokenHash: webChatSessions.tokenHash,
+      expiresAt: webChatSessions.expiresAt,
+    }).from(webChatSessions)
+      .where(activeCustomerChatCondition(input.customerContext))
       .orderBy(desc(webChatSessions.updatedAt), desc(webChatSessions.createdAt))
       .limit(1).for("update");
 
@@ -82,30 +68,32 @@ export async function resumeActiveCustomerChatSession(input: {
       throw new Error("CHAT_QUEUE_MISMATCH");
     }
 
-    const nextAiState = session.aiState === "active" ? "escalated" : session.aiState;
-    const nextContextData: Record<string, unknown> = {
-      ...(session.contextData ?? {}),
-      ...input.contextData,
-      resumedAt: now.toISOString(),
-    };
+    const now = new Date();
+    const token = createCustomerChatToken(session.id);
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const renewToken = session.tokenHash !== tokenHash
+      || session.expiresAt.getTime() <= now.getTime() + CHAT_TOKEN_RENEWAL_WINDOW_MS;
+    const expiresAt = renewToken
+      ? new Date(now.getTime() + CHAT_TOKEN_TTL_MS)
+      : session.expiresAt;
 
-    await tx
-      .update(webChatSessions)
-      .set({
-        tokenHash,
-        expiresAt,
-        lastSeenAt: now,
-        updatedAt: now,
-        contextUrl: input.contextUrl || null,
-        contextData: nextContextData,
-        aiState: nextAiState,
+    // Uma retomada comum não altera a fila, o responsável ou o ciclo de espera.
+    const escalated = input.requestHuman === true && session.aiState === "active";
+    const aiState = escalated ? "escalated" : session.aiState;
+
+    await tx.update(webChatSessions).set({
+      ...(renewToken ? { tokenHash, expiresAt } : {}),
+      lastSeenAt: now,
+      ...(escalated ? {
+        aiState,
         humanRequestedAt: session.humanRequestedAt ?? now,
         aiHandoffReason: input.handoffReason || null,
         aiHandoffAt: now,
-      })
-      .where(eq(webChatSessions.id, session.id));
+        updatedAt: now,
+      } : {}),
+    }).where(eq(webChatSessions.id, session.id));
 
-    if (!session.humanRequestedAt) {
+    if (escalated && !session.humanRequestedAt) {
       await tx.insert(supportChatEvents).values({
         sessionId: session.id,
         eventType: "human_requested",
@@ -117,12 +105,13 @@ export async function resumeActiveCustomerChatSession(input: {
       sessionId: session.id,
       token,
       chatNumber: session.chatNumber,
+      ticketId: session.ticketId,
       expiresAt,
-      aiState: nextAiState,
-      entryOptionLabel:
-        typeof nextContextData.entryOptionLabel === "string"
-          ? nextContextData.entryOptionLabel
-          : "Atendimento F10",
+      aiState,
+      entryOptionLabel: typeof session.contextData?.entryOptionLabel === "string"
+        ? session.contextData.entryOptionLabel : "Atendimento F10",
+      department: session.contextData?.department === "finance" ? "finance" : "support",
+      escalated,
     };
   });
 }

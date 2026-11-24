@@ -12,7 +12,6 @@ import {
 import { getFinanceEntryAction, isFinancialChatOption, type PublicChatDepartment } from "$lib/support/chatEntryRouting";
 import { resumeActiveCustomerChatSession } from "$lib/server/support/customerChatSessionRepository";
 import {
-  addPublicChatMessage,
   addPublicChatSystemMessage,
   startPublicChat,
 } from "$lib/server/support/publicChatRepository";
@@ -217,30 +216,17 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     const resumedSession = await resumeActiveCustomerChatSession({
       requiredQueueId: requestedQueueId,
       customerContext,
-      contextUrl,
-      contextData: handoffContextData,
       handoffReason,
+      requestHuman: true,
     });
+    let existingSession = resumedSession;
     let session;
-    let reused = false;
 
-    if (resumedSession) {
-      reused = true;
-      await addPublicChatMessage(
-        clientAddress,
-        resumedSession.sessionId,
-        resumedSession.token,
-        message,
-      );
-      session = {
-        sessionId: resumedSession.sessionId,
-        token: resumedSession.token,
-        expiresAt: resumedSession.expiresAt,
-        aiState: resumedSession.aiState,
-        entryOptionLabel: resumedSession.entryOptionLabel,
-      };
+    if (existingSession) {
+      session = existingSession;
     } else {
-      session = await startPublicChat(clientAddress, {
+      try {
+        session = await startPublicChat(clientAddress, {
         name,
         email,
         phone,
@@ -249,9 +235,21 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
         contextUrl,
         contextData: handoffContextData,
         enableAi: false,
-        customerContext,
-      });
+          customerContext,
+        });
+      } catch (cause) {
+        // O índice único impede a criação de duas conversas no mesmo contexto.
+        const error = cause as { code?: string; constraint_name?: string; cause?: { code?: string; constraint_name?: string } };
+        const databaseError = error?.cause ?? error;
+        if (databaseError?.code !== "23505" || databaseError.constraint_name !== "web_chat_sessions_active_customer_context_unique") throw cause;
+        existingSession = await resumeActiveCustomerChatSession({
+          customerContext, requiredQueueId: requestedQueueId, handoffReason, requestHuman: true,
+        });
+        if (!existingSession) throw cause;
+        session = existingSession;
+      }
     }
+    const reused = Boolean(existingSession);
 
     const [chatIdentity] = await getDatabase()
       .select({ chatNumber: webChatSessions.chatNumber })
@@ -294,23 +292,23 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
       ).catch(() => undefined);
     }
 
-    await notifySupportChatNeedsAttention(
-      session.sessionId,
-      reused
-        ? "Cliente retomou uma conversa de atendimento."
-        : "Novo atendimento solicitado pelo cliente.",
-    ).catch(() => undefined);
+    if (!reused || existingSession?.escalated) {
+      await notifySupportChatNeedsAttention(
+        session.sessionId,
+        "Novo atendimento solicitado pelo cliente.",
+      ).catch(() => undefined);
+    }
 
     return json(
       {
         sessionId: session.sessionId,
         token: session.token,
         chatNumber: chatIdentity.chatNumber,
-        ticketId: null,
+        ticketId: session.ticketId,
         // Mantido temporariamente para compatibilidade com o componente existente do chat.
         ticketNumber: chatIdentity.chatNumber,
         entryOptionLabel: session.entryOptionLabel,
-        department,
+        department: existingSession?.department ?? department,
         expiresAt: session.expiresAt.toISOString(),
         aiState: session.aiState,
         outsideSupportHours: availability.isOpen === false,
