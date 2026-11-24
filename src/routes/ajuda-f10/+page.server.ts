@@ -85,6 +85,7 @@ export const load: PageServerLoad = async ({ url, cookies }) => {
       ? {
           authenticated: true,
           name: customer.name,
+        requiresNameConfirmation: customer.requiresNameConfirmation ?? false,
           email: customer.email,
           groupName: customer.selectedGroupName,
           unitName: customer.selectedUnitName,

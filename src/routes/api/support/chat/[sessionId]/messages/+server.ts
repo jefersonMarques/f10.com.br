@@ -83,7 +83,7 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
   try {
     const [messages, waiting] = await Promise.all([
       listPublicChatMessages(sessionId, token),
-      getPublicChatWaitingStatus(sessionId),
+      getPublicChatWaitingStatus(sessionId).catch(() => ({ waitingSinceMs: null, offerTicket: false })),
     ]);
     return json(
       { messages, aiState: session.aiState, ticketId: session.ticketId, waiting },

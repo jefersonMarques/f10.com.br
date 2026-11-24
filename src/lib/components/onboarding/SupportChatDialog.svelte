@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CustomerProfileForm from "$lib/components/customerPortal/CustomerProfileForm.svelte";
+  import { needsCustomerNameConfirmation } from "$lib/support/customerProfile";
   import { browser } from "$app/environment";
   import {
     readRestorableSupportGuestMessages,
@@ -50,6 +52,7 @@
     authenticated: boolean;
     name: string;
     email: string;
+    requiresNameConfirmation?: boolean;
     groupName: string | null;
     unitName: string | null;
     requiresUnitSelection?: boolean;
@@ -60,6 +63,7 @@
     authenticated: boolean;
     name: string;
     email: string;
+    requiresNameConfirmation?: boolean;
     groupName: string | null;
     unitName: string | null;
     requiresUnitSelection: boolean;
@@ -196,7 +200,7 @@
   let attachmentError = "";
   let newMessageCount = 0;
   let handoffRequested = false;
-  let authStep: "login" | "unit" | "ready" = "login";
+  let authStep: "login" | "unit" | "profile" | "ready" = "login";
   let loginEmail = "";
   let loginPassword = "";
   let authSubmitting = false;
@@ -255,6 +259,7 @@
       authenticated: customerSupport.authenticated,
       name: customerSupport.name,
       email: customerSupport.email,
+      requiresNameConfirmation: customerSupport.requiresNameConfirmation ?? needsCustomerNameConfirmation(customerSupport.name, customerSupport.email),
       groupName: customerSupport.groupName,
       unitName: customerSupport.unitName,
       requiresUnitSelection: customerSupport.requiresUnitSelection ?? false,
@@ -690,6 +695,11 @@
     errorMessage = "";
 
     if (authState.authenticated) {
+      if (authState.requiresNameConfirmation) {
+        authStep = "profile";
+        await scrollToLatest();
+        return;
+      }
       if (authState.requiresUnitSelection) {
         authStep = "unit";
         prepareUnitSelection();
@@ -724,6 +734,12 @@
 
       authState = payload as unknown as AuthState;
       loginPassword = "";
+      authRequiredForSession = false;
+      if (authState.requiresNameConfirmation) {
+        authStep = "profile";
+        await scrollToLatest();
+        return;
+      }
       if (authState.requiresUnitSelection) {
         authStep = "unit";
         prepareUnitSelection();
@@ -773,7 +789,23 @@
     }
   }
 
+  async function handleProfileSaved(name: string): Promise<void> {
+    authState = { ...authState, name, requiresNameConfirmation: false };
+    await continueAfterAuthentication();
+  }
+
   async function continueAfterAuthentication(): Promise<void> {
+    if (authState.requiresNameConfirmation) {
+      authStep = "profile";
+      await scrollToLatest();
+      return;
+    }
+    if (authState.requiresUnitSelection && !session) {
+      authStep = "unit";
+      prepareUnitSelection();
+      await scrollToLatest();
+      return;
+    }
     authStep = "ready";
     if (session) {
       handoffRequested = false;
@@ -790,6 +822,11 @@
 
   async function startHumanChat(): Promise<void> {
     if (session || starting || !authState.authenticated) return;
+    if (authState.requiresNameConfirmation) {
+      authStep = "profile";
+      await scrollToLatest();
+      return;
+    }
     starting = true;
     authStep = "ready";
     errorMessage = "";
@@ -906,6 +943,7 @@
       }
 
       if (!response.ok) return;
+      const previousOffer = waitingStatus.offerTicket;
       if (payload.waiting && typeof payload.waiting === "object") {
         const waiting = payload.waiting as Record<string, unknown>;
         waitingStatus = {
@@ -924,7 +962,7 @@
         persistSession(session);
       }
 
-      if (changed) {
+      if (changed || (!previousOffer && waitingStatus.offerTicket)) {
         if (forceScroll || wasNearBottom) await scrollToLatest(forceScroll ? "auto" : "smooth");
         else newMessageCount += added || 1;
       }
@@ -1027,7 +1065,7 @@
   }
 
   async function sendReply(): Promise<void> {
-    if (!session || sending) return;
+    if (!session || sending || conversionSubmitting) return;
     const body = reply.trim();
     const images = [...pendingImages];
     if (!body && images.length === 0) return;
@@ -1296,6 +1334,11 @@
           <a href={`/cliente/chamados/${convertedTicket.ticketId}`} target="_blank" rel="noopener noreferrer" class="flex min-h-11 items-center justify-center rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white">Acompanhar chamado</a>
           <a href="/cliente/chamados" target="_blank" rel="noopener noreferrer" class="flex min-h-11 items-center justify-center rounded-xl border border-[#DDE2EB] text-[14px] font-semibold text-[#000A57]">Meus chamados</a>
           <button type="button" on:click={startNewConversation} class="w-full py-2 text-[13px] font-medium text-[#596171]">Iniciar outra conversa</button>
+        </div>
+      {:else if authStep === "profile" && authState.authenticated}
+        <div class="space-y-4 rounded-2xl border border-[#DDE2EB] bg-white p-5 shadow-sm">
+          <h3 class="text-[15px] font-semibold text-[#18233D]">Complete seu perfil</h3>
+          <CustomerProfileForm onSaved={handleProfileSaved} />
         </div>
       {:else}
       {#if activeDepartment === "finance" && !session && financeAction === null}
@@ -1574,6 +1617,8 @@
 
     {#if convertedTicket}
       <div class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-2 text-center text-[12px] text-[#697184]">Continue o atendimento pelo chamado.</div>
+    {:else if authStep === "profile" && authState.authenticated}
+      <div class="shrink-0 border-t border-[#E6E8EF] bg-white py-2"></div>
     {:else if session && (activeDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>
         {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[12px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte o arquivo para anexar</div>{/if}
