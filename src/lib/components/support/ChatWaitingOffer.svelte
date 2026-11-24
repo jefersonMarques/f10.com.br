@@ -101,8 +101,8 @@
       if (!sessionId) {
         requestId ||= crypto.randomUUID();
         form.set("requestId", requestId);
-        form.set("assistantTranscript", assistantTranscript.slice(0, 8000));
       }
+      if (assistantTranscript) form.set("assistantTranscript", assistantTranscript.slice(0, 8000));
       const endpoint = sessionId
         ? `/api/support/chat/${encodeURIComponent(sessionId)}/ticket`
         : "/api/support/chat/ticket";

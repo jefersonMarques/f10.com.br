@@ -49,6 +49,7 @@ async function canAccessChat(
 type CustomerChatTicketInput = {
   subject: string;
   description: string;
+  assistantTranscript?: string;
   files: File[];
 };
 
@@ -77,11 +78,12 @@ export async function createCustomerTicketFromChat(
 ): Promise<ConversionResult> {
   const subject = input.subject.trim();
   const description = input.description.trim();
-  if (subject.length < 3 || subject.length > 180 || !description || description.length > 10_000) {
+  const assistantTranscript = input.assistantTranscript?.trim() ?? "";
+  if (subject.length < 3 || subject.length > 180 || !description || description.length > 10_000 || assistantTranscript.length > 8000) {
     throw new Error("CHAT_TICKET_INVALID_INPUT");
   }
   return convertChatToTicket(sessionId, {
-    kind: "customer", customer, token, input: { ...input, subject, description },
+    kind: "customer", customer, token, input: { ...input, subject, description, assistantTranscript },
   });
 }
 
@@ -176,6 +178,10 @@ async function convertChatToTicket(sessionId: string, actor: ConversionActor): P
       async function submitCustomerDetails(ticketId: string, existing: boolean): Promise<void> {
         if (!customerInput || !customer) return;
         const now = new Date();
+        const description = existing ? `${customerInput.subject}\n\n${customerInput.description}` : customerInput.description;
+        const body = customerInput.assistantTranscript
+          ? `${description}\n\n---\n\nHistórico do Assistente F10:\n\n${customerInput.assistantTranscript}`
+          : description;
         await tx.insert(ticketMessages).values({
           id: messageId,
           ticketId,
@@ -183,7 +189,7 @@ async function convertChatToTicket(sessionId: string, actor: ConversionActor): P
           customerContactId: customer.contactId,
           visibility: "public",
           channel: "web_chat",
-          body: existing ? `${customerInput.subject}\n\n${customerInput.description}` : customerInput.description,
+          body,
         });
         if (attachmentsToAdd.length) {
           await tx.insert(ticketMessageAttachments).values(attachmentsToAdd.map((attachment) => ({

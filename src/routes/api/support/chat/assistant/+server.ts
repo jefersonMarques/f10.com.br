@@ -236,7 +236,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (result.action === "ticket_offer") {
       return json(assistantPayload({
-        answer: result.answer,
+        answer: "Essa situação pode ser analisada pela equipe técnica. Posso registrar um chamado aqui mesmo.",
         action: "ticket_offer",
         ticketUrl: "/cliente/chamados/novo",
         aiAvailable,

@@ -23,6 +23,7 @@ export const POST: RequestHandler = async ({ request, cookies, params, url }) =>
   catch { return json({ error: "INVALID_PAYLOAD" }, { status: 400 }); }
   const subjectValue = form.get("subject");
   const descriptionValue = form.get("description");
+  const transcriptValue = form.get("assistantTranscript");
   const files = form.getAll("files").filter((item): item is File => item instanceof File && item.size > 0);
   if (files.length > SUPPORT_ATTACHMENT_MAX_FILES || files.some((file) => file.size > SUPPORT_ATTACHMENT_MAX_BYTES)
     || files.reduce((sum, file) => sum + file.size, 0) > 32 * 1024 * 1024) {
@@ -33,6 +34,7 @@ export const POST: RequestHandler = async ({ request, cookies, params, url }) =>
     const result = await createCustomerTicketFromChat(customer, sessionId, token, {
       subject: typeof subjectValue === "string" ? subjectValue : "",
       description: typeof descriptionValue === "string" ? descriptionValue : "",
+      assistantTranscript: typeof transcriptValue === "string" ? transcriptValue : "",
       files,
     });
     return json({ ticketId: result.ticketId, ticketNumber: result.ticketNumber, created: result.created },

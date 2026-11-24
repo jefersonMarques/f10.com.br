@@ -33,6 +33,7 @@ import {
   type CustomerF10PortalSession,
 } from "$lib/server/customerPortal/customerF10AuthRepository";
 import type { CustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { findActiveCustomerChat } from "$lib/server/support/customerChatSessionRepository";
 import { resolveCustomerPortalTicketIntake } from "$lib/server/customerPortal/customerPortalTicketIntake";
 import {
   CUSTOMER_TEAM_ACTIVITY_EVENT_TYPES,
@@ -528,16 +529,19 @@ export async function createCustomerF10Ticket(
 
   const existingTicket = await findExistingTicket();
   if (existingTicket) return existingTicket;
+  if (input.requestId && unitContext && await findActiveCustomerChat({
+    legacyUserId: session.legacyUserId, groupId: unitContext.groupId, unitId: unitContext.unitId,
+  })) throw new Error("ACTIVE_CHAT_EXISTS");
 
   const intake = await resolveCustomerPortalTicketIntake();
+  const now = new Date();
+  const sla = await calculateTicketSlaDeadlines(intake.queueId, now);
   const messageId = randomUUID();
   const storedAttachments = await uploadSupportMessageAttachments(
     ticketId,
     messageId,
     input.files ?? [],
   );
-  const now = new Date();
-  const sla = await calculateTicketSlaDeadlines(intake.queueId, now);
 
   let ticket: { id: string; ticketNumber: number };
   try {

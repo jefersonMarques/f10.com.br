@@ -185,6 +185,8 @@
   let conversionSubmitting = false;
   let ticketRequested = false;
   let ticketFormOpen = false;
+  let ticketSourceSessionId = "";
+  let ticketAssistantTranscript = "";
   let guestOffer: "none" | "handoff" | "ticket" = "none";
   let convertedTicket: { ticketId: string; ticketNumber: number } | null = null;
   let guestMessages: GuestMessage[] = [];
@@ -222,6 +224,8 @@
     configuredDepartment = entryDepartment;
     ticketRequested = false;
     ticketFormOpen = false;
+    ticketSourceSessionId = "";
+    ticketAssistantTranscript = "";
     financeAction = null;
     handoffRequested = false;
     selectedEntryOptionId = "";
@@ -276,7 +280,8 @@
       .filter((body) => body.trim() && !/^(?:solicito atendimento|quero (?:abrir|criar) (?:um )?chamado|falar com a equipe)/i.test(body.trim()))
       .slice(-6).join("\n\n").slice(0, 10000);
   $: ticketFormReady = authState.authenticated && !authState.requiresNameConfirmation
-    && !authState.requiresUnitSelection && authStep === "ready" && !handoffRequested && !resumeLoading;
+    && !authState.requiresUnitSelection && authStep === "ready" && !handoffRequested && !resumeLoading
+    && (!ticketSourceSessionId || session?.sessionId === ticketSourceSessionId);
 
   function initializeAuthState(): void {
     authState = {
@@ -752,6 +757,8 @@
   function cancelTicketRequest(): void {
     ticketRequested = false;
     ticketFormOpen = false;
+    ticketSourceSessionId = "";
+    ticketAssistantTranscript = "";
     handoffRequested = false;
     resumeOnly = false;
     errorMessage = "";
@@ -760,6 +767,10 @@
 
   async function requestTicket(): Promise<void> {
     if (conversionSubmitting || resumeLoading) return;
+    if (!ticketRequested) {
+      ticketSourceSessionId = session?.sessionId ?? "";
+      ticketAssistantTranscript = session ? "" : buildGuestTranscript();
+    }
     ticketRequested = true;
     ticketFormOpen = true;
     resumeOnly = false;
@@ -775,6 +786,8 @@
   }
 
   function handleTicketFormOpen(): void {
+    ticketSourceSessionId = session?.sessionId ?? "";
+    ticketAssistantTranscript = "";
     ticketRequested = true;
     void scrollToLatest();
   }
@@ -828,7 +841,7 @@
       }
       const responseText = needsHuman && status?.isOpen === false
         ? "Essa situação precisa de uma análise da nossa equipe técnica."
-        : offersTicket ? "Posso registrar um chamado para você aqui mesmo." : answer;
+        : answer;
       guestMessages = [...guestMessages, createGuestMessage("assistant", responseText)];
       await scrollToLatest();
     } catch {
@@ -983,11 +996,17 @@
     const result = await recoverActiveChat();
     if (ticketRequested) {
       if (result === "error") return;
+      if (ticketSourceSessionId && session?.sessionId !== ticketSourceSessionId) {
+        handoffRequested = true;
+        errorMessage = "A conversa original foi encerrada. Confira seus chamados antes de iniciar outro atendimento.";
+        return;
+      }
       if (result === "resumed" && (session?.department ?? "support") !== activeDepartment) {
         cancelTicketRequest();
         errorMessage = "Existe um atendimento em outro setor. Continue por essa conversa.";
         return;
       }
+      ticketSourceSessionId = session?.sessionId ?? "";
       handoffRequested = false;
       resumeOnly = false;
       ticketFormOpen = true;
@@ -1428,6 +1447,8 @@
     guestOffer = "none";
     ticketRequested = false;
     ticketFormOpen = false;
+    ticketSourceSessionId = "";
+    ticketAssistantTranscript = "";
     handoffRequested = false;
     conversionSubmitting = false;
     errorMessage = "";
@@ -1485,6 +1506,8 @@
       guestOffer = "none";
       ticketRequested = false;
       ticketFormOpen = false;
+      ticketSourceSessionId = "";
+      ticketAssistantTranscript = "";
       guestReply = "";
       reply = "";
       handoffRequested = false;
@@ -1765,7 +1788,7 @@
                   <p class="text-[13px] leading-5 text-[#596171]">{status.nextOpenLabel ? "Nossa equipe retorna " + status.nextOpenLabel.toLowerCase() + "." : "Nossa equipe retorna no próximo expediente."} Você pode abrir um chamado aqui mesmo.</p>
                 {/if}
                 <button type="button" on:click={() => void requestTicket()} class="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white"><Ticket size={16}/> Abrir chamado</button>
-                {#if guestOffer === "handoff" && status?.isOpen !== false}
+                {#if guestOffer === "handoff" && (status?.isOpen === true || status?.hoursConfigured === false)}
                   <button type="button" on:click={() => void requestHumanSupport()} class="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#DDE1E9] text-[13px] font-semibold text-[#000A57]"><UserRound size={15}/> Falar com a equipe</button>
                 {/if}
                 <button type="button" on:click={() => (guestOffer = "none")} class="min-h-9 w-full text-[13px] font-medium text-[#596171]">Continuar com o assistente</button>
@@ -1825,6 +1848,12 @@
         </div>
       {/if}
       {/if}
+      {#if ticketRequested && handoffRequested && session}
+        <div class="mt-3 space-y-2 rounded-xl border border-[#E1E4EB] bg-white p-3 text-[13px]">
+          <p>{errorMessage || "Confirme a conversa antes de registrar o chamado."}</p>
+          <button type="button" on:click={cancelTicketRequest} class="font-semibold text-[#000A57]">Voltar à conversa</button>
+        </div>
+      {/if}
       {#if !convertedTicket && !departmentSessionMismatch && (session || ticketRequested)}
         <ChatWaitingOffer
           sessionId={session?.sessionId ?? ""}
@@ -1835,7 +1864,7 @@
           unitName={authState.unitName}
           groupName={authState.groupName}
           suggestedDescription={ticketDescription}
-          assistantTranscript={session ? "" : buildGuestTranscript()}
+          assistantTranscript={ticketAssistantTranscript}
           ready={ticketFormReady && !authRequiredForSession}
           bind:opened={ticketFormOpen}
           bind:submitting={conversionSubmitting}

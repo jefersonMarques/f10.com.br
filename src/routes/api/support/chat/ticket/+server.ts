@@ -2,7 +2,6 @@ import { json, type RequestHandler } from "@sveltejs/kit";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { createCustomerF10Ticket } from "$lib/server/customerPortal/customerF10TicketRepository";
 import { isAuthorizedF10Context } from "$lib/server/customerPortal/customerF10AuthRepository";
-import { findActiveCustomerChat } from "$lib/server/support/customerChatSessionRepository";
 import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_FILES } from "$lib/server/support/supportMessageAttachmentRepository";
 
 const MAX_BODY_BYTES = 34 * 1024 * 1024;
@@ -24,7 +23,7 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
 
   const customer = await getOptionalCustomerF10PortalSession(cookies);
   if (!customer) return json({ error: "CUSTOMER_AUTH_REQUIRED" }, { status: 401, headers });
-  const { legacyUserId, selectedGroupId: groupId, selectedUnitId: unitId } = customer;
+  const { selectedGroupId: groupId, selectedUnitId: unitId } = customer;
   if (groupId === null || unitId === null || !isAuthorizedF10Context(customer, groupId, unitId)) {
     return json({ error: "CUSTOMER_CONTEXT_REQUIRED" }, { status: 409, headers });
   }
@@ -53,9 +52,6 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
   }
 
   try {
-    if (await findActiveCustomerChat({ legacyUserId, groupId, unitId })) {
-      return json({ error: "ACTIVE_CHAT_EXISTS" }, { status: 409, headers });
-    }
     const ticket = await createCustomerF10Ticket(customer, {
       scope: "unit",
       groupId,
@@ -69,6 +65,7 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
     return json({ ticketId: ticket.id, ticketNumber: ticket.ticketNumber }, { status: 200, headers });
   } catch (cause) {
     const code = cause instanceof Error ? cause.message : "";
+    if (code === "ACTIVE_CHAT_EXISTS") return json({ error: code }, { status: 409, headers });
     if (code === "CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED") {
       return json({ error: code }, { status: 403, headers });
     }

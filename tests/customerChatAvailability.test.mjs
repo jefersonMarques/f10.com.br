@@ -8,6 +8,8 @@ const waiting = source("src/lib/server/support/chatWaitingService.ts");
 const offer = source("src/lib/components/support/ChatWaitingOffer.svelte");
 const portal = source("src/routes/api/support/chat/ticket/+server.ts");
 const start = source("src/routes/api/support/chat/start/+server.ts");
+const repository = source("src/lib/server/customerPortal/customerF10TicketRepository.ts");
+const bridge = source("src/lib/server/support/chatTicketBridge.ts");
 
 test("resume choice requires a positive authenticated server lookup", () => {
   assert.match(dialog, /hasConfirmedActiveChat = payload\?\.active === true/);
@@ -19,7 +21,7 @@ test("resume choice requires a positive authenticated server lookup", () => {
 test("assistant starts naturally and offers inline tickets only after an unresolved request", () => {
   assert.match(dialog, /guestOffer: "none" \| "handoff" \| "ticket" = "none"/);
   assert.match(dialog, /\{#if guestOffer !== "none"\}/);
-  assert.match(dialog, /guestOffer === "handoff" && status\?\.isOpen !== false/);
+  assert.match(dialog, /guestOffer === "handoff" && \(status\?\.isOpen === true \|\| status\?\.hoursConfigured === false\)/);
   assert.doesNotMatch(dialog, /href="\/cliente\/chamados\/novo"/);
   assert.match(dialog, /on:click=\{\(\) => void requestTicket\(\)\}/);
   assert.match(dialog, /bind:opened=\{ticketFormOpen\}/);
@@ -27,7 +29,8 @@ test("assistant starts naturally and offers inline tickets only after an unresol
   assert.match(portal, /getOptionalCustomerF10PortalSession\(cookies\)/);
   assert.match(portal, /isAuthorizedF10Context\(customer, groupId, unitId\)/);
   assert.match(portal, /createCustomerF10Ticket\(customer,/);
-  assert.match(portal, /findActiveCustomerChat/);
+  assert.match(repository, /findActiveCustomerChat/);
+  assert.match(portal, /error: code \}, \{ status: 409, headers \}/);
   assert.match(start, /error: "SUPPORT_OUTSIDE_HOURS"/);
 });
 
@@ -37,4 +40,16 @@ test("eligible chats can convert outside hours independently of waiting rules", 
   assert.match(waiting, /offerTicket: availability\?\.isOpen === false/);
   assert.match(offer, /outsideSupportHours \? "Fora do horário de atendimento"/);
   assert.match(offer, /outsideSupportHours \? `f10:chat-wait:/);
+});
+
+test("one form preserves context and prevents repeated submissions", () => {
+  assert.match(dialog, /ticketSourceSessionId && session\?\.sessionId !== ticketSourceSessionId/);
+  assert.match(dialog, /assistantTranscript=\{ticketAssistantTranscript\}/);
+  assert.match(offer, /requestId \|\|= crypto\.randomUUID\(\)/);
+  assert.match(offer, /if \(!ready \|\| submitting/);
+  assert.match(offer, /Aguardar na fila/);
+  assert.match(repository, /if \(existingTicket\) return existingTicket;/);
+  assert.match(repository, /\.onConflictDoNothing\(\{ target: tickets\.id \}\)/);
+  assert.match(repository, /Histórico do Assistente F10/);
+  assert.match(bridge, /Histórico do Assistente F10/);
 });
