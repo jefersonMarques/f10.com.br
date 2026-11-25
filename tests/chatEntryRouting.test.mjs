@@ -81,3 +81,12 @@ test("entry visibility defaults to business hours, respects explicit outside-hou
   assert.equal(canStartHumanChat(support, open), true);
   assert.equal(canStartHumanChat({ ...enabled, label: "Gerar PIX", teamName: "Financeiro" }, closed), false);
 });
+
+test("finance PIX remains an automated entry and respects the same schedule", () => {
+  const option = { label: "Gerar PIX", teamName: "Financeiro", initialHandling: "ai", showOutsideHours: true };
+  const closed = { isOpen: false, hoursConfigured: true };
+  assert.equal(getFinanceEntryAction(option), "pix");
+  assert.equal(isChatEntryVisible(option, closed), true);
+  assert.equal(isChatEntryVisible({ ...option, showOutsideHours: false }, closed), false);
+  assert.equal(canStartHumanChat(option, { isOpen: true, hoursConfigured: true }), false);
+});

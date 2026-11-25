@@ -4,7 +4,7 @@ import test from "node:test";
 
 test("public support chat uses one handoff action, headset, and minimal composer", () => {
   const source = readFileSync("src/lib/components/onboarding/SupportChatDialog.svelte", "utf8");
-  const humanActions = source.match(/on:click=\{\(\) => void requestHumanSupport\(\)\}/g) ?? [];
+  const humanActions = source.match(/on:click=\{\(\) => humanSupportOption && void requestHumanSupport\(humanSupportOption\)\}/g) ?? [];
 
   assert.equal(humanActions.length, 1);
   assert.match(source, /<Headset size=\{19\}/);

@@ -220,6 +220,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
           customerContext, requiredQueueId: requestedQueueId, handoffReason, requestHuman: true,
         });
         if (!existingSession) throw cause;
+        if (existingSession.department !== department) throw new Error("CHAT_QUEUE_MISMATCH");
         session = existingSession;
       }
     }

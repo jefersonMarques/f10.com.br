@@ -205,6 +205,7 @@
       && canStartHumanChat(supportEntryOptions[0], status) ? supportEntryOptions[0] : null;
   $: canRequestHuman = humanSupportOption !== null;
   let entryOptionsLoading = false;
+  let entryOptionsRequest: Promise<void> | null = null;
   let selectedEntryOptionId = "";
   let selectedEntryOptionLabel = "";
   let guestReply = "";
@@ -625,18 +626,27 @@
     }
   }
 
-  async function refreshEntryOptions(): Promise<void> {
-    if (entryOptionsLoading) return;
+  function refreshEntryOptions(): Promise<void> {
+    if (entryOptionsRequest) return entryOptionsRequest;
     entryOptionsLoading = true;
+    entryOptionsRequest = loadEntryOptions();
+    return entryOptionsRequest;
+  }
+
+  async function loadEntryOptions(): Promise<void> {
     try {
       const response = await fetch("/api/support/chat/options", { cache: "no-store" });
-      if (!response.ok) { entryOptions = []; return; }
+      if (!response.ok) {
+        entryOptions = [];
+        return;
+      }
       const payload = await response.json() as { options?: EntryOption[] };
       entryOptions = Array.isArray(payload.options) ? payload.options : [];
     } catch {
       entryOptions = [];
     } finally {
       entryOptionsLoading = false;
+      entryOptionsRequest = null;
     }
   }
 
@@ -897,8 +907,7 @@
   }
 
   async function ensureHumanEntryAvailable(): Promise<boolean> {
-    await refreshStatus();
-    await refreshEntryOptions();
+    await Promise.all([refreshStatus(), refreshEntryOptions()]);
     const option = entryOptions.find((item) => item.id === selectedEntryOptionId);
     if (option && canStartHumanChat(option, status)) return true;
     handoffRequested = false;
@@ -920,7 +929,7 @@
       selectedEntryOptionId = option.id;
       selectedEntryOptionLabel = option.label;
     }
-    if (!await ensureHumanEntryAvailable()) return;
+    if (starting || handoffRequested || !await ensureHumanEntryAvailable()) return;
     resumeOnly = false;
     handoffRequested = true;
     errorMessage = "";
@@ -1068,6 +1077,14 @@
     if (activeDepartment === "finance") {
       handoffRequested = false;
       if (financeAction === "human") await startHumanChat(true);
+      else if (financeAction === "pix") {
+        await Promise.all([refreshStatus(), refreshEntryOptions()]);
+        const option = entryOptions.find((item) => item.id === selectedEntryOptionId);
+        if (!option || !isChatEntryVisible(option, status) || getFinanceEntryAction(option) !== "pix") {
+          resetFinanceChoice();
+          errorMessage = "Esta opção de atendimento não está mais disponível.";
+        }
+      }
       return;
     }
     await startHumanChat(true);
@@ -1075,13 +1092,14 @@
 
   async function startHumanChat(checkedActiveChat = false): Promise<void> {
     if (session || starting || resumeLoading || !authState.authenticated || ticketRequested) return;
-    if (!await ensureHumanEntryAvailable()) return;
+    starting = true;
+    if (!await ensureHumanEntryAvailable()) { starting = false; return; }
     if (authState.requiresNameConfirmation) {
+      starting = false;
       authStep = "profile";
       await scrollToLatest();
       return;
     }
-    starting = true;
     authStep = "ready";
     errorMessage = "";
     if (!checkedActiveChat && await recoverActiveChat() !== "none") {
@@ -1125,6 +1143,18 @@
           await refreshEntryOptions();
           if (activeDepartment === "finance") resetFinanceChoice();
           await scrollToLatest();
+          return;
+        }
+        if (payload.error === "INVALID_ENTRY_OPTION") {
+          await refreshEntryOptions();
+          if (activeDepartment === "finance") resetFinanceChoice();
+          else {
+            selectedEntryOptionId = "";
+            selectedEntryOptionLabel = "";
+            handoffRequested = false;
+            guestOffer = "handoff";
+          }
+          errorMessage = "Esta opção de atendimento não está mais disponível.";
           return;
         }
         if (response.status === 401) {
@@ -1822,7 +1852,7 @@
           {/each}
 
           {#if activeDepartment === "support" && !handoffRequested && !ticketRequested && !assistantSending}
-            {#if supportEntryOptions.length > 0 && !selectedSupportOption}
+            {#if supportEntryOptions.length > 0 && (!selectedSupportOption || selectedSupportOption.initialHandling === "human")}
               <div class="ml-10 space-y-2" aria-label="Opções cadastradas">
                 {#each supportEntryOptions as option (option.id)}
                   <button type="button" on:click={() => void selectSupportOption(option)} class="flex w-full items-center gap-2 rounded-xl border border-[#DDE1E9] bg-white px-3 py-2.5 text-left">
