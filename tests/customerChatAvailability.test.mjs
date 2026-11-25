@@ -40,7 +40,7 @@ test("assistant exposes support actions during business hours and offers tickets
 });
 
 test("eligible chats can convert outside hours independently of waiting rules", () => {
-  assert.match(waiting, /if \(!canConvert\) return \{ waitingSinceMs, offerTicket: false \}/);
+  assert.match(waiting, /if \(!canConvert \|\| chat\?\.hasHumanResponse \|\| waitingSinceMs === null\) \{\s*return \{ waitingSinceMs, offerTicket: false \}/);
   assert.match(waiting, /const delayedOffer = settings\.enabled && settings\.offerTicket/);
   assert.match(waiting, /offerTicket: availability\?\.isOpen === false/);
   assert.match(offer, /outsideSupportHours \? "Fora do horário de atendimento"/);
@@ -57,4 +57,17 @@ test("one form preserves context and prevents repeated submissions", () => {
   assert.match(repository, /\.onConflictDoNothing\(\{ target: tickets\.id \}\)/);
   assert.match(repository, /Histórico do Assistente F10/);
   assert.match(bridge, /Histórico do Assistente F10/);
+});
+
+test("queue conversion offer ends after the first public human response", () => {
+  const query = source("src/lib/server/support/chatWaitingQuery.ts");
+  assert.match(waiting, /hasHumanResponse: chatHasHumanResponse\(\)/);
+  assert.match(query, /"web_chat_sessions"\."first_response_at" is not null/);
+  assert.match(query, /m\.session_id = "web_chat_sessions"\."id"\s*and m\.visibility = 'public' and m\.author_type = 'user'/);
+  assert.match(query, /m\.ticket_id = "web_chat_sessions"\."ticket_id"\s*and m\.visibility = 'public' and m\.author_type = 'user'\s*and m\.created_at >= "web_chat_sessions"\."created_at"/);
+  const gate = waiting.indexOf("if (!canConvert || chat?.hasHumanResponse || waitingSinceMs === null)");
+  assert.ok(gate >= 0 && gate < waiting.indexOf("const delayedOffer"));
+  assert.ok(gate < waiting.indexOf("const availability = await getSupportAvailabilityStatus()"));
+  assert.match(offer, /\{#if opened && ready\}/);
+  assert.match(offer, /\{:else if available && ready && !opened\}/);
 });

@@ -7,7 +7,7 @@ import { teamMembers, users } from "$lib/server/db/schema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { sendDevicePushAlerts } from "$lib/server/notifications/devicePush";
 import { getChatWaitingSettings, type ChatWaitingSettings } from "$lib/server/settings/chatWaitingSettingsRepository";
-import { chatWaitingSinceMs } from "$lib/server/support/chatWaitingQuery";
+import { chatHasHumanResponse, chatWaitingSinceMs } from "$lib/server/support/chatWaitingQuery";
 import { canAccessTicket, getUserSupportQueueIds } from "$lib/server/support/supportAccess";
 import { listSupportAgentPresence } from "$lib/server/support/supportAgentPresence";
 import { getChatEscalationLevel, type ChatEscalationLevel } from "$lib/support/chatOperationalPolicy";
@@ -25,6 +25,7 @@ export async function getPublicChatWaitingStatus(sessionId: string) {
     getChatWaitingSettings(),
     getDatabase().select({
       waitingSinceMs: chatWaitingSinceMs(),
+      hasHumanResponse: chatHasHumanResponse(),
       closedAt: webChatSessions.closedAt,
       aiState: webChatSessions.aiState,
       ticketId: webChatSessions.ticketId,
@@ -37,9 +38,11 @@ export async function getPublicChatWaitingStatus(sessionId: string) {
   const waitingSinceMs = chat?.waitingSinceMs ?? null;
   const canConvert = Boolean(chat && !chat.closedAt && chat.aiState !== "active"
     && (!chat.ticketId || (chat.ticketStatus && !["resolved", "closed"].includes(chat.ticketStatus))));
-  if (!canConvert) return { waitingSinceMs, offerTicket: false };
+  if (!canConvert || chat?.hasHumanResponse || waitingSinceMs === null) {
+    return { waitingSinceMs, offerTicket: false };
+  }
 
-  const delayedOffer = settings.enabled && settings.offerTicket && waitingSinceMs !== null
+  const delayedOffer = settings.enabled && settings.offerTicket
     && Date.now() - waitingSinceMs >= settings.delaySeconds * 1000;
   if (delayedOffer) return { waitingSinceMs, offerTicket: true };
 

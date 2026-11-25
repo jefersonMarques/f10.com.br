@@ -45,3 +45,21 @@ export function chatWaitingSinceMs() {
     )
   end`;
 }
+
+// A oferta de conversão ao cliente termina após a primeira resposta pública humana.
+export function chatHasHumanResponse() {
+  return sql<boolean>`(
+    "web_chat_sessions"."first_response_at" is not null
+    or exists (
+      select 1 from web_chat_messages m
+      where m.session_id = "web_chat_sessions"."id"
+        and m.visibility = 'public' and m.author_type = 'user'
+    )
+    or exists (
+      select 1 from ticket_messages m
+      where m.ticket_id = "web_chat_sessions"."ticket_id"
+        and m.visibility = 'public' and m.author_type = 'user'
+        and m.created_at >= "web_chat_sessions"."created_at"
+    )
+  )`;
+}
