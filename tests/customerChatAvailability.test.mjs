@@ -18,10 +18,14 @@ test("resume choice requires a positive authenticated server lookup", () => {
   assert.match(dialog, /session = null;\s*hasConfirmedActiveChat = false/);
 });
 
-test("assistant starts naturally and offers inline tickets only after an unresolved request", () => {
+test("assistant exposes support actions during business hours and offers tickets after unresolved requests outside hours", () => {
   assert.match(dialog, /guestOffer: "none" \| "handoff" \| "ticket" = "none"/);
   assert.match(dialog, /\{#if guestOffer !== "none"\}/);
-  assert.match(dialog, /guestOffer === "handoff" && \(status\?\.isOpen === true \|\| status\?\.hoursConfigured === false\)/);
+  assert.match(dialog, /canRequestHuman = status\?\.isOpen === true \|\| status\?\.hoursConfigured === false/);
+  assert.match(dialog, /\{#if canRequestHuman \|\| guestOffer !== "none"\}/);
+  assert.match(dialog, /\{#if canRequestHuman\}\s*<button[^\n]*requestHumanSupport\(\)[^\n]*Falar com a equipe/);
+  assert.match(dialog, /guestOffer === "none" \? "ml-10 flex flex-wrap gap-2"/);
+  assert.equal((dialog.match(/on:click=\{\(\) => void requestHumanSupport\(\)\}/g) ?? []).length, 1);
   assert.doesNotMatch(dialog, /href="\/cliente\/chamados\/novo"/);
   assert.match(dialog, /on:click=\{\(\) => void requestTicket\(\)\}/);
   assert.match(dialog, /bind:opened=\{ticketFormOpen\}/);

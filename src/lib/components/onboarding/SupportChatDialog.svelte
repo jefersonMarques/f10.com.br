@@ -232,6 +232,7 @@
     selectedEntryOptionLabel = "";
   }
   $: activeDepartment = entryDepartment;
+  $: canRequestHuman = status?.isOpen === true || status?.hoursConfigured === false;
   let initializedDepartment: "support" | "finance" | null = null;
   let authState: AuthState = {
     authenticated: false,
@@ -1782,16 +1783,18 @@
           {/each}
 
           {#if activeDepartment === "support" && !handoffRequested && !ticketRequested && !assistantSending}
-            {#if guestOffer !== "none"}
-              <section class="ml-10 space-y-2 rounded-2xl border border-[#DDE2EB] bg-white p-3.5 shadow-sm" aria-label="Opções de atendimento">
+            {#if canRequestHuman || guestOffer !== "none"}
+              <section class={guestOffer === "none" ? "ml-10 flex flex-wrap gap-2" : "ml-10 space-y-2 rounded-2xl border border-[#DDE2EB] bg-white p-3.5 shadow-sm"} aria-label="Opções de atendimento">
                 {#if status?.isOpen === false}
                   <p class="text-[13px] leading-5 text-[#596171]">{status.nextOpenLabel ? "Nossa equipe retorna " + status.nextOpenLabel.toLowerCase() + "." : "Nossa equipe retorna no próximo expediente."} Você pode abrir um chamado aqui mesmo.</p>
                 {/if}
-                <button type="button" on:click={() => void requestTicket()} class="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[14px] font-semibold text-white"><Ticket size={16}/> Abrir chamado</button>
-                {#if guestOffer === "handoff" && (status?.isOpen === true || status?.hoursConfigured === false)}
-                  <button type="button" on:click={() => void requestHumanSupport()} class="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#DDE1E9] text-[13px] font-semibold text-[#000A57]"><UserRound size={15}/> Falar com a equipe</button>
+                {#if canRequestHuman}
+                  <button type="button" on:click={() => void requestHumanSupport()} class={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#F3B88D] bg-[#FFF6EE] px-3 text-[13px] font-semibold text-[#A84B08] ${guestOffer === "none" ? "" : "w-full"}`}><UserRound size={16}/> Falar com a equipe</button>
                 {/if}
-                <button type="button" on:click={() => (guestOffer = "none")} class="min-h-9 w-full text-[13px] font-medium text-[#596171]">Continuar com o assistente</button>
+                <button type="button" on:click={() => void requestTicket()} class={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold ${guestOffer === "none" ? "border border-[#DDE1E9] bg-white text-[#000A57]" : "w-full bg-[#000A57] text-white"}`}><Ticket size={16}/> Abrir chamado</button>
+                {#if guestOffer !== "none"}
+                  <button type="button" on:click={() => (guestOffer = "none")} class="min-h-9 w-full text-[13px] font-medium text-[#596171]">Continuar com o assistente</button>
+                {/if}
               </section>
             {/if}
             {#if authState.authenticated && !authState.requiresUnitSelection && hasConfirmedActiveChat}
