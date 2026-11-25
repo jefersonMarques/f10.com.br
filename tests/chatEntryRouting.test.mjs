@@ -4,6 +4,8 @@ import {
   isFinancialChatOption,
   filterChatOptionsByDepartment,
   getFinanceEntryAction,
+  isChatEntryVisible,
+  canStartHumanChat,
 } from "../src/lib/support/chatEntryRouting.ts";
 
 test("financial routing requires an active Financeiro team association", () => {
@@ -60,4 +62,22 @@ test("finance entry action follows handling and explicit PIX intent", () => {
     teamName: "Helpdesk",
     initialHandling: "ai",
   }), null);
+});
+
+test("entry visibility defaults to business hours, respects explicit outside-hours flag and inactive entries", () => {
+  const open = { isOpen: true, hoursConfigured: true };
+  const closed = { isOpen: false, hoursConfigured: true };
+  const unconfigured = { isOpen: null, hoursConfigured: false };
+  const support = { label: "Suporte", initialHandling: "ai" };
+  const enabled = { ...support, showOutsideHours: true };
+  assert.equal(isChatEntryVisible(support, open), true);
+  assert.equal(isChatEntryVisible(support, closed), false);
+  assert.equal(isChatEntryVisible(enabled, closed), true);
+  assert.equal(isChatEntryVisible({ ...enabled, active: false }, open), false);
+  assert.equal(isChatEntryVisible(support, unconfigured), true);
+  assert.equal(isChatEntryVisible(enabled, null), false);
+  assert.equal(canStartHumanChat(enabled, closed), false);
+  assert.equal(canStartHumanChat({ ...enabled, initialHandling: "human" }, closed), true);
+  assert.equal(canStartHumanChat(support, open), true);
+  assert.equal(canStartHumanChat({ ...enabled, label: "Gerar PIX", teamName: "Financeiro" }, closed), false);
 });

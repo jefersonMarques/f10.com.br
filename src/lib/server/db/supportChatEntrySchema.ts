@@ -27,6 +27,7 @@ export const supportChatEntryOptions = pgTable(
       .notNull()
       .default("ai"),
     active: boolean("active").notNull().default(true),
+    showOutsideHours: boolean("show_outside_hours").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(10),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

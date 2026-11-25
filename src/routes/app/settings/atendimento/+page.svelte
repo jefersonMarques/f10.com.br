@@ -163,7 +163,7 @@
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF2E8] text-[#C85C08]"><MessagesSquare size={18}/></span>
       <div>
         <h2 class="text-[14px] font-semibold text-app-text">Entrada do chat</h2>
-        <p class="application-text-meta mt-1 max-w-[760px] leading-4 text-[#858B99]">As opções aparecem antes do formulário do cliente. Cada opção direciona para uma fila; a fila define a equipe, o prazo padrão de conclusão e, no modo automático, somente integrantes elegíveis e Online entram no round-robin.</p>
+        <p class="application-text-meta mt-1 max-w-[760px] leading-4 text-[#858B99]">Cada opção direciona para uma fila. Fora do expediente, somente as opções liberadas aparecem. Atendimento humano liberado nesse período entra na fila, sem promessa de resposta imediata.</p>
       </div>
     </div>
 
@@ -188,6 +188,7 @@
             <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Ordem</span><input name="sortOrder" type="number" min="0" max="10000" value={option.sortOrder} class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-app-surface px-2"/></label>
             <div class="flex flex-wrap items-center gap-3 lg:col-span-5">
               <label class="application-text-meta flex items-center gap-2 font-semibold text-[#626978]"><input name="active" type="checkbox" checked={option.active} class="h-4 w-4 rounded border-[#C9CEDA]"/>Exibir no chat</label>
+              <label class="application-text-caption flex items-center gap-2 font-semibold text-[#626978]"><input name="showOutsideHours" type="checkbox" checked={option.showOutsideHours} class="h-4 w-4 rounded border-[#C9CEDA]"/>Exibir fora do horário de atendimento</label>
               <button type="submit" class="application-text-meta inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white"><Save size={13}/>Salvar</button>
             </div>
           </form>
@@ -208,6 +209,7 @@
         <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Atendimento inicial</span><select name="initialHandling" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-app-surface px-2"><option value="ai">Automação + humano</option><option value="human">Humano</option></select></label>
         <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Ordem</span><input name="sortOrder" type="number" min="0" max="10000" value="10" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-app-surface px-2"/></label>
         <label class="application-text-meta flex items-center gap-2 font-semibold text-[#626978]"><input name="active" type="checkbox" checked class="h-4 w-4 rounded border-[#C9CEDA]"/>Exibir no chat</label>
+        <label class="application-text-caption flex items-center gap-2 font-semibold text-[#626978]"><input name="showOutsideHours" type="checkbox" class="h-4 w-4 rounded border-[#C9CEDA]"/>Exibir fora do horário de atendimento</label>
         <div class="sm:col-span-2 lg:col-span-3"><button type="submit" class="application-text-meta inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white"><Plus size={13}/>Criar opção</button></div>
       </form>
     </details>

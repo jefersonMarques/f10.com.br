@@ -6,6 +6,8 @@ type ChatEntryRoute = {
   queueCode?: string;
   teamName?: string | null;
   initialHandling?: "ai" | "human";
+  showOutsideHours?: boolean;
+  active?: boolean;
 };
 
 function normalizeRouteText(value: string): string {
@@ -42,4 +44,29 @@ export function getFinanceEntryAction(
     return "pix";
   }
   return null;
+}
+
+export type ChatEntryAvailability = {
+  isOpen: boolean | null;
+  hoursConfigured: boolean;
+};
+
+export function isChatEntryVisible(
+  option: ChatEntryRoute,
+  availability: ChatEntryAvailability | null,
+): boolean {
+  if (option.active === false || !availability) return false;
+  if (availability.isOpen === true || availability.hoursConfigured === false) return true;
+  return availability.isOpen === false && option.showOutsideHours === true;
+}
+
+export function canStartHumanChat(
+  option: ChatEntryRoute,
+  availability: ChatEntryAvailability | null,
+): boolean {
+  if (!isChatEntryVisible(option, availability)) return false;
+  if (getFinanceEntryAction(option) === "pix") return false;
+  // Fora do expediente, somente uma opção humana explicitamente liberada abre fila.
+  return availability?.isOpen === true || availability?.hoursConfigured === false
+    || option.initialHandling === "human";
 }

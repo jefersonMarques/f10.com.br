@@ -21,7 +21,8 @@ test("help center and customer portal mount one shared chat implementation", () 
 
 test("single human handoff CTA and legacy session migration are preserved", () => {
   const chat = read("src/lib/components/onboarding/SupportChatDialog.svelte");
-  assert.equal((chat.match(/on:click=\{\(\) => void requestHumanSupport\(\)\}/g) ?? []).length, 1);
+  assert.match(chat, /on:click=\{\(\) => humanSupportOption && void requestHumanSupport\(humanSupportOption\)\}/);
+  assert.match(chat, /on:click=\{\(\) => void selectSupportOption\(option\)\}/);
   assert.match(chat, /SUPPORT_ASSISTANT_GUEST_KEY/);
   assert.match(chat, /SUPPORT_CHAT_SESSION_KEY/);
   assert.match(chat, /Headset size=\{19\}/);

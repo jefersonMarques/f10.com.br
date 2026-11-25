@@ -78,6 +78,7 @@ function readEntryOption(formData: FormData) {
     queueId,
     initialHandling,
     active: formData.has("active"),
+    showOutsideHours: formData.has("showOutsideHours"),
     sortOrder,
   };
 }

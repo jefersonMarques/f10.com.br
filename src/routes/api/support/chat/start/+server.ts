@@ -9,7 +9,7 @@ import {
   listPublicSupportChatEntryOptions,
   resolveSupportChatEntryOption,
 } from "$lib/server/support/supportChatEntryRepository";
-import { getFinanceEntryAction, isFinancialChatOption, type PublicChatDepartment } from "$lib/support/chatEntryRouting";
+import { canStartHumanChat, getFinanceEntryAction, isFinancialChatOption, type PublicChatDepartment } from "$lib/support/chatEntryRouting";
 import { resumeActiveCustomerChatSession } from "$lib/server/support/customerChatSessionRepository";
 import {
   addPublicChatSystemMessage,
@@ -53,41 +53,18 @@ function sanitizeContextUrl(value: string): string {
   }
 }
 
-async function resolveEffectiveEntryOptionId(
+async function resolveEffectiveEntryOption(
   entryOptionId: string | null,
   department: PublicChatDepartment,
-): Promise<string | null> {
-  const options = await listPublicSupportChatEntryOptions();
-
-  if (department === "finance") {
-    if (entryOptionId) {
-      const option = options.find((item) => item.id === entryOptionId);
-      if (option && getFinanceEntryAction(option) === "human") {
-        return option.id;
-      }
-      throw new Error("CHAT_ENTRY_OPTION_NOT_FOUND");
-    }
-
-    const humanOption = options.find(
-      (option) => getFinanceEntryAction(option) === "human",
-    );
-    if (!humanOption) throw new Error("FINANCE_QUEUE_UNAVAILABLE");
-    return humanOption.id;
-  }
-
-  if (entryOptionId) {
-    const option = options.find((item) => item.id === entryOptionId);
-    if (!option || isFinancialChatOption(option)) {
-      throw new Error("CHAT_ENTRY_OPTION_NOT_FOUND");
-    }
-    return option.id;
-  }
-
-  const supportOptions = options.filter((option) => !isFinancialChatOption(option));
-  const preferred = supportOptions.find((option) => option.queueCode === "support")
-    ?? supportOptions.find((option) => option.initialHandling === "human")
-    ?? supportOptions[0];
-  return preferred?.id ?? null;
+) {
+  const options = (await listPublicSupportChatEntryOptions()).filter((option) =>
+    department === "finance" ? getFinanceEntryAction(option) === "human" : !isFinancialChatOption(option),
+  );
+  const option = entryOptionId
+    ? options.find((item) => item.id === entryOptionId)
+    : options.length === 1 ? options[0] : null;
+  if (!option) throw new Error("CHAT_ENTRY_OPTION_NOT_FOUND");
+  return option;
 }
 
 function buildOutOfHoursMessage(nextOpenLabel: string | null): string {
@@ -204,30 +181,24 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
   };
 
   try {
-    const [effectiveEntryOptionId, availability] = await Promise.all([
-      resolveEffectiveEntryOptionId(entryOptionId, department),
-      getSupportAvailabilityStatus(),
-    ]);
-
-    const requestedQueueId = department === "finance"
-      ? (await resolveSupportChatEntryOption(effectiveEntryOptionId)).queueId
-      : null;
-
-    const resumedSession = await resumeActiveCustomerChatSession({
-      requiredQueueId: requestedQueueId,
-      customerContext,
-      handoffReason,
-      requestHuman: department !== "support" || availability.isOpen !== false,
-    });
+    const availability = await getSupportAvailabilityStatus();
+    // Recuperar uma conversa existente não depende das opções atuais de entrada.
+    const resumedSession = await resumeActiveCustomerChatSession({ customerContext });
+    let effectiveEntryOptionId: string | null = null;
+    let requestedQueueId: string | null = null;
     let existingSession = resumedSession;
     let session;
 
     if (existingSession) {
+      if (existingSession.department !== department) throw new Error("CHAT_QUEUE_MISMATCH");
       session = existingSession;
     } else {
-      if (department === "support" && availability.isOpen === false) {
+      const option = await resolveEffectiveEntryOption(entryOptionId, department);
+      if (!canStartHumanChat(option, availability)) {
         return json({ error: "SUPPORT_OUTSIDE_HOURS", nextOpenLabel: availability.nextOpenLabel }, { status: 409, headers: { "Cache-Control": "no-store" } });
       }
+      effectiveEntryOptionId = option.id;
+      requestedQueueId = (await resolveSupportChatEntryOption(option.id)).queueId;
       try {
         session = await startPublicChat(clientAddress, {
           name,

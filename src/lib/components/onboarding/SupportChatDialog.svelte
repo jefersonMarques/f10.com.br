@@ -16,6 +16,8 @@
   import {
     filterChatOptionsByDepartment,
     getFinanceEntryAction,
+    isChatEntryVisible,
+    canStartHumanChat,
     type FinanceEntryAction,
   } from "$lib/support/chatEntryRouting";
   import {
@@ -128,6 +130,7 @@
     teamName?: string | null;
     description: string;
     initialHandling: "ai" | "human";
+    showOutsideHours: boolean;
   };
 
   type PendingImage = {
@@ -192,9 +195,15 @@
   let guestMessages: GuestMessage[] = [];
   let status: SupportStatus | null = null;
   let entryOptions: EntryOption[] = [];
-  $: financeEntryOptions = filterChatOptionsByDepartment(entryOptions, "finance")
+  $: visibleEntryOptions = entryOptions.filter((option) => isChatEntryVisible(option, status));
+  $: financeEntryOptions = filterChatOptionsByDepartment(visibleEntryOptions, "finance")
     .filter((option) => getFinanceEntryAction(option) !== null);
-  let entryOptionsLoaded = false;
+  $: supportEntryOptions = filterChatOptionsByDepartment(visibleEntryOptions, "support");
+  $: selectedSupportOption = supportEntryOptions.find((option) => option.id === selectedEntryOptionId);
+  $: humanSupportOption = selectedSupportOption?.initialHandling === "ai" && canStartHumanChat(selectedSupportOption, status)
+    ? selectedSupportOption : supportEntryOptions.length === 1 && supportEntryOptions[0].initialHandling === "ai"
+      && canStartHumanChat(supportEntryOptions[0], status) ? supportEntryOptions[0] : null;
+  $: canRequestHuman = humanSupportOption !== null;
   let entryOptionsLoading = false;
   let selectedEntryOptionId = "";
   let selectedEntryOptionLabel = "";
@@ -232,7 +241,7 @@
     selectedEntryOptionLabel = "";
   }
   $: activeDepartment = entryDepartment;
-  $: canRequestHuman = status?.isOpen === true || status?.hoursConfigured === false;
+  $: canOpenTicket = status?.isOpen === true || status?.hoursConfigured === false || guestOffer !== "none";
   let initializedDepartment: "support" | "finance" | null = null;
   let authState: AuthState = {
     authenticated: false,
@@ -248,7 +257,7 @@
   $: if (browser && isOpen && !restored) restoreStoredState();
   $: if (browser) syncPolling(isOpen && !authRequiredForSession && !resumeLoading, session?.sessionId ?? "");
   $: if (browser) syncStatusPolling(isOpen);
-  $: if (browser && isOpen && !entryOptionsLoaded && !entryOptionsLoading) void refreshEntryOptions();
+
   $: if (browser && isOpen && restored && initializedDepartment !== activeDepartment) {
     initializedDepartment = activeDepartment;
     if (activeDepartment === "finance" && !resumeOnly && !ticketRequested) {
@@ -598,8 +607,10 @@
 
     if (!shouldPoll) return;
     void refreshStatus();
+    void refreshEntryOptions();
     statusTimer = setInterval(() => {
       void refreshStatus();
+      void refreshEntryOptions();
       void checkActiveChatAvailability();
     }, 60_000);
   }
@@ -607,23 +618,24 @@
   async function refreshStatus(): Promise<void> {
     try {
       const response = await fetch("/api/support/chat/status", { cache: "no-store" });
-      if (response.ok) status = await response.json() as SupportStatus;
+      status = response.ok ? await response.json() as SupportStatus : null;
     } catch {
+      status = null;
       // O chat continua funcional mesmo sem o indicador de disponibilidade.
     }
   }
 
   async function refreshEntryOptions(): Promise<void> {
+    if (entryOptionsLoading) return;
     entryOptionsLoading = true;
     try {
       const response = await fetch("/api/support/chat/options", { cache: "no-store" });
-      if (!response.ok) return;
+      if (!response.ok) { entryOptions = []; return; }
       const payload = await response.json() as { options?: EntryOption[] };
       entryOptions = Array.isArray(payload.options) ? payload.options : [];
     } catch {
       entryOptions = [];
     } finally {
-      entryOptionsLoaded = true;
       entryOptionsLoading = false;
     }
   }
@@ -672,12 +684,12 @@
   }
 
   function buildAssistantContext(): string {
-    return guestMessages
+    const context = guestMessages
       .filter((message) => message.role === "customer")
       .slice(-6)
       .map((message) => `Cliente: ${message.body.trim()}`)
-      .join("\n")
-      .slice(0, 3_000);
+      .join("\n");
+    return `${selectedEntryOptionLabel ? `Assunto: ${selectedEntryOptionLabel}\n` : ""}${context}`.slice(0, 3_000);
   }
 
   function updateUnresolvedCount(value: unknown): void {
@@ -711,6 +723,7 @@
   }
 
   async function selectFinanceOption(option: EntryOption): Promise<void> {
+    if (!isChatEntryVisible(option, status)) return;
     const action = getFinanceEntryAction(option);
     if (!action) return;
 
@@ -868,15 +881,46 @@
     }
   }
 
-  async function requestHumanSupport(): Promise<void> {
-    if (activeDepartment === "support") {
-      await refreshStatus();
-      if (status?.isOpen === false) {
-        guestOffer = "handoff";
-        await scrollToLatest();
-        return;
-      }
+  async function selectSupportOption(option: EntryOption): Promise<void> {
+    if (!isChatEntryVisible(option, status)) return;
+    selectedEntryOptionId = option.id;
+    selectedEntryOptionLabel = option.label;
+    errorMessage = "";
+    if (option.initialHandling === "human") {
+      await requestHumanSupport();
+      return;
     }
+    guestMessages = [...guestMessages,
+      createGuestMessage("customer", option.label),
+      createGuestMessage("assistant", "Conte um pouco mais sobre o que precisa.")];
+    await scrollToLatest();
+  }
+
+  async function ensureHumanEntryAvailable(): Promise<boolean> {
+    await refreshStatus();
+    await refreshEntryOptions();
+    const option = entryOptions.find((item) => item.id === selectedEntryOptionId);
+    if (option && canStartHumanChat(option, status)) return true;
+    handoffRequested = false;
+    if (activeDepartment === "finance") {
+      resetFinanceChoice();
+      errorMessage = "Esta opção de atendimento não está mais disponível.";
+    } else {
+      guestOffer = "handoff";
+      selectedEntryOptionId = "";
+      selectedEntryOptionLabel = "";
+      errorMessage = "";
+    }
+    await scrollToLatest();
+    return false;
+  }
+
+  async function requestHumanSupport(option?: EntryOption): Promise<void> {
+    if (option) {
+      selectedEntryOptionId = option.id;
+      selectedEntryOptionLabel = option.label;
+    }
+    if (!await ensureHumanEntryAvailable()) return;
     resumeOnly = false;
     handoffRequested = true;
     errorMessage = "";
@@ -1031,15 +1075,7 @@
 
   async function startHumanChat(checkedActiveChat = false): Promise<void> {
     if (session || starting || resumeLoading || !authState.authenticated || ticketRequested) return;
-    if (activeDepartment === "support") {
-      await refreshStatus();
-      if (status?.isOpen === false) {
-        handoffRequested = false;
-        guestOffer = "handoff";
-        await scrollToLatest();
-        return;
-      }
-    }
+    if (!await ensureHumanEntryAvailable()) return;
     if (authState.requiresNameConfirmation) {
       authStep = "profile";
       await scrollToLatest();
@@ -1086,6 +1122,8 @@
           };
           guestOffer = "handoff";
           handoffRequested = false;
+          await refreshEntryOptions();
+          if (activeDepartment === "finance") resetFinanceChoice();
           await scrollToLatest();
           return;
         }
@@ -1618,12 +1656,13 @@
                 </span>
                 <span class="min-w-0 flex-1">
                   <strong class="block text-[13px] font-semibold text-[#18233D]">
-                    {getFinanceEntryAction(option) === "human" ? "Falar com financeiro" : "Gerar PIX"}
+                    {option.label}
                   </strong>
                   <span class="mt-0.5 block text-[12px] text-[#747D8F]">
-                    {getFinanceEntryAction(option) === "human"
-                      ? "Tire dúvidas com nossa equipe"
-                      : "Selecione uma parcela em aberto"}
+                    {option.description}
+                    {#if status?.isOpen === false && getFinanceEntryAction(option) === "human"}
+                      <span class="block text-[#A65B13]">Entrada na fila · {status.nextOpenLabel ?? "próximo expediente"}</span>
+                    {/if}
                   </span>
                 </span>
                 <ChevronRight size={18} class="shrink-0 text-[#8D97AA]" aria-hidden="true"/>
@@ -1783,15 +1822,34 @@
           {/each}
 
           {#if activeDepartment === "support" && !handoffRequested && !ticketRequested && !assistantSending}
-            {#if canRequestHuman || guestOffer !== "none"}
+            {#if supportEntryOptions.length > 0 && !selectedSupportOption}
+              <div class="ml-10 space-y-2" aria-label="Opções cadastradas">
+                {#each supportEntryOptions as option (option.id)}
+                  <button type="button" on:click={() => void selectSupportOption(option)} class="flex w-full items-center gap-2 rounded-xl border border-[#DDE1E9] bg-white px-3 py-2.5 text-left">
+                    {#if option.initialHandling === "human"}<UserRound size={16} class="shrink-0 text-[#A84B08]"/>{:else}<MessageCircleMore size={16} class="shrink-0 text-[#000A57]"/>{/if}
+                    <span class="min-w-0 flex-1">
+                      <strong class="block text-[13px] font-semibold text-[#18233D]">{option.label}</strong>
+                      {#if option.description}<span class="block text-[12px] text-[#697184]">{option.description}</span>{/if}
+                      {#if option.initialHandling === "human" && status?.isOpen === false}
+                        <span class="block text-[12px] text-[#A65B13]">Entrada na fila · {status.nextOpenLabel ?? "próximo expediente"}</span>
+                      {/if}
+                    </span>
+                    <ChevronRight size={15} class="shrink-0 text-[#8D97AA]"/>
+                  </button>
+                {/each}
+              </div>
+            {:else if selectedSupportOption}
+              <button type="button" on:click={() => { selectedEntryOptionId = ""; selectedEntryOptionLabel = ""; }} class="ml-10 text-[12px] font-medium text-[#596171]">Alterar assunto</button>
+            {/if}
+            {#if canRequestHuman || canOpenTicket}
               <section class={guestOffer === "none" ? "ml-10 flex flex-wrap gap-2" : "ml-10 space-y-2 rounded-2xl border border-[#DDE2EB] bg-white p-3.5 shadow-sm"} aria-label="Opções de atendimento">
                 {#if status?.isOpen === false}
                   <p class="text-[13px] leading-5 text-[#596171]">{status.nextOpenLabel ? "Nossa equipe retorna " + status.nextOpenLabel.toLowerCase() + "." : "Nossa equipe retorna no próximo expediente."} Você pode abrir um chamado aqui mesmo.</p>
                 {/if}
                 {#if canRequestHuman}
-                  <button type="button" on:click={() => void requestHumanSupport()} class={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#F3B88D] bg-[#FFF6EE] px-3 text-[13px] font-semibold text-[#A84B08] ${guestOffer === "none" ? "" : "w-full"}`}><UserRound size={16}/> Falar com a equipe</button>
+                  <button type="button" on:click={() => humanSupportOption && void requestHumanSupport(humanSupportOption)} class={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#F3B88D] bg-[#FFF6EE] px-3 text-[13px] font-semibold text-[#A84B08] ${guestOffer === "none" ? "" : "w-full"}`}><UserRound size={16}/> Falar com a equipe</button>
                 {/if}
-                <button type="button" on:click={() => void requestTicket()} class={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold ${guestOffer === "none" ? "border border-[#DDE1E9] bg-white text-[#000A57]" : "w-full bg-[#000A57] text-white"}`}><Ticket size={16}/> Abrir chamado</button>
+                {#if canOpenTicket}<button type="button" on:click={() => void requestTicket()} class={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold ${guestOffer === "none" ? "border border-[#DDE1E9] bg-white text-[#000A57]" : "w-full bg-[#000A57] text-white"}`}><Ticket size={16}/> Abrir chamado</button>{/if}
                 {#if guestOffer !== "none"}
                   <button type="button" on:click={() => (guestOffer = "none")} class="min-h-9 w-full text-[13px] font-medium text-[#596171]">Continuar com o assistente</button>
                 {/if}

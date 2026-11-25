@@ -15,6 +15,7 @@ export type SupportChatEntryOptionInput = {
   queueId: string;
   initialHandling: SupportChatInitialHandling;
   active: boolean;
+  showOutsideHours: boolean;
   sortOrder: number;
 };
 
@@ -27,6 +28,7 @@ export async function listPublicSupportChatEntryOptions() {
       teamName: teams.name,
       description: supportChatEntryOptions.description,
       initialHandling: supportChatEntryOptions.initialHandling,
+      showOutsideHours: supportChatEntryOptions.showOutsideHours,
     })
     .from(supportChatEntryOptions)
     .innerJoin(supportQueues, eq(supportChatEntryOptions.queueId, supportQueues.id))
@@ -51,6 +53,7 @@ export async function resolveSupportChatEntryOption(optionId: string | null) {
         queueId: supportChatEntryOptions.queueId,
         defaultDueDays: supportQueues.defaultDueDays,
         initialHandling: supportChatEntryOptions.initialHandling,
+        showOutsideHours: supportChatEntryOptions.showOutsideHours,
       })
       .from(supportChatEntryOptions)
       .innerJoin(supportQueues, eq(supportChatEntryOptions.queueId, supportQueues.id))
@@ -82,6 +85,7 @@ export async function resolveSupportChatEntryOption(optionId: string | null) {
     queueId: fallback.queueId,
     defaultDueDays: fallback.defaultDueDays,
     initialHandling: "ai" as const,
+    showOutsideHours: false,
   };
 }
 
@@ -96,6 +100,7 @@ export async function getSupportChatEntrySettings() {
         queueId: supportChatEntryOptions.queueId,
         queueName: supportQueues.name,
         initialHandling: supportChatEntryOptions.initialHandling,
+        showOutsideHours: supportChatEntryOptions.showOutsideHours,
         active: supportChatEntryOptions.active,
         sortOrder: supportChatEntryOptions.sortOrder,
       })
@@ -151,6 +156,7 @@ export async function createSupportChatEntryOption(
       queueId: input.queueId,
       initialHandling: input.initialHandling,
       active: input.active,
+      showOutsideHours: input.showOutsideHours,
       sortOrder: input.sortOrder,
     })
     .returning({ id: supportChatEntryOptions.id });
@@ -161,7 +167,7 @@ export async function createSupportChatEntryOption(
     action: "operations.support_chat.entry_option.created",
     entityType: "support_chat_entry_option",
     entityId: created.id,
-    metadata: { queueId: input.queueId, initialHandling: input.initialHandling },
+    metadata: { queueId: input.queueId, initialHandling: input.initialHandling, showOutsideHours: input.showOutsideHours },
   });
 }
 
@@ -179,6 +185,7 @@ export async function updateSupportChatEntryOption(
       queueId: input.queueId,
       initialHandling: input.initialHandling,
       active: input.active,
+      showOutsideHours: input.showOutsideHours,
       sortOrder: input.sortOrder,
       updatedAt: new Date(),
     })
@@ -191,7 +198,7 @@ export async function updateSupportChatEntryOption(
     action: "operations.support_chat.entry_option.updated",
     entityType: "support_chat_entry_option",
     entityId: updated.id,
-    metadata: { queueId: input.queueId, initialHandling: input.initialHandling, active: input.active },
+    metadata: { queueId: input.queueId, initialHandling: input.initialHandling, active: input.active, showOutsideHours: input.showOutsideHours },
   });
 }
 
