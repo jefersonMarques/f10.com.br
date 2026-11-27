@@ -69,6 +69,7 @@
   let contactMatches: Contact[] = [];
   let contractTimer: ReturnType<typeof setTimeout> | null = null;
   let contactTimer: ReturnType<typeof setTimeout> | null = null;
+  let relationshipsRequestId = 0;
   let contractRequestId = 0;
   let contactRequestId = 0;
 
@@ -95,11 +96,13 @@
   onDestroy(() => {
     if (contractTimer) clearTimeout(contractTimer);
     if (contactTimer) clearTimeout(contactTimer);
+    relationshipsRequestId += 1;
     contractRequestId += 1;
     contactRequestId += 1;
   });
 
   async function loadRelationships(): Promise<void> {
+    const requestId = ++relationshipsRequestId;
     loading = true;
     try {
       const response = await fetch(
@@ -107,17 +110,23 @@
         { cache: "no-store" },
       );
       if (!response.ok) throw new Error(response.status === 403 ? "RELATIONSHIPS_FORBIDDEN" : "RELATIONSHIPS_LOAD_FAILED");
-      data = await response.json() as Relationships;
+      const next = await response.json() as Relationships;
+      if (requestId !== relationshipsRequestId) return;
+      data = next;
       errorMessage = "";
     } catch (cause) {
+      if (requestId !== relationshipsRequestId) return;
+      data = null;
       errorMessage = cause instanceof Error && cause.message === "RELATIONSHIPS_FORBIDDEN"
         ? "Seu perfil não possui permissão para consultar os contratos F10 deste ticket."
         : "Não foi possível carregar empresas e pessoas deste ticket.";
     } finally {
-      loading = false;
-      if (contractSearchDialog?.open) {
-        await tick();
-        contractSearchInput?.focus();
+      if (requestId === relationshipsRequestId) {
+        loading = false;
+        if (contractSearchDialog?.open) {
+          await tick();
+          contractSearchInput?.focus();
+        }
       }
     }
   }

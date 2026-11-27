@@ -161,7 +161,7 @@ test("contract relationships resolve the explicitly linked requester before the 
   assert.match(repository, /await assertContact\(tx, ticket.contactId\)/);
   assert.match(repository, /expectedRequesterContactId && ticket.contactId !== expectedRequesterContactId/);
   assert.match(api, /hasPermission\(permissions, "customers.manage", "all"\)/);
-  assert.match(requester, /\.limit\(1\)\.for\("update"\)/);
+  assert.equal((requester.match(/\.limit\(1\)\.for\("update"\)/g) ?? []).length, 2);
   assert.match(inline, /showModal\(\);\s*await loadRelationships\(\)/);
   assert.match(inline, /JSON.stringify\(\{ action, \.\.\.options, expectedRequesterContactId \}\)/);
   assert.doesNotMatch(repository, /UPDATE tickets SET customer_contact_id/);
