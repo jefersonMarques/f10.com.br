@@ -46,10 +46,11 @@ export const load: PageServerLoad = async ({ parent, params, setHeaders }) => {
     throw error(403, "Acesso não autorizado.");
   }
   const result = await getDatabase().execute(sql`
-    SELECT t.customer_contact_id::text AS "contactId", c.name, c.email,
-      t.ticket_number AS "ticketNumber", t.subject
+    SELECT coalesce(rp.customer_contact_id, t.customer_contact_id)::text AS "contactId",
+      c.name, c.email, t.ticket_number AS "ticketNumber", t.subject
     FROM tickets t
-    LEFT JOIN customer_contacts c ON c.id = t.customer_contact_id
+    LEFT JOIN ticket_requester_profiles rp ON rp.ticket_id = t.id
+    LEFT JOIN customer_contacts c ON c.id = coalesce(rp.customer_contact_id, t.customer_contact_id)
     WHERE t.id = ${ticketId}::uuid
   `);
   const ticket = (result as unknown as Array<{

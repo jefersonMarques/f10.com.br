@@ -26,6 +26,7 @@ type UpdateInput = {
   contractId?: string;
   contactId?: string;
   grantToRequester?: boolean;
+  expectedRequesterContactId?: string;
   notificationsEnabled?: boolean;
 };
 
@@ -69,7 +70,8 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
   );
 
   const result = await getDatabase().execute(sql`
-    SELECT t.customer_contact_id::text AS "contactId",
+    SELECT coalesce(rp.customer_contact_id, t.customer_contact_id)::text AS "contactId",
+      t.customer_contact_id::text AS "originalContactId",
       rp.customer_contact_id::text AS "explicitContactId",
       coalesce(nullif(rp.display_name, ''), requester.name, c.name)
         AS "requesterName",
@@ -83,6 +85,7 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
   `);
   const ticket = (result as unknown as Array<{
     contactId: string | null;
+    originalContactId: string | null;
     explicitContactId: string | null;
     requesterName: string | null;
     requesterEmail: string | null;
@@ -102,7 +105,7 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
     contracts,
     participants: participants.filter((person) =>
       person.contactId !== ticket.contactId &&
-      person.contactId !== ticket.explicitContactId),
+      person.contactId !== ticket.originalContactId),
     allowedContracts,
     canEdit: hasPermission(permissions, "tickets.reply"),
     canManageCustomers: hasPermission(permissions, "customers.manage", "all"),
@@ -133,7 +136,12 @@ export const POST: RequestHandler = async ({ cookies, params, url, request }) =>
             !hasPermission(permissions, "customers.manage", "all")) {
           throw error(403, "Sem permissão para autorizar contratos.");
         }
-        await addTicketContract(ticketId, userId, contractId, grantAccess);
+        const expectedRequester = input.expectedRequesterContactId;
+        if (expectedRequester !== undefined &&
+            (typeof expectedRequester !== "string" || !UUID_PATTERN.test(expectedRequester))) {
+          throw error(400, "Solicitante inválido.");
+        }
+        await addTicketContract(ticketId, userId, contractId, grantAccess, expectedRequester);
         break;
       }
       case "removeContract":
@@ -174,7 +182,9 @@ export const POST: RequestHandler = async ({ cookies, params, url, request }) =>
     }
     const code = cause instanceof Error ? cause.message : "";
     const messages: Record<string, string> = {
-      SUPPORT_TICKET_REQUESTER_REQUIRED: "Selecione primeiro o solicitante principal.",
+      SUPPORT_TICKET_REQUESTER_REQUIRED: "Vincule um contato cadastrado como solicitante.",
+      SUPPORT_TICKET_REQUESTER_CHANGED: "O solicitante foi alterado. Abra novamente a busca de contratos.",
+      SUPPORT_CONTACT_NOT_FOUND: "O contato do solicitante não está ativo.",
       SUPPORT_TICKET_CONTRACT_REQUIRED: "O ticket deve manter ao menos um contrato.",
       SUPPORT_TICKET_CONTRACT_FORBIDDEN: "Solicitante sem autorização para este contrato.",
       SUPPORT_PARTICIPANT_CONTRACT_FORBIDDEN: "A pessoa não possui acesso a todas as empresas do ticket.",

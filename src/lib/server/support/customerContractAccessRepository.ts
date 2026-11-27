@@ -276,6 +276,26 @@ export async function saveTicketContracts(
   `);
 }
 
+async function lockTicketRequester(tx: Transaction, ticketId: string) {
+  // A leitura após o bloqueio respeita alterações concorrentes do solicitante.
+  const [ticket] = rows(await tx.execute(sql`
+    SELECT customer_contact_id::text AS original_contact_id
+    FROM tickets WHERE id = ${ticketId}::uuid FOR UPDATE
+  `));
+  if (!ticket) throw new Error("SUPPORT_TICKET_NOT_FOUND");
+
+  const [profile] = rows(await tx.execute(sql`
+    SELECT customer_contact_id::text AS contact_id
+    FROM ticket_requester_profiles WHERE ticket_id = ${ticketId}::uuid
+  `));
+  const contactId = profile?.contact_id ?? ticket.original_contact_id;
+  return {
+    contactId: typeof contactId === "string" ? contactId : null,
+    originalContactId: typeof ticket.original_contact_id === "string"
+      ? ticket.original_contact_id : null,
+  };
+}
+
 export async function replaceTicketContractLinks(
   ticketId: string,
   actorUserId: string,
@@ -285,16 +305,11 @@ export async function replaceTicketContractLinks(
     throw new Error("SUPPORT_TICKET_INVALID");
   }
   await getDatabase().transaction(async (tx) => {
-    const ticket = rows(await tx.execute(sql`
-      SELECT customer_contact_id::text AS contact_id
-      FROM tickets WHERE id = ${ticketId}::uuid FOR UPDATE
-    `))[0];
-    if (!ticket || typeof ticket.contact_id !== "string") {
-      throw new Error("SUPPORT_TICKET_REQUESTER_REQUIRED");
-    }
+    const ticket = await lockTicketRequester(tx, ticketId);
+    if (!ticket.contactId) throw new Error("SUPPORT_TICKET_REQUESTER_REQUIRED");
 
     await saveTicketContracts(
-      tx, ticketId, ticket.contact_id, actorUserId, contractIds,
+      tx, ticketId, ticket.contactId, actorUserId, contractIds,
     );
     await tx.execute(sql`
       INSERT INTO ticket_events (ticket_id, actor_user_id, event_type, metadata)
@@ -354,13 +369,11 @@ export async function addTicketCustomerParticipant(
     throw new Error("SUPPORT_PARTICIPANT_INVALID");
   }
   await getDatabase().transaction(async (tx) => {
+    const ticket = await lockTicketRequester(tx, ticketId);
+    if (ticket.contactId === contactId || ticket.originalContactId === contactId) {
+      throw new Error("SUPPORT_PARTICIPANT_IS_REQUESTER");
+    }
     await assertContact(tx, contactId);
-    const ticket = rows(await tx.execute(sql`
-      SELECT customer_contact_id::text AS contact_id
-      FROM tickets WHERE id = ${ticketId}::uuid FOR UPDATE
-    `))[0];
-    if (!ticket) throw new Error("SUPPORT_TICKET_NOT_FOUND");
-    if (ticket.contact_id === contactId) throw new Error("SUPPORT_PARTICIPANT_IS_REQUESTER");
 
     const contractCount = rows(await tx.execute(sql`
       SELECT count(*)::int AS total FROM ticket_contract_links
@@ -460,6 +473,7 @@ export async function addTicketContract(
   actorUserId: string,
   contractId: number,
   grantToRequester: boolean,
+  expectedRequesterContactId?: string,
 ): Promise<void> {
   if (!validId(ticketId) || !validId(actorUserId) ||
       !Number.isSafeInteger(contractId) || contractId <= 0) {
@@ -468,22 +482,20 @@ export async function addTicketContract(
 
   const unitId = getConfiguredF10UnitId();
   await getDatabase().transaction(async (tx) => {
-    const [ticket] = rows(await tx.execute(sql`
-      SELECT customer_contact_id::text AS contact_id
-      FROM tickets WHERE id = ${ticketId}::uuid FOR UPDATE
-    `));
-    if (!ticket || typeof ticket.contact_id !== "string") {
-      throw new Error("SUPPORT_TICKET_REQUESTER_REQUIRED");
-    }
+    const ticket = await lockTicketRequester(tx, ticketId);
+    if (!ticket.contactId) throw new Error("SUPPORT_TICKET_REQUESTER_REQUIRED");
 
-    await assertContact(tx, ticket.contact_id);
+    if (expectedRequesterContactId && ticket.contactId !== expectedRequesterContactId) {
+      throw new Error("SUPPORT_TICKET_REQUESTER_CHANGED");
+    }
+    await assertContact(tx, ticket.contactId);
     await assertContracts(tx, unitId, [contractId]);
     if (grantToRequester) {
       await tx.execute(sql`
         INSERT INTO customer_contract_access(
           customer_contact_id, unit_id, contract_id, granted_by
         ) VALUES (
-          ${ticket.contact_id}::uuid, ${unitId}, ${contractId},
+          ${ticket.contactId}::uuid, ${unitId}, ${contractId},
           ${actorUserId}::uuid
         )
         ON CONFLICT (customer_contact_id, unit_id, contract_id) DO NOTHING
@@ -503,7 +515,7 @@ export async function addTicketContract(
       throw new Error("SUPPORT_CONTRACT_SELECTION_LIMIT");
     }
     await saveTicketContracts(
-      tx, ticketId, ticket.contact_id, actorUserId, selected,
+      tx, ticketId, ticket.contactId, actorUserId, selected,
     );
     await tx.execute(sql`
       INSERT INTO ticket_events(ticket_id, actor_user_id, event_type, metadata)
@@ -512,6 +524,7 @@ export async function addTicketContract(
         ${JSON.stringify({
           contractIds: selected,
           grantToRequester,
+          requesterContactId: ticket.contactId,
         })}::jsonb)
     `);
     await tx.execute(sql`
@@ -531,13 +544,8 @@ export async function removeTicketContract(
   }
 
   await getDatabase().transaction(async (tx) => {
-    const [ticket] = rows(await tx.execute(sql`
-      SELECT customer_contact_id::text AS contact_id
-      FROM tickets WHERE id = ${ticketId}::uuid FOR UPDATE
-    `));
-    if (!ticket || typeof ticket.contact_id !== "string") {
-      throw new Error("SUPPORT_TICKET_REQUESTER_REQUIRED");
-    }
+    const ticket = await lockTicketRequester(tx, ticketId);
+    if (!ticket.contactId) throw new Error("SUPPORT_TICKET_REQUESTER_REQUIRED");
 
     const selected = rows(await tx.execute(sql`
       SELECT contract_id::text AS contract_id
@@ -551,7 +559,7 @@ export async function removeTicketContract(
     }
 
     await saveTicketContracts(
-      tx, ticketId, ticket.contact_id, actorUserId, remaining,
+      tx, ticketId, ticket.contactId, actorUserId, remaining,
     );
     await tx.execute(sql`
       INSERT INTO ticket_events(ticket_id, actor_user_id, event_type, metadata)

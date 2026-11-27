@@ -77,7 +77,7 @@ export async function linkTicketRequesterContact(
   const now = new Date();
   await getDatabase().transaction(async (tx) => {
     const [ticket] = await tx.select({ id: tickets.id })
-      .from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+      .from(tickets).where(eq(tickets.id, ticketId)).limit(1).for("update");
     if (!ticket) throw new Error("TICKET_NOT_FOUND");
 
     const coverage = await tx.execute(sql`

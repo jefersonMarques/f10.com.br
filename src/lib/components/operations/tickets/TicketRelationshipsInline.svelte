@@ -31,6 +31,7 @@
     requester: {
       contactId: string | null;
       explicitContactId: string | null;
+      originalContactId: string | null;
       requesterName: string | null;
       requesterEmail: string | null;
     };
@@ -49,6 +50,7 @@
   export async function focusContracts(): Promise<void> {
     if (!contractSearchDialog) return;
     if (!contractSearchDialog.open) contractSearchDialog.showModal();
+    await loadRelationships();
     await tick();
     contractSearchInput?.focus();
   }
@@ -175,7 +177,7 @@
       if (requestId === contactRequestId) {
         contactMatches = payload.customers.filter((person) =>
           person.id !== data?.requester.contactId &&
-          person.id !== data?.requester.explicitContactId &&
+          person.id !== data?.requester.originalContactId &&
           !data?.participants.some((participant) => participant.contactId === person.id));
       }
     } catch {
@@ -205,7 +207,8 @@
       notificationsEnabled?: boolean;
     },
   ): Promise<void> {
-    if (saving) return;
+    if (saving || (action === "addContract" && !data?.requester.contactId)) return;
+    const expectedRequesterContactId = action === "addContract" ? data?.requester.contactId : undefined;
     saving = true;
     errorMessage = "";
     successMessage = "";
@@ -215,7 +218,7 @@
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, ...options }),
+          body: JSON.stringify({ action, ...options, expectedRequesterContactId }),
         },
       );
       if (!response.ok) {
@@ -446,7 +449,11 @@
         </div>
         {#if !data.requester.contactId}
           <p role="status" class="application-text-caption rounded-lg bg-[var(--app-surface-muted)] px-3 py-2 text-[var(--app-text-muted)]">
-            Para vincular o contrato, primeiro use "Vincular ou trocar solicitante" nos dados do atendimento.
+            Vincule um contato cadastrado em "Vincular ou trocar solicitante".
+          </p>
+        {:else}
+          <p class="application-text-caption flex items-center gap-2 text-[var(--app-text-muted)]">
+            <UserRound size={15} class="shrink-0"/> {data.requester.requesterName ?? data.requester.requesterEmail ?? "Solicitante vinculado"}
           </p>
         {/if}
         {#if contractSearchLoading}

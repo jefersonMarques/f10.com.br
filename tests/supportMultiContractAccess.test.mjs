@@ -145,3 +145,24 @@ test("school contract search uses the same corporate-holder fallback", () => {
   assert.match(searchQuery, /THEN nullif\(api_holder\.name, ''\) END/);
   assert.match(searchQuery, /Escola não identificada/);
 });
+
+test("contract relationships resolve the explicitly linked requester before the original contact", () => {
+  const api = source("src/routes/api/app/tickets/[ticketId]/relationships/+server.ts");
+  const page = source("src/routes/app/tickets/[ticketId]/relationships/+page.server.ts");
+  const repository = source("src/lib/server/support/customerContractAccessRepository.ts");
+  const requester = source("src/lib/server/support/ticketRequesterRepository.ts");
+  const inline = source("src/lib/components/operations/tickets/TicketRelationshipsInline.svelte");
+
+  assert.match(api, /coalesce\(rp.customer_contact_id, t.customer_contact_id\)::text AS "contactId"/);
+  assert.match(page, /coalesce\(rp.customer_contact_id, t.customer_contact_id\)::text AS "contactId"/);
+  assert.match(api, /getContactContractAccess\(ticket.contactId\)/);
+  assert.match(repository, /const contactId = profile\?\.contact_id \?\? ticket.original_contact_id/);
+  assert.equal((repository.match(/await lockTicketRequester\(tx, ticketId\)/g) ?? []).length, 4);
+  assert.match(repository, /await assertContact\(tx, ticket.contactId\)/);
+  assert.match(repository, /expectedRequesterContactId && ticket.contactId !== expectedRequesterContactId/);
+  assert.match(api, /hasPermission\(permissions, "customers.manage", "all"\)/);
+  assert.match(requester, /\.limit\(1\)\.for\("update"\)/);
+  assert.match(inline, /showModal\(\);\s*await loadRelationships\(\)/);
+  assert.match(inline, /JSON.stringify\(\{ action, \.\.\.options, expectedRequesterContactId \}\)/);
+  assert.doesNotMatch(repository, /UPDATE tickets SET customer_contact_id/);
+});
